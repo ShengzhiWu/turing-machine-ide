@@ -4,11 +4,18 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Turing machine IDE</title>
+    <style>
+        button {
+            width: 100%; height: 6em;
+            border-radius: 1.5em; border: none;
+            box-shadow:0em 0.4em 0.5em 0em #999999;
+            cursor: pointer;
+        }
+         
+        td {width:1.5em;}
+    </style>
 </head>
 <body style="margin: 0; display: flex; flex-direction: row; height: 100vh;">
-        <style>
-            td {width:1.5em;}
-        </style>
 
         <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
         <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
@@ -21,33 +28,48 @@
         <script src="https://cdn.jsdelivr.net/npm/codemirror-colorpicker@1.9.80/dist/codemirror-colorpicker.min.js"></script>
         <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/codemirror-colorpicker@1.9.80/addon/codemirror-colorpicker.min.css">
 
-        <div id="element1" style="display: flex; flex-direction: column; width: 33%;">
-            <div id="element3" style="height: 80%;">
-                <textarea id="code-textarea" wrap="off" style="position: absolute; width: 100%; height: 100%; outline: none; background-color: hsl(0, 0%, 20%); color: hsl(0, 0%, 90%);"></textarea>
+        <div id="code-panel" style="width: 33%;">
+            <div style="position: absolute; top: 0em; bottom: 0em; left: 0em; right: 1.5em; display: flex; flex-direction: column;">
+                <div id="turing_machine_code-panel" style="height: 80%;">
+                    <textarea id="code-textarea" wrap="off" style="position: absolute; width: 100%; height: 100%; outline: none; background-color: hsl(0, 0%, 20%); color: hsl(0, 0%, 90%);"></textarea>
+                </div>
+                
+                <textarea id="style-textarea" wrap="off" style="outline: none; background-color: hsl(0, 0%, 20%); color: hsl(0, 0%, 90%);"></textarea>
+                
             </div>
 
-            <textarea id="style-textarea" wrap="off" style="flex: 1; outline: none; background-color: hsl(0, 0%, 20%); color: hsl(0, 0%, 90%);"></textarea>
+            <div style="position: absolute; top: 0em; bottom: 0em; width: 1.5em; right: 0em; margin-top: 0.5em; background-color: hsl(0, 0%, 90%);">
+                <button onclick="compile();" style="background-color: rgb(63, 138, 63); color: white;">▶</button>
+            </div>
         </div>
 
-        <div id="element2" style="width: 40%; background-color: hsl(0, 0%, 80%);">
+        <div id="graph-panel" style="width: 40%; background-color: hsl(0, 0%, 80%);">
             <svg id="graph-view" style="position: absolute; width:100%; height:100%;"></svg>
         </div>
 
-        <div id="element2" style="flex: 1; overflow:scroll;">
-            <table id="history-table" style="line-height: 1.2em; border-collapse: collapse; text-align:center; font-size:0.75em;"></table>
+        <div id="tape-panel" style="flex: 1;">
+            <div style="top: 0em; width: 100%; height: 1.5em; background-color: aqua;"></div>
+            <div style="position: absolute; width: -webkit-fill-available; height: -webkit-fill-available; top: 1.5em;">
+                <div style="overflow:scroll; height: 100%;">
+                    <!-- <div style="background-color: yellow; width: 1000px; height: 1000px;"></div> -->
+                    <div style="width: max-content;">
+                        <table id="history-table" style="margin-top: 1em; margin-bottom: 1em; line-height: 1.2em; border-collapse: collapse; text-align:center; font-size:0.75em;"></table>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <script>
             $(function() {
-                $("#element1").resizable({
+                $("#code-panel").resizable({
                     handles: "e"
                 });
     
-                $("#element2").resizable({
+                $("#graph-panel").resizable({
                     handles: "e"
                 });
     
-                $("#element3").resizable({
+                $("#turing_machine_code-panel").resizable({
                     handles: "s"
                 });
             });
@@ -119,7 +141,6 @@
     59: ["R", {"R": [48]}]
 }`;
             var code = eval("["+code_text+"]")[0];
-
             code_textarea.innerHTML = code_text;
 
             var result_table_style_text = 
@@ -134,7 +155,6 @@
     "1~": [undefined, "brown"]
 }`;
             var result_table_style = eval("["+result_table_style_text+"]")[0];
-
             style_textarea.innerHTML = result_table_style_text;
 
             const editor_code = CodeMirror.fromTextArea(code_textarea, {
@@ -557,6 +577,20 @@
             }
 
             refresh_history_table(history_table, result);
+
+            function compile()
+            {
+                code_text = editor_code.getDoc().getValue();
+                result_table_style_text = editor_style.getDoc().getValue();
+                code = eval("["+code_text+"]")[0];
+                result_table_style = eval("["+result_table_style_text+"]")[0];
+
+                graph = construct_directed_graph(code);
+
+                tape = toArray(["", "1", "0", "1", "1", "1", "", "1", "1", "0", "", "", "", "", "", "", "", "", "", "", "", "", ""]);
+                result = turing_machine_run(code, tape, 1600, false);
+                refresh_history_table(history_table, result);
+            }
         </script>
 </body>
 </html>
