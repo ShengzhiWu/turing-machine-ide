@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Turing machine IDE</title>
+</head>
+<body style="margin: 0; display: flex; flex-direction: row; height: 100vh;">
+        <style>
+            td {width:1.5em;}
+        </style>
+
+        <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+        <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+        <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.62.0/codemirror.min.css">
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.62.0/theme/seti.min.css">
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.62.0/codemirror.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.62.0/mode/javascript/javascript.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/codemirror-colorpicker@1.9.80/dist/codemirror-colorpicker.min.js"></script>
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/codemirror-colorpicker@1.9.80/addon/codemirror-colorpicker.min.css">
+
+        <div id="element1" style="display: flex; flex-direction: column; width: 33%;">
+            <div id="element3" style="height: 80%;">
+                <textarea id="code-textarea" wrap="off" style="position: absolute; width: 100%; height: 100%; outline: none; background-color: hsl(0, 0%, 20%); color: hsl(0, 0%, 90%);"></textarea>
+            </div>
+
+            <textarea id="style-textarea" wrap="off" style="flex: 1; outline: none; background-color: hsl(0, 0%, 20%); color: hsl(0, 0%, 90%);"></textarea>
+        </div>
+
+        <div id="element2" style="width: 40%; background-color: hsl(0, 0%, 80%);">
+            <svg id="graph-view" style="position: absolute; width:100%; height:100%;"></svg>
+        </div>
+
+        <div id="element2" style="flex: 1; overflow:scroll;">
+            <table id="history-table" style="line-height: 1.2em; border-collapse: collapse; text-align:center; font-size:0.75em;"></table>
+        </div>
+
+        <script>
+            $(function() {
+                $("#element1").resizable({
+                    handles: "e"
+                });
+    
+                $("#element2").resizable({
+                    handles: "e"
+                });
+    
+                $("#element3").resizable({
+                    handles: "s"
+                });
+            });
+        </script>
+
+        <script>
+            const code_textarea = document.querySelector('#code-textarea');
+            const style_textarea = document.querySelector('#style-textarea');
+            const graph_view = document.querySelector('#graph-view');
+            const history_table = document.querySelector('#history-table');
+
+            var code_text =
+`{
+    "start": ["R", {"": [2, "P"]}],
+    2: ["R", {"": [3]}],
+    3: ["R", {"0": [4], "1": [4]}],
+    4: ["R", {"": [5, "Q"]}],
+    5: ["L", {"P": [6]}],
+    6: ["R", {"": [9], "0": [7, "0'"], "1": [7, "1'"]}],
+    7: ["R", {"Q": [8]}],
+    8: ["R", {"": [5, "A"]}],
+    9: ["R", {"A": [10]}],
+    10: ["R", {"": [11, "R"]}],
+    11: ["L", {"P": [12]}],
+    12: ["R", {"": [17], "0'": [13, "0"], "1'": [14, "1"]}],
+    13: ["R", {"R": [15]}],
+    14: ["R", {"R": [16]}],
+    15: ["R", {"": [11, "0"]}],
+    16: ["R", {"": [11, "1"]}],
+    17: ["R", {"Q": [18]}],
+    18: ["L", {"": [53], "0": [19, "0'"], "1": [19, "1'"]}],
+    19: ["R", {"R": [20]}],
+    20: ["R", {"": [21], "0": [24, "0~"], "1": [24, "1~"], "0~": [25], "1~": [25]}],
+    21: ["L", {"P": [22, ""], "0'": [21, "0"], "1'": [21, "1"]}],
+    22: ["R", {"R": [23, ""]}],
+    23: ["L", {"Q": ["end", ""]}],
+    24: ["L", {"Q": [18]}],
+    25: ["L", {"R": [26], "0'": [24, "0~"], "1'": [24, "1~"]}],
+    26: ["R", {"": [27], "0": [27], "1": [27], "0~": [26, "0'"], "1~": [26, "1'"]}],
+    27: ["L", {"Q": [28]}],
+    28: ["R", {"A": [29, "0"]}],
+    29: ["L", {"": [17], "0'": [29, "0"], "1'": [29, "1"]}],
+    30: ["R", {"Q": [59], "0'": [31, "0"], "1'": [32, "1"]}],
+    31: ["R", {"R": [51]}],
+    32: ["R", {"R": [52]}],
+    33: ["L", {"": [30]}],
+    34: ["L", {"": [41], "0": [35, "0'"], "1": [36, "1'"]}],
+    35: ["R", {"R": [56]}],
+    36: ["R", {"R": [57]}],
+    37: ["L", {"0~": [40, "0'"], "1~": [40, "1'"]}],
+    38: ["L", {"0~": [39, "1'"], "1~": [40, "0'"]}],
+    39: ["L", {"0~": [39, "1~"], "1~": [40, "0~"]}],
+    40: ["L", {"Q": [34]}],
+    41: ["R", {"R": [45]}],
+    45: ["R", {"": [46], "0": [46], "1": [46], "0~": [45, "0'"], "1~": [45, "1'"]}],
+    46: ["L", {"Q": [47]}],
+    47: ["R", {"A": [29, "1"]}],
+    48: ["R", {"0'": [48, "0~"], "1'": [48, "1~"], "": [49], "0": [49], "1": [49]}],
+    49: ["L", {"Q": [50]}],
+    50: ["L", {"0'": [50, "0"], "1'": [50, "1"], "": [58], "0": [58], "1": [58]}],
+    51: ["R", {"0~": [33, "0'"], "1~": [48]}],
+    52: ["R", {"0~": [26, "0'"], "1~": [33, "1'"]}],
+    53: ["R", {"R": [54]}],
+    54: ["R", {"1'": [48, "1~"], "0~": [55], "1~": [55]}],
+    55: ["L", {"": [30]}],
+    56: ["R", {"": [37], "0": [37], "1": [37]}],
+    57: ["R", {"": [38], "0": [38], "1": [38]}],
+    58: ["R", {"Q": [34]}],
+    59: ["R", {"R": [48]}]
+}`;
+            var code = eval("["+code_text+"]")[0];
+
+            code_textarea.innerHTML = code_text;
+
+            var result_table_style_text = 
+`{
+    "P": ["red", "white"],
+    "Q": ["green", "white"],
+    "R": ["blue", "white"],
+    "A": ["gray", "white"],
+    "0'": [undefined, "brown"],
+    "0~": [undefined, "brown"],
+    "1'": [undefined, "brown"],
+    "1~": [undefined, "brown"]
+}`;
+            var result_table_style = eval("["+result_table_style_text+"]")[0];
+
+            style_textarea.innerHTML = result_table_style_text;
+
+            const editor_code = CodeMirror.fromTextArea(code_textarea, {
+                lineNumbers: true,   // Show line numbers
+                mode: 'javascript',  // Set language mode to JavaScript
+                theme: 'seti'    // Set the editor theme (optional)
+            });
+            editor_code.setSize("100%", "100%");
+
+            const editor_style = CodeMirror.fromTextArea(style_textarea, {
+                lineNumbers: true,   // Show line numbers
+                mode: 'javascript',  // Set language mode to JavaScript
+                theme: 'seti',    // Set the editor theme (optional)
+                colorpicker: true
+            });
+            editor_style.setSize("100%", "100%");
+
+            var global_size_factor = 0.5;
+            var global_force_factor = 2.;
+            var connection_default_length = 0.6*global_size_factor;  // 0.15
+            var self_connection_default_length = 0.4*global_size_factor;  // 0.15
+            var vertex_prefered_distance = 1.4*global_size_factor;  //0.8
+            var vertex_repel_strength = 0.01*global_force_factor;  // 0.02
+            var connection_length_preserve_strength = 0.01*global_force_factor;  // 0.02
+
+            class RandomGenerator {
+                constructor(seed) {
+                    this.seed = seed;
+                    this.multiplier = 1664525;
+                    this.increment = 1013904223;
+                    this.modulus = Math.pow(2, 32);
+                    this.state = seed;
+                }
+
+                next() {  // 0~1
+                    this.state = (this.state * this.multiplier + this.increment) % this.modulus;
+                    return this.state / this.modulus;
+                }
+
+                nextGaussion(quality=4) {  // Standard normal distribution
+                    result = 0.;
+                    for(var i=0;i<quality;i++)
+                        result += this.next();
+                    return (result-quality*0.5)/Math.sqrt(quality/12.);
+                }
+            }
+
+            function construct_directed_graph(code, seed=0)
+            {
+                const rng = new RandomGenerator(seed)
+                const random_point = ()=>[rng.nextGaussion(), rng.nextGaussion()];
+                var graph = [];
+                for (const [state, action] of Object.entries(code)) {
+                    graph.push([state, random_point(), true, [], action[0]]);  // Add every state as a node in graph.
+                }
+
+                var i = Object.keys(code).indexOf("start");
+                if(i!=-1)
+                {   // Add a "p1restart" node in graph for displaying an arrow to the node where program starts.
+                    // This node itself is invisible.
+                    graph.push(["prestart", random_point(), false, [[i, "", connection_default_length, 0/*Offset for displaying multiple edges*/]], undefined]);
+                }
+
+                Object.keys(code).forEach(state=>  // Traversal all states, which are alreagdy a node in graph.
+                {
+                    i = graph.findIndex(e=>e[0]==state);
+                    const node = graph[i];
+                    var self_connection_id = 0;
+                    for (const [key, value] of Object.entries(code[state][1])) {  // Traversal all downstream nodes.
+                        const edge_name = (key==""?'""':key)+(value.length>1?'→'+(value[1]==""?'""':value[1]):"");
+                        if(value[0]==state)  // This is a connection to self.
+                        {
+                            graph.push(["self-connection", random_point(), false, i, undefined]);  // Add the new node for displaying a self-connection.
+                            node[3].push([graph.length-1, edge_name , self_connection_default_length, undefined]);
+                            self_connection_id ++;
+                        }
+                        else  // This is a connection to another node.
+                        {
+                            var j = graph.findIndex(e=>e[0]==value[0]);
+                            if(j==-1)  // This is a connection to a new node.
+                            {
+                                graph.push([value[0]=="end"?"end_from_"+i:value[0], random_point(), value[0]!="end", [], value[0]!="end"?"?":undefined]);  // Add the new node.
+                                j = graph.length-1;
+                            }
+
+                            // Calaulate offset for displaying multiple edges.
+                            var offset = 0.5;
+                            node[3].forEach(connection=>
+                            {
+                                if(connection[0]==j)  // Found muitiple edge of same direction.
+                                {
+                                    offset = Math.min(offset, connection[3]);
+                                    connection[3] += 0.5;
+                                }
+                            });
+                            const node2 = graph[j];
+                            if(node2[0]=='self-connection')
+                                return;
+                            node2[3].forEach(connection=>
+                            {
+                                if(connection[0]==i)  // Found muitiple edge of opposite direction.
+                                {
+                                    offset = Math.min(offset, -connection[3]);
+                                    connection[3] -= 0.5;
+                                }
+                            });
+                            offset -= 0.5;
+
+                            node[3].push([j, edge_name, connection_default_length, offset]);
+                        }
+                        
+                    }
+                });
+
+                return graph;
+            }
+
+            // Display parameters
+            var frame = {"x": 400, "y":450, "factor":200};  // Frame for visualization.
+            var vertex_r = 10;  // (px)
+            var arrow_head_length = 10;  // (px)
+            var arrow_head_width = 7;  // (px)
+            var self_connection_angle = 1.;
+            var connection_text_offset = 10.;  // (px)
+            var self_connection_text_distance_factor = 0.85;
+            var vertex_name_text_offset = [8, 15];
+            var multiple_edges_gap_angle = 1.2;
+            var multiple_edges_shape_param1 = 0.3;
+            var multiple_edges_shape_param2 = 50;  // (px)
+
+            function vector_plus(u, v)
+            {
+                return [u[0]+v[0], u[1]+v[1]]
+            }
+
+            function vector_subtract(u, v)
+            {
+                return [u[0]-v[0], u[1]-v[1]]
+            }
+
+            function vector_length(v)
+            {
+                return Math.sqrt(v[0]*v[0]+v[1]*v[1]);
+            }
+
+            function vector_scale(k, v)
+            {
+                return [k*v[0], k*v[1]];
+            }
+
+            function vector_rotate(v, angle)
+            {
+                const cos = Math.cos(angle);
+                const sin = Math.sin(angle);
+                return [v[0]*cos-v[1]*sin, v[0]*sin+v[1]*cos];
+            }
+
+            function generate_arrow_head_svg(top, direction)
+            {
+                const arrow_head_root = vector_subtract(top, vector_scale(arrow_head_length, direction));
+                return '<polygon points="'
+                    +(arrow_head_root[0]+direction[1]*arrow_head_width*0.5)+','+(arrow_head_root[1]-direction[0]*arrow_head_width*0.5)+' '
+                    +top[0]+','+top[1]+' '
+                    +(arrow_head_root[0]-direction[1]*arrow_head_width*0.5)+','+(arrow_head_root[1]+direction[0]*arrow_head_width*0.5)+'" fill="black"/>';
+            }
+
+            function generate_arrow_svg(a, b)
+            {
+                var s = '<line x1="'+a[0]+'" y1="'+a[1]+'" x2="'+b[0]+'" y2="'+b[1]+'" stroke="black" stroke-width="1"/>';
+
+                const v = vector_subtract(b, a);
+                const l = vector_length(v);
+                if(l>=arrow_head_length)
+                {
+                    const v_normalized = vector_scale(1./l, v);
+                    s += generate_arrow_head_svg(b, v_normalized);
+                }
+
+                return s;
+            }
+
+            function generate_connections_svg(frame, graph)
+            {
+                var s = "";
+
+                graph.forEach(node=>
+                {
+                    if(node[0]=='self-connection')
+                        return;
+                    const a = vector_plus([frame.x, frame.y], vector_scale(frame.factor, node[1]));
+                    node[3].forEach(connection=>
+                    {
+                        const target_node = graph[connection[0]];
+                        const b = vector_plus([frame.x, frame.y], vector_scale(frame.factor, target_node[1]));
+                        const name = connection[1];
+                        const v = vector_subtract(b, a);
+                        const l = vector_length(v);
+                        const v_normalized = vector_scale(1./l, v);
+                        const normal = [-v_normalized[1], v_normalized[0]];
+                        const c = vector_scale(vertex_r, v_normalized);
+                        if(target_node[0]=="self-connection")  // Self-connection
+                        {
+                            const c1 = vector_rotate(c, self_connection_angle*0.5);
+                            const c2 = vector_rotate(c, -self_connection_angle*0.5);
+                            const c3 = vector_scale(l/vertex_r, c1);
+                            const c4 = vector_scale(l/vertex_r, c2);
+                            const p1 = vector_plus(a, c1);
+                            const p2 = vector_plus(a, c2);
+                            const p3 = vector_plus(a, c3);
+                            const p4 = vector_plus(a, c4);
+                            const text_location = vector_plus(a, vector_scale(self_connection_text_distance_factor, v));
+                            s += '<path d="M '+p1[0]+' '+p1[1]+' C '+p3[0]+' '+p3[1]+' '+p4[0]+' '+p4[1]+' '+p2[0]+' '+p2[1]+'" stroke="black" stroke-width="1" fill="none"/>'
+                                +generate_arrow_head_svg(p2, vector_scale(-1./vertex_r, c2))
+                                +'<text x="'+(text_location[0]-3)+'" y="'+(text_location[1]+4)+'" fill="black" style="font-size:12px">'+name+'</text>';
+                        }
+                        else  // Normal connection
+                        {
+                            if(l>vertex_r*2)
+                            {
+                                const offset = connection[3];
+                                const l_cramp = Math.min(multiple_edges_shape_param2, l);
+                                const c1 = vector_rotate(c, multiple_edges_gap_angle*offset*0.5);
+                                const c2 = vector_rotate(c, -multiple_edges_gap_angle*offset*0.5);
+                                const p1 = vector_plus(a, c1);
+                                const p2 = vector_subtract(b, c2);
+                                const p3 = vector_plus(p1, vector_scale(multiple_edges_shape_param1*l_cramp/vertex_r, c1));
+                                const p4 = vector_subtract(p2, vector_scale(multiple_edges_shape_param1*l_cramp/vertex_r, c2));
+                                const text_location = vector_plus(vector_scale(0.5, vector_plus(p3, p4)), vector_scale(connection_text_offset*Math.sign(offset+0.1), normal));
+                                // s += generate_arrow_svg(vector_plus(a, c), vector_subtract(b, c))
+                                //     +'<text x="'+(text_location[0]-3)+'" y="'+(text_location[1]+4)+'" fill="black" style="font-size:12px">'+name+'</text>';
+                                s += '<path d="M '+p1[0]+' '+p1[1]+' C '+p3[0]+' '+p3[1]+' '+p4[0]+' '+p4[1]+' '+p2[0]+' '+p2[1]+'" stroke="black" stroke-width="1" fill="none"/>'
+                                    +generate_arrow_head_svg(p2, vector_scale(1./vertex_r, c2))
+                                    +'<text x="'+(text_location[0]-3)+'" y="'+(text_location[1]+4)+'" fill="black" style="font-size:12px">'+name+'</text>';
+                            }
+                        }
+                    });
+                });
+
+                return s;
+            }
+
+            function generate_vertices_svg(frame, graph)
+            {
+                var s = '<g fill="white">';
+
+                graph.forEach(node=>
+                {
+                    if(node[2])
+                    {
+                        const p = vector_plus([frame.x, frame.y], vector_scale(frame.factor, node[1]));
+                        // const action = code[node[0]];
+                        s += '<circle cx="'+p[0]+'" cy="'+p[1]+'" r="'+vertex_r+'" />'
+                            +'<text x="'+(p[0]-3)+'" y="'+(p[1]+4)+'" fill="black" style="font-size:12px">'+node[4]+'</text>'
+                            +'<text x="'+(p[0]+vertex_name_text_offset[0]-3)+'" y="'+(p[1]+vertex_name_text_offset[1]+4)+'" fill="black" style="font-size:12px">'+node[0]+'</text>';
+                    }
+                });
+
+                s += '</g>';
+
+                return s;
+            }
+
+            function generate_graph_view_content(graph)
+            {
+                var s = "";
+
+                s += generate_connections_svg(frame, graph);
+                s += generate_vertices_svg(frame, graph);
+
+                return s;
+            }
+
+            var graph = construct_directed_graph(code);
+            graph_view.innerHTML = generate_graph_view_content(graph);
+
+            function graph_evolve()
+            {
+                // Vertices repeling
+                for(var i=0;i<graph.length;i++)
+                    for(var j=0;j<i;j++)
+                    {
+                        const v = vector_subtract(graph[j][1], graph[i][1]);
+                        const d = vector_length(v);
+                        if(d<vertex_prefered_distance)
+                        {
+                            const force = vector_scale((1-d/vertex_prefered_distance)*vertex_repel_strength/d, v);
+                            graph[j][1] = vector_plus(graph[j][1], force);
+                            graph[i][1] = vector_subtract(graph[i][1], force);
+                        }
+                    }
+
+                // Connections length preserving
+                graph.forEach(node1=>
+                {
+                    if(node1[0]=="self-connection")
+                        return;
+                    node1[3].forEach(connection=>
+                    {
+                        const node2 = graph[connection[0]];
+                        const prefered_length = connection[2];
+                        const v = vector_subtract(node2[1], node1[1]);
+                        const d = vector_length(v);
+                        const force = vector_scale((1-d/prefered_length)*connection_length_preserve_strength/d, v);
+                        node2[1] = vector_plus(node2[1], force);
+                        node1[1] = vector_subtract(node1[1], force);
+                    });
+                });
+            }
+
+            function graph_view_evolve()
+            {
+                graph_evolve();
+                graph_view.innerHTML = generate_graph_view_content(graph);
+                
+                requestAnimationFrame(graph_view_evolve);  // 由运行环境决定下次执行的时间（通常与画面刷新率保持一致）
+            }
+
+            graph_view_evolve();
+
+            function toArray(list)  // Converts list to array. Also can be used to clone an array.
+            {
+                a = new Array(list.length);
+                for(var i=0;i<list.length;i++)
+                    a[i] = list[i];
+                return a;
+            }
+
+            function turing_machine_run(code, tape, max_steps, detailed_output)
+            {
+                var step = 0;
+                var position = 0;
+                var state = "start";
+                var history = [[step, position, state, toArray(tape)]];
+
+                while(state!="end")
+                {
+                    var need_record = detailed_output;
+                    step ++;
+                    if(step>max_steps)
+                        break;
+
+                    var state_0 = state;
+                    var action = code[state];
+                    if(action==undefined)
+                        break;
+
+                    var a = action[1][tape[position]];
+                    if(a!=undefined)
+                    {
+                        state = a[0];
+                        if(a.length>1)
+                        {
+                            tape[position] = a[1];
+                            need_record = true;
+                        }
+                    }
+
+                    if(need_record)
+                    {
+                        history.push([step, position, state_0, toArray(tape)]);
+                    }
+
+                    action = code[state];
+                    if(action==undefined)
+                        break;
+                    if(action[0]=="R")
+                        position ++;
+                    else
+                        position --;
+                }
+
+                return history;
+            }
+
+            var tape = toArray(["", "1", "0", "1", "1", "1", "", "1", "1", "0", "", "", "", "", "", "", "", "", "", "", "", "", ""]);
+
+            var result = turing_machine_run(code, tape, 1600, false);
+            // console.log(result);
+
+            function generate_history_table_row(record)
+            {
+                var s = "";
+
+                s += '<td style="border:none; padding-right:1em; text-align:right">'+record[0]+'</td>';
+
+                position = 0;
+                record[3].forEach(e => {
+                    var style = "border:1px solid black;";
+
+                    style_list = result_table_style[e];
+                    if(style_list!=undefined)
+                    {
+                        var background = style_list[0];
+                        if(background!=undefined)
+                            style += "background-color: "+background+"; ";
+                        var foreground = style_list[1];
+                        if(foreground!=undefined)
+                            style += "color: "+foreground+"; ";
+                    }
+
+                    if(position==record[1])
+                        style += "border-top: 4px solid black; ";
+
+                    s += "<td"+(style==""?"":' style="'+style+'"')+">"+e+"</td>";
+
+                    position ++;
+                });
+                return "<tr>"+s+"</tr>";
+            }
+
+            function refresh_history_table(history_table, history)
+            {
+                var s = "";
+
+                history.forEach(e=>{
+                    s += generate_history_table_row(e);
+                });
+
+                history_table.innerHTML = s;
+            }
+
+            refresh_history_table(history_table, result);
+        </script>
+</body>
+</html>
