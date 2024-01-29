@@ -48,7 +48,11 @@
         </div>
 
         <div id="tape-panel" style="flex: 1;">
-            <div style="top: 0em; width: 100%; height: 1.5em; background-color: aqua;"></div>
+            <div style="top: 0em; width: 100%; height: 1.5em;">
+                Max steps
+                <input id="max-steps-input" type="text" value="10000"/>
+            </div>
+
             <div style="position: absolute; width: -webkit-fill-available; height: -webkit-fill-available; top: 1.5em;">
                 <div style="overflow:scroll; height: 100%;">
                     <!-- <div style="background-color: yellow; width: 1000px; height: 1000px;"></div> -->
@@ -79,6 +83,7 @@
             const code_textarea = document.querySelector('#code-textarea');
             const style_textarea = document.querySelector('#style-textarea');
             const graph_view = document.querySelector('#graph-view');
+            const max_steps_input = document.querySelector('#max-steps-input');
             const history_table = document.querySelector('#history-table');
 
             var code_text =
@@ -588,7 +593,7 @@
                 graph = construct_directed_graph(code);
 
                 tape = toArray(["", "1", "0", "1", "1", "1", "", "1", "1", "0", "", "", "", "", "", "", "", "", "", "", "", "", ""]);
-                result = turing_machine_run(code, tape, 1600, false);
+                result = turing_machine_run(code, tape, max_steps_input.value, false);
                 refresh_history_table(history_table, result);
             }
         </script>
