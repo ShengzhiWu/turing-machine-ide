@@ -557,6 +557,40 @@
             result = turing_machine_run(code, tape, max_steps_input.value, false);
             refresh_history_table(history_table, result);
         }
+
+        // Add event listeners
+
+        graph_view.addEventListener("mousedown", e => {  // Middle button dragging for moving the graph
+            if(e.button == 1) {
+                var last_position = [e.offsetX, e.offsetY];
+                var on_mouse_move = e => {
+                    const new_position = [e.offsetX, e.offsetY];
+                    frame.x += new_position[0] - last_position[0];
+                    frame.y += new_position[1] - last_position[1];
+                    last_position = new_position;
+                };
+                var on_mouse_up = e => {
+                    window.removeEventListener("mousemove", on_mouse_move);  // Remove listeners after dragging is done
+                    window.removeEventListener("mouseup", on_mouse_up);
+                };
+                window.addEventListener("mousemove", on_mouse_move);
+                window.addEventListener("mouseup", on_mouse_up);
+            }
+        });
+
+        graph_view.addEventListener("wheel", e => {  // Wheel scrolling for zooming the graph
+            const zoom_factor = 1.1;
+            if(e.deltaY < 0) {  // Zoom in
+                frame.factor *= zoom_factor;
+                frame.x = e.offsetX + zoom_factor * (frame.x - e.offsetX);
+                frame.y = e.offsetY + zoom_factor * (frame.y - e.offsetY);
+            }
+            else {  // Zoom out
+                frame.factor /= zoom_factor;
+                frame.x = e.offsetX + (1 / zoom_factor) * (frame.x - e.offsetX);
+                frame.y = e.offsetY + (1 / zoom_factor) * (frame.y - e.offsetY);
+            }
+        });
     </script>
 </body>
 </html>
