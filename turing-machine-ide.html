@@ -457,7 +457,7 @@
             return a;
         }
 
-        function turing_machine_run(code, tape, max_steps, detailed_output) {
+        function run_turing_machine(code, tape, max_steps, detailed_output) {
             var step = 0;
             var position = 0;
             var state = "start";
@@ -501,7 +501,7 @@
 
         var tape = toArray(["", "1", "0", "1", "1", "1", "", "1", "1", "0", "", "", "", "", "", "", "", "", "", "", "", "", ""]);
 
-        var result = turing_machine_run(code, tape, 1600, false);
+        var result = run_turing_machine(code, tape, 1600, false);
         // console.log(result);
 
         function generate_history_table_row(record) {
@@ -554,7 +554,7 @@
             graph = construct_directed_graph(code);
 
             tape = toArray(["", "1", "0", "1", "1", "1", "", "1", "1", "0", "", "", "", "", "", "", "", "", "", "", "", "", ""]);
-            result = turing_machine_run(code, tape, max_steps_input.value, false);
+            result = run_turing_machine(code, tape, max_steps_input.value, false);
             refresh_history_table(history_table, result);
         }
 
