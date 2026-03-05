@@ -5,21 +5,62 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Turing machine IDE</title>
     <style>
-        button {
-            width: 100%; height: 6em;
-            border-radius: 1.5em; border: none;
-            box-shadow:0em 0.4em 0.5em 0em #999999;
+        #refresh-btn {
+            position: absolute;
+            left: 0.5em;
+            top: 0.5em;
+            width: 2em;
+            height: 2em;
+            margin: 0; padding: 0;
+            background-color: transparent;
+            border: none;
+            border-radius: 50%;  /* Round */
             cursor: pointer;
+        }
+
+        .glow-icon {
+            width: 2em;
+            height: 2em;
+            fill: none;
+            stroke: rgba(255, 255, 255, 0.7);
+            stroke-width: 2.2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            transition: stroke 0.2s;
+        }
+
+        #refresh-btn:hover .glow-icon {
+            stroke: white;  /* White stroke */
+        }
+
+        #refresh-btn:active .glow-icon {
+            stroke: white;  /* White stroke */
+            filter: drop-shadow(0 0 4px rgba(255,255,255,1));  /* Glow */
+        }
+
+        #run-btn {
+            height: 3em;
+            margin-left: 20%; margin-right: 20%;
+            border-radius: 1.5em; border: none;
+            background-color: rgb(63, 138, 63);
+            transition: background-color 0.2s ease;
+            cursor: pointer;
+        }
+
+        #run-btn:hover {
+            background-color: rgb(97, 170, 97);
         }
          
         td {width:1.5em;}
     </style>
 </head>
 <body style="margin: 0; display: flex; flex-direction: row; height: 100vh;">
+    <!-- jQuery and draggable / resizable functionality -->
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
     <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
 
+    <!-- CodeMirror for code editing -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.62.0/codemirror.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.62.0/theme/seti.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.62.0/codemirror.min.js"></script>
@@ -27,53 +68,61 @@
     <script src="https://cdn.jsdelivr.net/npm/codemirror-colorpicker@1.9.80/dist/codemirror-colorpicker.min.js"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/codemirror-colorpicker@1.9.80/addon/codemirror-colorpicker.min.css">
 
-    <div id="code-panel" style="width: 33%;">
-        <div style="position: absolute; top: 0em; bottom: 0em; left: 0em; right: 1.5em; display: flex; flex-direction: column;">
-            <div id="turing_machine_code-panel" style="height: 80%;">
-                <textarea id="code-textarea" wrap="off" style="position: absolute; width: 100%; height: 100%; outline: none; background-color: hsl(0, 0%, 20%); color: hsl(0, 0%, 90%);"></textarea>
+    <div id="code-panel" style="width: 33%; height: 100vh; overflow: hidden; display: flex; flex-direction: column;">
+        <div id="turing_machine_code-panel" style="flex: 0 0 auto; margin-bottom: 2px; height: 80%; overflow: hidden;">
+            <div style="height: 100%; overflow: auto;">
+                <textarea id="code-textarea"></textarea>
             </div>
-            
-            <textarea id="style-textarea" wrap="off" style="outline: none; background-color: hsl(0, 0%, 20%); color: hsl(0, 0%, 90%);"></textarea>
-            
         </div>
-
-        <div style="position: absolute; top: 0em; bottom: 0em; width: 1.5em; right: 0em; margin-top: 0.5em; background-color: hsl(0, 0%, 90%);">
-            <button onclick="compile();" style="background-color: rgb(63, 138, 63); color: white;">▶</button>
+        
+        <div id="style-panel" style="flex: 1 1 auto; min-height: 50px; overflow: hidden;">
+            <div style="height: 100%; overflow: auto;">
+                <textarea id="style-textarea"></textarea>
+            </div>
         </div>
     </div>
 
-    <div id="graph-panel" style="width: 40%; background-color: hsl(0, 0%, 80%);">
+    <div id="graph-panel" style="width: 40%; background-color: hsl(0, 0%, 60%);">
         <svg id="graph-view" style="position: absolute; width:100%; height:100%;"></svg>
+
+        <button id="refresh-btn" title="Initialize Graph Embedding" onclick="refresh_graph_embedding();">
+            <!-- The refresh icon -->
+            <svg class="glow-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" style="width: 100%; height: 100%;">
+                <path d="M21 12 A9 9 0 1 1 18.36 5.64" />  <!-- Arc -->
+                <polyline points="18.36 1.64 18.36 5.64 14.36 5.64" />  <!-- Arrow -->
+            </svg>
+        </button>
     </div>
 
-    <div id="tape-panel" style="flex: 1;">
-        <div style="top: 0em; width: 100%; height: 1.5em;">
+    <div id="tape-panel" style="padding-top: 0.5em; flex: 1; overflow: hidden; display: flex; flex-direction: column; gap: 0.5em; background-color: hsl(0, 0%, 90%);">
+        <button id="run-btn" title="Run Program" onclick="run_program();" style="color: white;">▶</button>
+        <div>
             Max steps
             <input id="max-steps-input" type="text" value="10000"/>
         </div>
 
-        <div style="position: absolute; width: -webkit-fill-available; height: -webkit-fill-available; top: 1.5em;">
+        <div style=" overflow: hidden;">
             <div style="overflow:scroll; height: 100%;">
-                <!-- <div style="background-color: yellow; width: 1000px; height: 1000px;"></div> -->
-                <div style="width: max-content;">
-                    <table id="history-table" style="margin-top: 1em; margin-bottom: 1em; line-height: 1.2em; border-collapse: collapse; text-align:center; font-size:0.75em;"></table>
+                <div style="width: max-content; padding-bottom: 1em; background-color: white;">
+                    <table id="history-table" style="line-height: 1.2em; border-collapse: collapse; text-align:center; font-size:0.75em;"></table>
                 </div>
             </div>
         </div>
     </div>
 
     <script>
+        // Initialize resizable panels
         $(function() {
             $("#code-panel").resizable({
-                handles: "e"
+                handles: "e"  // Can be resized from the east edge
             });
 
             $("#graph-panel").resizable({
-                handles: "e"
+                handles: "e"  // Can be resized from the east edge
             });
 
             $("#turing_machine_code-panel").resizable({
-                handles: "s"
+                handles: "s"  // Can be resized from the south edge
             });
         });
     </script>
@@ -539,13 +588,22 @@
 
         refresh_history_table(history_table, result);
 
-        function compile() {
+        function refresh_graph_embedding() {
+            // TODO: real-time compile
             code_text = editor_code.getDoc().getValue();
             result_table_style_text = editor_style.getDoc().getValue();
             code = eval("[" + code_text+"]")[0];
             result_table_style = eval("[" + result_table_style_text + "]")[0];
 
             graph = construct_directed_graph_with_code(code);
+        }
+
+        function run_program() {
+            // TODO: real-time compile
+            code_text = editor_code.getDoc().getValue();
+            result_table_style_text = editor_style.getDoc().getValue();
+            code = eval("[" + code_text+"]")[0];
+            result_table_style = eval("[" + result_table_style_text + "]")[0];
 
             tape = toArray(["", "1", "0", "1", "1", "1", "", "1", "1", "0", "", "", "", "", "", "", "", "", "", "", "", "", ""]);
             result = run_turing_machine(code, tape, max_steps_input.value, false);
@@ -557,6 +615,7 @@
         graph_view.addEventListener("mousedown", e => {  // Middle button dragging for moving the graph
             if(e.button == 1) {
                 var last_position = [e.offsetX, e.offsetY];
+                graph_view.style.cursor = "grabbing";  // Change cursor to grabbing
                 var on_mouse_move = e => {
                     const new_position = [e.offsetX, e.offsetY];
                     frame.x += new_position[0] - last_position[0];
@@ -566,6 +625,7 @@
                 var on_mouse_up = e => {
                     window.removeEventListener("mousemove", on_mouse_move);  // Remove listeners after dragging is done
                     window.removeEventListener("mouseup", on_mouse_up);
+                    graph_view.style.cursor = "default";  // Change cursor back to default
                 };
                 window.addEventListener("mousemove", on_mouse_move);
                 window.addEventListener("mouseup", on_mouse_up);
