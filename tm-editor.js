@@ -70,53 +70,52 @@ const SHADOW_CSS = `
 :host {
     display: block;
     width: 100%;
-    height: 100%;        /* 跟随父容器高度 */
+    height: 100%;
+    font-size: 13px; /* 统一基准：外部改这一个值即可缩放整个编辑器 */
     font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', Consolas, 'Courier New', monospace;
 }
 *, *::before, *::after { box-sizing: border-box; }
 
 .editor-container {
-    width: 100%;         /* 去掉 1100px */
-    height: 100%;        /* 撑满 :host */
+    width: 100%;
+    height: 100%;
     display: flex;
     flex-direction: column;
     background: #1e2434;
-    overflow: hidden;
+    display: flex; flex-direction: column;
+    border-radius: 1.5em; overflow: hidden;
     box-shadow: 0 20px 40px rgba(0,0,0,0.6), 0 0 0 2px #3d4459 inset;
 }
 .format-bar {
-    background: #2a3145; padding: 12px 28px; border-bottom: 2px solid #0b0f1a;
-    font-size: 16px; line-height: 1.7; display: flex; gap: 4px;
-    color: #b7c4e0; user-select: none;
+    background: #2a3145; padding: 0.75em 0.5em; border-bottom: 2px solid #0b0f1a;
+    font-size: 1em; line-height: 1.7; display: flex; gap: 0.25em;
+    color: #b7c4e0; user-select: none; flex-shrink: 0;
 }
-.format-item { padding: 0 4px; border-radius: 6px; transition: background-color 0.15s; }
+.format-item { padding: 0 0.25em; border-radius: 0.375em; transition: background-color 0.15s; }
 .format-item.active { background-color: rgba(255,255,255,0.15); box-shadow: 0 0 0 1px rgba(255,255,255,0.2); }
-.format-comma { color: #ffd966; font-weight: bold; margin: 0 4px; }
+.format-comma { color: #ffd966; font-weight: bold; margin: 0 0.25em; }
 
-.code-wrapper {
-    flex: 1;             /* 去掉 max-height: 520px，占满剩余空间 */
-    min-height: 0;       /* flex 子项必须加，否则不会收缩 */
-    display: flex; background: #171c2b; overflow: hidden; }
+.code-wrapper { display: flex; flex: 1; min-height: 0; background: #171c2b; overflow: hidden; }
 .line-numbers {
-    background: #1a1f30; padding: 24px 0 24px 16px; text-align: right;
-    color: #5d6b93; font-size: 16px; line-height: 1.7; user-select: none;
-    border-right: 1px solid #2f384f; min-width: 60px; flex-shrink: 0; overflow: hidden;
+    background: #1a1f30; padding: 1.5em 0 1.5em 1em; text-align: right;
+    color: #5d6b93; font-size: 1em; line-height: 1.7; user-select: none;
+    border-right: 1px solid #2f384f; min-width: 3.75em; flex-shrink: 0; overflow: hidden;
 }
-.line-numbers div { padding-right: 12px; }
+.line-numbers div { padding-right: 0.75em; }
 .editor-area { position: relative; flex-grow: 1; min-width: 0; overflow: hidden; }
 
 pre.highlight-layer {
-    position: absolute; top: 0; left: 0; margin: 0; padding: 24px 28px;
+    position: absolute; top: 0; left: 0; margin: 0; padding: 1.5em 1.75em;
     font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', Consolas, 'Courier New', monospace;
-    font-size: 16px; line-height: 1.7; white-space: pre;
+    font-size: 1em; line-height: 1.7; white-space: pre;
     pointer-events: none; overflow: visible; z-index: 1;
 }
 textarea {
     position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-    padding: 24px 28px; margin: 0; border: none; background: transparent;
+    padding: 1.5em 1.75em; margin: 0; border: none; background: transparent;
     color: transparent; caret-color: #f3f7ff;
     font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', Consolas, 'Courier New', monospace;
-    font-size: 16px; line-height: 1.7; white-space: pre;
+    font-size: 1em; line-height: 1.7; white-space: pre;
     overflow: auto; resize: none; outline: none; z-index: 2;
     scrollbar-width: thin; scrollbar-color: #3d4a6b #171c2b;
 }
@@ -139,12 +138,11 @@ textarea::-webkit-scrollbar-corner { background: #171c2b; }
 .token-error   { text-decoration: red wavy underline; text-decoration-skip-ink: none; text-underline-position: under; }
 .token-match   { background: rgba(200,200,200,0.18); }
 
-/* 补全浮层和错误提示：fixed 定位，挂在 shadow root 内，不受 overflow 裁剪 */
 .suggestions {
     position: fixed; background: #262e42; border: 1px solid #4e5a7c;
-    border-radius: 14px; box-shadow: 0 12px 28px rgba(0,0,0,0.7);
-    max-height: 240px; overflow-y: auto; z-index: 9000;
-    font-size: 15px; min-width: 180px; padding: 8px 0; display: none;
+    border-radius: 0.875em; box-shadow: 0 12px 28px rgba(0,0,0,0.7);
+    max-height: 15em; overflow-y: auto; z-index: 9000;
+    font-size: 0.9375em; min-width: 11em; padding: 0.5em 0; display: none;
     font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', Consolas, 'Courier New', monospace;
     scrollbar-width: thin; scrollbar-color: #3d4a6b #262e42;
 }
@@ -152,23 +150,24 @@ textarea::-webkit-scrollbar-corner { background: #171c2b; }
 .suggestions::-webkit-scrollbar-track { background: #262e42; }
 .suggestions::-webkit-scrollbar-thumb { background: #3d4a6b; border-radius: 3px; }
 .suggestions div {
-    padding: 10px 20px; color: #eef4ff; cursor: pointer;
+    padding: 0.625em 1.25em; color: #eef4ff; cursor: pointer;
     transition: background 0.1s; border-left: 3px solid transparent;
 }
 .suggestions div:hover, .suggestions div.selected { background: #3d4a6b; }
 
 .error-tooltip {
     position: fixed; background: #44232e; border: 1px solid #ff6b7c;
-    border-radius: 10px; padding: 8px 16px; color: #ffd6dc; font-size: 14px;
-    max-width: 420px; box-shadow: 0 8px 20px rgba(0,0,0,0.6);
+    border-radius: 0.625em; padding: 0.5em 1em; color: #ffd6dc; font-size: 0.875em;
+    max-width: 26em; box-shadow: 0 8px 20px rgba(0,0,0,0.6);
     z-index: 9999; pointer-events: none; display: none;
     font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', Consolas, 'Courier New', monospace;
 }
 .info-bar {
-    display: flex; justify-content: space-between; padding: 10px 24px;
-    background: #1b2132; color: #a0b0d0; font-size: 13px; border-top: 1px solid #2f384f;
+    display: flex; justify-content: space-between; padding: 0.625em 1.5em;
+    background: #1b2132; color: #a0b0d0; font-size: 0.8125em;
+    border-top: 1px solid #2f384f; flex-shrink: 0;
 }
-.error-count { padding: 4px 12px; border-radius: 30px; }
+.error-count { padding: 0.25em 0.75em; border-radius: 2em; }
 .error-count.has-errors { background: #44232e; color: #ffa7b5; border-left: 3px solid #ff4d6d; }
 .error-count.no-errors  { background: #1e3a2a; color: #7ee8a2; border-left: 3px solid #3ecf6e; }
 `;
@@ -422,7 +421,7 @@ class TmEditor extends HTMLElement {
     </div>
     <div class="info-bar" part="info-bar">
         <span class="status-hint"></span>
-        <span class="error-count no-errors"></span>
+        <span class="error-count no-errors" style="margin-left: 1em; display: flex; align-items: center; justify-content: center; white-space: nowrap; /* 关键属性：禁止文本换行 */"></span>
     </div>
 </div>
 <div class="suggestions"></div>
@@ -598,7 +597,7 @@ class TmEditor extends HTMLElement {
         const color = ELEM_COLORS[elemIdx] || '#ffb86b';
         this._suggestBox.innerHTML = this._currentSuggestions.map((item, i) => {
             const hint = this._hint(item, elemIdx);
-            const hintHtml = hint ? ` <span style="color:#5d6b93;font-size:13px">${hint}</span>` : '';
+            const hintHtml = hint ? ` <span style="color:#5d6b93;font-size:0.8125em">${hint}</span>` : '';
             return `<div class="${i === 0 ? 'selected' : ''}" data-index="${i}"
                 style="border-left-color:${i === 0 ? color : 'transparent'}">${escapeHtml(item)}${hintHtml}</div>`;
         }).join('');
@@ -629,9 +628,10 @@ class TmEditor extends HTMLElement {
         document.body.appendChild(mirror);
         const cr = caret.getBoundingClientRect();
         document.body.removeChild(mirror);
-        const boxH = Math.min(this._currentSuggestions.length * 40 + 16, 240);
+        // 用实际渲染高度代替写死的 px 值
+        const boxH = this._suggestBox.getBoundingClientRect().height;
         let left = cr.left, top = cr.bottom + 4;
-        if (left + 200 > window.innerWidth  - 8) left = window.innerWidth  - 208;
+        if (left + this._suggestBox.offsetWidth > window.innerWidth  - 8) left = window.innerWidth  - this._suggestBox.offsetWidth - 8;
         if (top  + boxH > window.innerHeight - 8) top  = cr.top - boxH - 4;
         this._suggestBox.style.left = left + 'px';
         this._suggestBox.style.top  = top  + 'px';
