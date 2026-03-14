@@ -134,297 +134,66 @@
         const max_steps_input = document.querySelector('#max-steps-input');
         const history_table = document.querySelector('#history-table');
 
-        // 紧凑格式（旧） -> 新格式
-        // let codeNew = "";
-        // for (const [key1, value1] of Object.entries(code)) {
-        //     for (const [key2, value2] of Object.entries(value1[1])) {
-        //         let newLine = [key1];
-        //         newLine.push(`"${key2}"`);
-        //         if (value2.length > 1)
-        //             newLine.push(`"${value2[1]}"`);
-        //         else
-        //             newLine.push('N');
-        //         const nextState = value2[0];
-        //         if (code[nextState] == undefined)
-        //             newLine.push('N');
-        //         else
-        //             newLine.push(code[nextState][0]);
-        //         newLine.push(nextState);
-        //         codeNew += newLine.join(", ") + "\n";
-        //     }
-        //     let newLine = [key1, 'other', 'N', value1[0]];
-        //     codeNew += newLine.join(", ") + "\n\n";
-        // }
-
-        var code_text = `start, "", "P", R, 2
-start, other, N, R
-
-2, "", N, R, 3
-2, other, N, R
-
-3, "0", N, R, 4
-3, "1", N, R, 4
-3, other, N, R
-
-4, "", "Q", L, 5
-4, other, N, R
-
-5, "P", N, R, 6
-5, other, N, L
-
-6, "0", "0'", R, 7
-6, "1", "1'", R, 7
-6, "", N, R, 9
-6, other, N, R
-
-7, "Q", N, R, 8
-7, other, N, R
-
-8, "", "A", L, 5
-8, other, N, R
-
-9, "A", N, R, 10
-9, other, N, R
-
-10, "", "R", L, 11
-10, other, N, R
-
-11, "P", N, R, 12
-11, other, N, L
-
-12, "", N, R, 17
-12, "0'", "0", R, 13
-12, "1'", "1", R, 14
-12, other, N, R
-
-13, "R", N, R, 15
-13, other, N, R
-
-14, "R", N, R, 16
-14, other, N, R
-
-15, "", "0", L, 11
-15, other, N, R
-
-16, "", "1", L, 11
-16, other, N, R
-
-17, "Q", N, L, 18
-17, other, N, R
-
-18, "0", "0'", R, 19
-18, "1", "1'", R, 19
-18, "", N, R, 53
-18, other, N, L
-
-19, "R", N, R, 20
-19, other, N, R
-
-20, "0", "0~", L, 24
-20, "1", "1~", L, 24
-20, "", N, L, 21
-20, "0~", N, L, 25
-20, "1~", N, L, 25
-20, other, N, R
-
-21, "P", "", R, 22
-21, "0'", "0", L, 21
-21, "1'", "1", L, 21
-21, other, N, L
-
-22, "R", "", L, 23
-22, other, N, R
-
-23, "Q", "", N, end
-23, other, N, L
-
-24, "Q", N, L, 18
-24, other, N, L
-
-25, "R", N, R, 26
-25, "0'", "0~", L, 24
-25, "1'", "1~", L, 24
-25, other, N, L
-
-26, "0", N, L, 27
-26, "1", N, L, 27
-26, "", N, L, 27
-26, "0~", "0'", R, 26
-26, "1~", "1'", R, 26
-26, other, N, R
-
-27, "Q", N, R, 28
-27, other, N, L
-
-28, "A", "0", L, 29
-28, other, N, R
-
-29, "", N, R, 17
-29, "0'", "0", L, 29
-29, "1'", "1", L, 29
-29, other, N, L
-
-30, "Q", N, R, 59
-30, "0'", "0", R, 31
-30, "1'", "1", R, 32
-30, other, N, R
-
-31, "R", N, R, 51
-31, other, N, R
-
-32, "R", N, R, 52
-32, other, N, R
-
-33, "", N, R, 30
-33, other, N, L
-
-34, "0", "0'", R, 35
-34, "1", "1'", R, 36
-34, "", N, R, 41
-34, other, N, L
-
-35, "R", N, R, 56
-35, other, N, R
-
-36, "R", N, R, 57
-36, other, N, R
-
-37, "0~", "0'", L, 40
-37, "1~", "1'", L, 40
-37, other, N, L
-
-38, "0~", "1'", L, 39
-38, "1~", "0'", L, 40
-38, other, N, L
-
-39, "0~", "1~", L, 39
-39, "1~", "0~", L, 40
-39, other, N, L
-
-40, "Q", N, L, 34
-40, other, N, L
-
-41, "R", N, R, 45
-41, other, N, R
-
-45, "0", N, L, 46
-45, "1", N, L, 46
-45, "", N, L, 46
-45, "0~", "0'", R, 45
-45, "1~", "1'", R, 45
-45, other, N, R
-
-46, "Q", N, R, 47
-46, other, N, L
-
-47, "A", "1", L, 29
-47, other, N, R
-
-48, "0", N, L, 49
-48, "1", N, L, 49
-48, "0'", "0~", R, 48
-48, "1'", "1~", R, 48
-48, "", N, L, 49
-48, other, N, R
-
-49, "Q", N, L, 50
-49, other, N, L
-
-50, "0", N, R, 58
-50, "1", N, R, 58
-50, "0'", "0", L, 50
-50, "1'", "1", L, 50
-50, "", N, R, 58
-50, other, N, L
-
-51, "0~", "0'", L, 33
-51, "1~", N, R, 48
-51, other, N, R
-
-52, "0~", "0'", R, 26
-52, "1~", "1'", L, 33
-52, other, N, R
-
-53, "R", N, R, 54
-53, other, N, R
-
-54, "1'", "1~", R, 48
-54, "0~", N, L, 55
-54, "1~", N, L, 55
-54, other, N, R
-
-55, "", N, R, 30
-55, other, N, L
-
-56, "0", N, L, 37
-56, "1", N, L, 37
-56, "", N, L, 37
-56, other, N, R
-
-57, "0", N, L, 38
-57, "1", N, L, 38
-57, "", N, L, 38
-57, other, N, R
-
-58, "Q", N, L, 34
-58, other, N, R
-
-59, "R", N, R, 48
-59, other, N, R
-`;
-
-        const NOT_VALID = Symbol('not valid');
-        const N = Symbol('N');
-        const OTHER = Symbol('other');
-
-        function parseCode(code) { // 解析新格式代码
-            const result = {};
-            code.split("\n").forEach(line => {  // 遍历行
-                // 去掉注释
-                line = line.split("//")[0].trim();
-
-                if (line.length == 0)
-                    return;
-                
-                const parts = line.split(",").map(part => part.trim());
-
-                const state = parts[0];
-                let input = parts[1];
-                if (input == 'other')
-                    input = OTHER;
-                else {
-                    if (input == undefined || !input.startsWith('"') || !input.endsWith('"'))
-                        input = NOT_VALID;  // 无效值
-                    else
-                        input = input.slice(1, -1);  // 去掉引号
-                }
-                let output = parts[2];
-                if (output == 'N')
-                    output = N;
-                else {
-                    if (output == undefined || !output.startsWith('"') || !output.endsWith('"'))
-                        output = NOT_VALID;  // 无效值
-                    else
-                        output = output.slice(1, -1);  // 去掉引号
-                }
-                let direction = parts[3];
-                if (direction != 'L' && direction != 'R' && direction != 'N')
-                    direction = NOT_VALID;
-                let nextState = parts[4];
-                if (nextState == undefined)
-                    nextState = state;
-
-                if (result[state] == undefined)
-                    result[state] = {};
-                result[state][input] = [output, direction, nextState];
-            });
-
-            return result;
-        }
-
-        var code = parseCode(code_text);  // 解析代码文本
-        console.log(code);
-
+        var code_text =
+`{
+"start": ["R", {"": [2, "P"]}],
+2: ["R", {"": [3]}],
+3: ["R", {"0": [4], "1": [4]}],
+4: ["R", {"": [5, "Q"]}],
+5: ["L", {"P": [6]}],
+6: ["R", {"": [9], "0": [7, "0'"], "1": [7, "1'"]}],
+7: ["R", {"Q": [8]}],
+8: ["R", {"": [5, "A"]}],
+9: ["R", {"A": [10]}],
+10: ["R", {"": [11, "R"]}],
+11: ["L", {"P": [12]}],
+12: ["R", {"": [17], "0'": [13, "0"], "1'": [14, "1"]}],
+13: ["R", {"R": [15]}],
+14: ["R", {"R": [16]}],
+15: ["R", {"": [11, "0"]}],
+16: ["R", {"": [11, "1"]}],
+17: ["R", {"Q": [18]}],
+18: ["L", {"": [53], "0": [19, "0'"], "1": [19, "1'"]}],
+19: ["R", {"R": [20]}],
+20: ["R", {"": [21], "0": [24, "0~"], "1": [24, "1~"], "0~": [25], "1~": [25]}],
+21: ["L", {"P": [22, ""], "0'": [21, "0"], "1'": [21, "1"]}],
+22: ["R", {"R": [23, ""]}],
+23: ["L", {"Q": ["end", ""]}],
+24: ["L", {"Q": [18]}],
+25: ["L", {"R": [26], "0'": [24, "0~"], "1'": [24, "1~"]}],
+26: ["R", {"": [27], "0": [27], "1": [27], "0~": [26, "0'"], "1~": [26, "1'"]}],
+27: ["L", {"Q": [28]}],
+28: ["R", {"A": [29, "0"]}],
+29: ["L", {"": [17], "0'": [29, "0"], "1'": [29, "1"]}],
+30: ["R", {"Q": [59], "0'": [31, "0"], "1'": [32, "1"]}],
+31: ["R", {"R": [51]}],
+32: ["R", {"R": [52]}],
+33: ["L", {"": [30]}],
+34: ["L", {"": [41], "0": [35, "0'"], "1": [36, "1'"]}],
+35: ["R", {"R": [56]}],
+36: ["R", {"R": [57]}],
+37: ["L", {"0~": [40, "0'"], "1~": [40, "1'"]}],
+38: ["L", {"0~": [39, "1'"], "1~": [40, "0'"]}],
+39: ["L", {"0~": [39, "1~"], "1~": [40, "0~"]}],
+40: ["L", {"Q": [34]}],
+41: ["R", {"R": [45]}],
+45: ["R", {"": [46], "0": [46], "1": [46], "0~": [45, "0'"], "1~": [45, "1'"]}],
+46: ["L", {"Q": [47]}],
+47: ["R", {"A": [29, "1"]}],
+48: ["R", {"0'": [48, "0~"], "1'": [48, "1~"], "": [49], "0": [49], "1": [49]}],
+49: ["L", {"Q": [50]}],
+50: ["L", {"0'": [50, "0"], "1'": [50, "1"], "": [58], "0": [58], "1": [58]}],
+51: ["R", {"0~": [33, "0'"], "1~": [48]}],
+52: ["R", {"0~": [26, "0'"], "1~": [33, "1'"]}],
+53: ["R", {"R": [54]}],
+54: ["R", {"1'": [48, "1~"], "0~": [55], "1~": [55]}],
+55: ["L", {"": [30]}],
+56: ["R", {"": [37], "0": [37], "1": [37]}],
+57: ["R", {"": [38], "0": [38], "1": [38]}],
+58: ["R", {"Q": [34]}],
+59: ["R", {"R": [48]}]
+}`;
+        var code = eval("[" + code_text + "]")[0];
         code_textarea.innerHTML = code_text;
 
         var result_table_style_text = 
@@ -491,66 +260,51 @@ start, other, N, R
             const get_random_point = () => [rng.nextGaussion(), rng.nextGaussion()];
             var graph = [];
             for (const [state, action] of Object.entries(code)) {
-                graph.push([
-                    state,  // State
-                    get_random_point(),  // Position
-                    true,  // Visibility
-                    []  // Connections: [target_vertex_index, edge_name, prefered_length, offset_for_multiple_edges]
-                ]);  // Add every state as a node in graph
+                graph.push([state, get_random_point(), true, [], action[0]]);  // Add every state as a node in graph.
             }
 
             var i;
-            Object.keys(code).forEach(state => {  // Traversal all states
+            Object.keys(code).forEach(state => {  // Traversal all states, which are alreagdy a node in graph.
                 i = graph.findIndex(e => e[0] == state);
-                const vertex = graph[i];
-                for (let [input, action] of Object.entries(code[state])) {  // Traversal all actions
-                    if (input == NOT_VALID)
-                        input = '*';
-                    let [output, direction, nextState] = action;
-                    if (output == NOT_VALID)
-                        output = '*';
-                    if (direction == NOT_VALID)
-                        direction = '*';
-                    const edge_name = (input == "" ? '""': input) + (output != N ? '→'+ (output == "" ? '""': output): "") + ', ' + direction;
-                    if(nextState == state)  // Connect to self
+                const node = graph[i];
+                var self_connection_id = 0;
+                for (const [key, value] of Object.entries(code[state][1])) {  // Traversal all downstream nodes.
+                    const edge_name = (key == "" ? '""': key) + (value.length > 1 ? '→'+(value[1] == "" ? '""': value[1]): "");
+                    if(value[0]==state)  // This is a connection to self.
                     {
-                        graph.push(["self-connection", get_random_point(), false, i]);  // Add the new node for displaying a self-connection
-                        vertex[3].push([graph.length - 1, edge_name , self_connection_default_length, undefined]);  // Add a connection
+                        graph.push(["self-connection", get_random_point(), false, i, undefined]);  // Add the new node for displaying a self-connection.
+                        node[3].push([graph.length - 1, edge_name , self_connection_default_length, undefined]);
+                        self_connection_id ++;
                     }
-                    else  // Connection to another vertex
+                    else  // This is a connection to another node.
                     {
-                        var j = graph.findIndex(e => e[0] == nextState);
+                        var j = graph.findIndex(e => e[0] == value[0]);
                         if(j == -1) {  // This is a connection to a new node.
-                            graph.push([
-                                nextState == "end" ? "end_from_" + i : nextState,
-                                get_random_point(),
-                                true,
-                                []
-                            ]);  // Add the new node.
+                            graph.push([value[0] == "end" ? "end_from_" + i : value[0], get_random_point(), true, [], value[0] != "end" ? "?": undefined]);  // Add the new node.
                             j = graph.length - 1;
                         }
 
                         // Calaulate offset for displaying multiple edges.
                         var offset = 0.5;
-                        vertex[3].forEach(connection => {
-                            if(connection[0] == j)  // Found multiple edge of same direction
+                        node[3].forEach(connection => {
+                            if(connection[0] == j)  // Found multiple edge of same direction.
                             {
                                 offset = Math.min(offset, connection[3]);
                                 connection[3] += 0.5;
                             }
                         });
-                        const nextStateVertex = graph[j];
-                        if(nextStateVertex[0]=='self-connection')
+                        const node2 = graph[j];
+                        if(node2[0]=='self-connection')
                             return;
-                        nextStateVertex[3].forEach(connection => {
-                            if(connection[0] == i) {  // Found multiple edge of opposite direction
+                        node2[3].forEach(connection => {
+                            if(connection[0] == i) {  // Found multiple edge of opposite direction.
                                 offset = Math.min(offset, -connection[3]);
                                 connection[3] -= 0.5;
                             }
                         });
                         offset -= 0.5;
 
-                        vertex[3].push([j, edge_name, connection_default_length, offset]);
+                        node[3].push([j, edge_name, connection_default_length, offset]);
                     }
                     
                 }
@@ -752,47 +506,36 @@ start, other, N, R
             var state = "start";
             var history = [[step, position, state, toArray(tape)]];
 
-            while(state != "end" && state != "error") {
+            while(state!="end") {
                 var need_record = detailed_output;
                 step ++;
-                if(step > max_steps)
+                if(step>max_steps)
                     break;
 
                 var state_0 = state;
-                var actionDict = code[state];
-                if(actionDict == undefined) {
-                    state = "error";
+                var action = code[state];
+                if(action==undefined)
                     break;
-                }
 
-                var action = actionDict[tape[position]];
-                if (action == undefined)
-                    action = actionDict[OTHER];
-                if (action == undefined) {
-                    state = "error";
-                    break;
-                }
-                state = action[2];
-                if (action[0] == NOT_VALID) {
-                    state = "error";
-                    break;
-                }
-                if (action[0] != N) {
-                    tape[position] = action[0];
-                    need_record = true;
+                var a = action[1][tape[position]];
+                if(a!=undefined) {
+                    state = a[0];
+                    if(a.length>1) {
+                        tape[position] = a[1];
+                        need_record = true;
+                    }
                 }
 
                 if(need_record) {
                     history.push([step, position, state_0, toArray(tape)]);
                 }
 
-                if (action[1] == NOT_VALID) {
-                    state = "error";
+                action = code[state];
+                if(action==undefined)
                     break;
-                }
-                if(action[1]=="R")
+                if(action[0]=="R")
                     position ++;
-                else if (action[1]=="L")
+                else
                     position --;
             }
 
@@ -849,7 +592,7 @@ start, other, N, R
             // TODO: real-time compile
             code_text = editor_code.getDoc().getValue();
             result_table_style_text = editor_style.getDoc().getValue();
-            code = parseCode(code_text);
+            code = eval("[" + code_text+"]")[0];
             result_table_style = eval("[" + result_table_style_text + "]")[0];
 
             graph = construct_directed_graph_with_code(code);
@@ -859,7 +602,7 @@ start, other, N, R
             // TODO: real-time compile
             code_text = editor_code.getDoc().getValue();
             result_table_style_text = editor_style.getDoc().getValue();
-            code = parseCode(code_text);
+            code = eval("[" + code_text+"]")[0];
             result_table_style = eval("[" + result_table_style_text + "]")[0];
 
             tape = toArray(["", "1", "0", "1", "1", "1", "", "1", "1", "0", "", "", "", "", "", "", "", "", "", "", "", "", ""]);
