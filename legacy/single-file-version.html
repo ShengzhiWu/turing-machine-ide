@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Turing machine IDE</title>
-    <script src="tm-editor.js"></script>
     <style>
         #refresh-btn {
             position: absolute;
@@ -69,10 +68,10 @@
     <script src="https://cdn.jsdelivr.net/npm/codemirror-colorpicker@1.9.80/dist/codemirror-colorpicker.min.js"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/codemirror-colorpicker@1.9.80/addon/codemirror-colorpicker.min.css">
 
-    <div id="code-panel" style="width: 33%; height: 100vh; overflow: hidden; display: flex; flex-direction: column; background-color: hsl(0, 0%, 0%);">
+    <div id="code-panel" style="width: 33%; height: 100vh; overflow: hidden; display: flex; flex-direction: column;">
         <div id="turing_machine_code-panel" style="flex: 0 0 auto; margin-bottom: 2px; height: 80%; overflow: hidden;">
-            <div style="height: 100%; overflow: auto; overflow: hidden;">
-                <tm-editor id="code-editor" lang="zh" value=''></tm-editor>
+            <div style="height: 100%; overflow: auto;">
+                <textarea id="code-textarea"></textarea>
             </div>
         </div>
         
@@ -129,7 +128,7 @@
     </script>
 
     <script>
-        const code_editor = document.querySelector('#code-editor');
+        const code_textarea = document.querySelector('#code-textarea');
         const style_textarea = document.querySelector('#style-textarea');
         const graph_view = document.querySelector('#graph-view');
         const max_steps_input = document.querySelector('#max-steps-input');
@@ -426,7 +425,7 @@ start, other, N, R
         var code = parseCode(code_text);  // 解析代码文本
         console.log(code);
 
-        code_editor.value = code_text;
+        code_textarea.innerHTML = code_text;
 
         var result_table_style_text = 
 `{
@@ -441,6 +440,13 @@ start, other, N, R
 }`;
         var result_table_style = eval("["+result_table_style_text+"]")[0];
         style_textarea.innerHTML = result_table_style_text;
+
+        const editor_code = CodeMirror.fromTextArea(code_textarea, {
+            lineNumbers: true,  // Show line numbers
+            mode: 'javascript',  // Set language mode to JavaScript
+            theme: 'seti'  // Set the editor theme (optional)
+        });
+        editor_code.setSize("100%", "100%");
 
         const editor_style = CodeMirror.fromTextArea(style_textarea, {
             lineNumbers: true,  // Show line numbers
