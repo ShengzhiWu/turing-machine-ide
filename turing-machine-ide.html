@@ -470,9 +470,22 @@ start, other, N, R
 
         var code = parseProgramCode(code_text);  // 解析代码文本
 
-        code_editor.value = code_text;
+        code_editor.value = code_text;  // 将代码编辑器的内容设置成指定内容
+        code_editor.lang = 'zh';  // 设置语言，可选项有zh和en
 
         var result_table_style;  // 结果表格的风格（每种符号的前景色、背景色）
+
+        // 监听内容变化
+        code_editor.addEventListener('tm-change', e => {
+            const { value, errorCount } = e.detail;
+            code = parseProgramCode(value);  // 解析代码文本
+        });
+
+        // 监听错误变化
+        // code_editor.addEventListener('tm-errors', e => {
+        //     const { errorCount } = e.detail;
+        //     addLog(`[tm-errors] 错误数量变为 ${errorCount}`);
+        // });
 
         style_editor.addEventListener('cm-change', e => {
             const result_table_style_text = style_editor.value;
@@ -875,19 +888,11 @@ start, other, N, R
 
         function refresh_graph_embedding() {
             // TODO: real-time compile
-            code_text = editor_code.getDoc().getValue();  // TODO!
-            code = parseProgramCode(code_text);
-
             graph = construct_directed_graph_with_code(code);
         }
 
         function run_program() {
             // TODO: real-time compile
-            code_text = editor_code.getDoc().getValue();  // TODO!
-            const result_table_style_text = editor_style.getDoc().getValue();  // TODO!
-            code = parseProgramCode(code_text);
-            result_table_style = eval("[" + result_table_style_text + "]")[0];
-
             tape = toArray(["", "1", "0", "1", "1", "1", "", "1", "1", "0", "", "", "", "", "", "", "", "", "", "", "", "", ""]);
             result = run_turing_machine(code, tape, max_steps_input.value, false);
             refresh_history_table(history_table, result);
