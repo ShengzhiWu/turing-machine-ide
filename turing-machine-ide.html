@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Turing machine IDE</title>
-    <script src="tm-editor.js"></script>
     <style>
         #refresh-btn {
             position: absolute;
@@ -61,24 +60,27 @@
     <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
     <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
 
-    <!-- CodeMirror for code editing -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.62.0/codemirror.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.62.0/theme/seti.min.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.62.0/codemirror.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.62.0/mode/javascript/javascript.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/codemirror-colorpicker@1.9.80/dist/codemirror-colorpicker.min.js"></script>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/codemirror-colorpicker@1.9.80/addon/codemirror-colorpicker.min.css">
+    <!-- CodeMirror 核心（本地文件） -->
+    <link rel="stylesheet" href="vendor/codemirror/codemirror.min.css">
+    <script src="vendor/codemirror/codemirror.min.js"></script>
+
+    <!-- codemirror-colorpicker（本地文件） -->
+    <link rel="stylesheet" href="vendor/codemirror-colorpicker/codemirror-colorpicker.css">
+    <script src="vendor/codemirror-colorpicker/codemirror-colorpicker.js"></script>
+
+    <script src="tm-editor.js"></script>
+    <script src="colormap-editor.js" defer></script>
 
     <div id="code-panel" style="width: 33%; height: 100vh; overflow: hidden; display: flex; flex-direction: column; background-color: hsl(0, 0%, 0%);">
-        <div id="turing_machine_code-panel" style="flex: 0 0 auto; margin-bottom: 2px; height: 80%; overflow: hidden;">
-            <div style="height: 100%; overflow: auto; overflow: hidden;">
+        <div id="turing_machine_code-panel" style="flex: 0 0 auto; margin-bottom: 2px; height: 70%; overflow: hidden;">
+            <div style="height: 100%;">
                 <tm-editor id="code-editor" lang="zh" value=''></tm-editor>
             </div>
         </div>
         
         <div id="style-panel" style="flex: 1 1 auto; min-height: 50px; overflow: hidden;">
-            <div style="height: 100%; overflow: auto;">
-                <textarea id="style-textarea"></textarea>
+            <div style="height: 100%;">
+                <colormap-editor id="style-textarea"></colormap-editor>
             </div>
         </div>
     </div>
@@ -130,7 +132,7 @@
 
     <script>
         const code_editor = document.querySelector('#code-editor');
-        const style_textarea = document.querySelector('#style-textarea');
+        const style_editor = document.querySelector('#style-textarea');
         const graph_view = document.querySelector('#graph-view');
         const max_steps_input = document.querySelector('#max-steps-input');
         const history_table = document.querySelector('#history-table');
@@ -378,7 +380,7 @@ start, other, N, R
         const N = Symbol('N');
         const OTHER = Symbol('other');
 
-        function parseCode(code) { // 解析新格式代码
+        function parseProgramCode(code) { // 解析新格式代码
             const result = {};
             code.split("\n").forEach(line => {  // 遍历行
                 // 去掉注释
@@ -423,32 +425,63 @@ start, other, N, R
             return result;
         }
 
-        var code = parseCode(code_text);  // 解析代码文本
-        console.log(code);
+        function _splitTopLevel(str) {  // 根据逗号分割（无视括号中的逗号）
+            const parts = [];
+            let depth = 0, cur = '';
+            for (const c of str) {
+                if      (c === '(')           { depth++; cur += c; }
+                else if (c === ')')           { depth--; cur += c; }
+                else if (c === ',' && !depth) { parts.push(cur.trim()); cur = ''; }
+                else                          { cur += c; }
+            }
+            if (cur.trim()) parts.push(cur.trim());
+            return parts;
+        }
+
+        function parseStyleCode(code) {  // 解析风格代码
+            // 创建一个临时元素
+            const div = document.createElement('div');
+            const result = {};
+            code.split("\n").forEach(line => {  // 遍历行
+                // 去掉注释
+                line = line.split("//")[0].trim();
+
+                if (line.length == 0)
+                    return;
+                
+                // 根据逗号分割（无视括号中的逗号）
+                const parts = _splitTopLevel(line);
+
+                result[parts[0]] = {};
+
+                div.style.color = '';
+                div.style.color = parts[1];
+                if (div.style.color !== '')
+                    result[parts[0]]['foreground'] = parts[1];
+
+                div.style.color = '';
+                div.style.color = parts[2];
+                if (div.style.color !== '')
+                    result[parts[0]]['background'] = parts[2];
+            });
+
+            return result;
+        }
+
+        var code = parseProgramCode(code_text);  // 解析代码文本
 
         code_editor.value = code_text;
 
-        var result_table_style_text = 
-`{
-"P": ["red", "white"],
-"Q": ["green", "white"],
-"R": ["blue", "white"],
-"A": ["gray", "white"],
-"0'": [undefined, "brown"],
-"0~": [undefined, "brown"],
-"1'": [undefined, "brown"],
-"1~": [undefined, "brown"]
-}`;
-        var result_table_style = eval("["+result_table_style_text+"]")[0];
-        style_textarea.innerHTML = result_table_style_text;
+        var result_table_style;  // 结果表格的风格（每种符号的前景色、背景色）
 
-        const editor_style = CodeMirror.fromTextArea(style_textarea, {
-            lineNumbers: true,  // Show line numbers
-            mode: 'javascript',  // Set language mode to JavaScript
-            theme: 'seti',  // Set the editor theme (optional)
-            colorpicker: true
+        style_editor.addEventListener('cm-change', e => {
+            const result_table_style_text = style_editor.value;
+            result_table_style = parseStyleCode(result_table_style_text);
+            refresh_history_table(history_table, result);
         });
-        editor_style.setSize("100%", "100%");
+        // style_textarea.addEventListener('cm-errors', e => {  // 风格框有语法错的监听器
+        //     console.log('errors:', e.detail.errors);
+        // });
 
         var global_size_factor = 0.5;
         var global_force_factor = 2.;
@@ -808,13 +841,11 @@ start, other, N, R
                 var style = "border:1px solid black;";
 
                 style_list = result_table_style[e];
-                if(style_list!=undefined) {
-                    var background = style_list[0];
-                    if(background!=undefined)
-                        style += "background-color: " + background + "; ";
-                    var foreground = style_list[1];
-                    if(foreground!=undefined)
-                        style += "color: " + foreground + "; ";
+                if(style_list) {
+                    if(style_list['background'])
+                        style += "background-color: " + style_list['background'] + "; ";
+                    if(style_list['foreground'])
+                        style += "color: " + style_list['foreground'] + "; ";
                 }
 
                 if(position==record[1])
@@ -828,6 +859,9 @@ start, other, N, R
         }
 
         function refresh_history_table(history_table, history) {
+            if (!result_table_style)
+                return;
+
             var s = "";
 
             history.forEach(e=>{
@@ -841,19 +875,17 @@ start, other, N, R
 
         function refresh_graph_embedding() {
             // TODO: real-time compile
-            code_text = editor_code.getDoc().getValue();
-            result_table_style_text = editor_style.getDoc().getValue();
-            code = parseCode(code_text);
-            result_table_style = eval("[" + result_table_style_text + "]")[0];
+            code_text = editor_code.getDoc().getValue();  // TODO!
+            code = parseProgramCode(code_text);
 
             graph = construct_directed_graph_with_code(code);
         }
 
         function run_program() {
             // TODO: real-time compile
-            code_text = editor_code.getDoc().getValue();
-            result_table_style_text = editor_style.getDoc().getValue();
-            code = parseCode(code_text);
+            code_text = editor_code.getDoc().getValue();  // TODO!
+            const result_table_style_text = editor_style.getDoc().getValue();  // TODO!
+            code = parseProgramCode(code_text);
             result_table_style = eval("[" + result_table_style_text + "]")[0];
 
             tape = toArray(["", "1", "0", "1", "1", "1", "", "1", "1", "0", "", "", "", "", "", "", "", "", "", "", "", "", ""]);
