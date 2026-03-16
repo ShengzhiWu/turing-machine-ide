@@ -746,12 +746,13 @@ start, other, N, R
             return a;
         }
 
-        function run_turing_machine(code, tape, max_steps, detailed_output) {
+        function run_turing_machine(code, tape, max_steps, detailed_output) {  // 运行图灵机
             var step = 0;
             var position = 0;
             var state = "start";
             var history = [[step, position, state, toArray(tape)]];
 
+            tape = toArray(tape);  // Clone the tape, to avoid changing the original tape.
             while(state != "end" && state != "error") {
                 var need_record = detailed_output;
                 step ++;
@@ -833,6 +834,15 @@ start, other, N, R
             return "<tr>" + s + "</tr>";
         }
 
+        // 用户编辑纸带初值完成回调函数
+        function finishEditingTapeCallback(data) {
+            console.log('回调函数被触发:', data);
+            if (data.value !== tape[data.cellIndex]) {  // 有变化
+                tape[data.cellIndex] = data.value;  // 更新纸带数据
+                run_program();  // 重新运行程序
+            }
+        }
+
         function refresh_history_table(history_table, history) {
             var s = "";
 
@@ -841,6 +851,36 @@ start, other, N, R
             });
 
             history_table.innerHTML = s;
+            
+            // 让第一行所有单元格可编辑
+            const firstRowCells = history_table.rows[0].cells;  // 获取表格第一行的所有单元格
+            for (let i = 0; i < firstRowCells.length; i++) {
+                if (i == 0)
+                    continue;  // 跳过第一列（步数）
+                const cell = firstRowCells[i];
+                
+                // 设置单元格为可编辑
+                cell.contentEditable = true;
+                
+                // 添加失去焦点事件监听
+                cell.addEventListener('blur', function(event) {
+                    finishEditingTapeCallback({
+                        cellIndex: i - 1,
+                        value: cell.textContent
+                    });
+                });
+                
+                // 添加键盘事件监听（按下回车）
+                cell.addEventListener('keydown', function(event) {
+                    if (event.key === 'Enter') {
+                        event.preventDefault();  // 防止回车产生新行
+                        cell.blur();  // 主动失去焦点。这会触发上面的blur事件
+                    }
+                });
+                
+                // 保存原始内容，用于对比变化
+                cell.setAttribute('data-original-content', cell.textContent);
+            }
         }
 
         refresh_history_table(history_table, result);
@@ -862,7 +902,6 @@ start, other, N, R
             code = parseCode(code_text);
             result_table_style = eval("[" + result_table_style_text + "]")[0];
 
-            tape = toArray(["", "1", "0", "1", "1", "1", "", "1", "1", "0", "", "", "", "", "", "", "", "", "", "", "", "", ""]);
             result = run_turing_machine(code, tape, max_steps_input.value, false);
             refresh_history_table(history_table, result);
         }
