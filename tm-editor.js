@@ -110,6 +110,8 @@ pre.highlight-layer {
     font-size: 1em; line-height: 1.7; white-space: pre;
     pointer-events: none; overflow: visible; z-index: 1;
 }
+/* 每行高亮内容包在一个 block span 里，与 textarea 行对齐 */
+pre.highlight-layer > span { display: block; }
 textarea {
     position: absolute; top: 0; left: 0; width: 100%; height: 100%;
     padding: 1.5em 1.75em; margin: 0; border: none; background: transparent;
@@ -293,12 +295,12 @@ function highlightLine(lineIdx, line, allErrors, extraErrors = []) {
     return html || '<span class="token-plain"> </span>';
 }
 
-function highlightAll(text) {
-    const lines  = text.split('\n');
-    const parsed = lines.map(l => parseLine(l));
+// 计算 duplicate 映射（纯数据，不生成 HTML）
+// 返回 Map<lineIdx, {charStart, charEnd}>
+function computeDupLines(lines, parsed) {
     const seen = new Map(), dupLines = new Map();
-    const dupEnd = i => parsed[i].code.slice(0, parsed[i].commentIdx !== -1 ? parsed[i].commentIdx : parsed[i].code.length).trimEnd().length;
-
+    const dupEnd = i => parsed[i].code.slice(0,
+        parsed[i].commentIdx !== -1 ? parsed[i].commentIdx : parsed[i].code.length).trimEnd().length;
     for (let i = 0; i < lines.length; i++) {
         const el = parsed[i].elements;
         if (el.length < 2 || !el[0].trimmed || !el[1].trimmed) continue;
@@ -309,14 +311,15 @@ function highlightAll(text) {
             dupLines.set(i, { charStart: 0, charEnd: dupEnd(i) });
         } else seen.set(key, i);
     }
-
-    const allErrors = [];
-    const html = lines.map((line, i) => {
-        const extra = dupLines.has(i) ? [{ lineIdx: i, ...dupLines.get(i), type: 'duplicate' }] : [];
-        return highlightLine(i, line, allErrors, extra);
-    }).join('\n');
-    return { html, errors: allErrors, lines };
+    return dupLines;
 }
+
+// 将 dupLines Map 序列化为字符串，用于快速比较某行的 duplicate 状态是否变化
+function dupKey(dupLines, i) {
+    const d = dupLines.get(i);
+    return d ? `${d.charStart}:${d.charEnd}` : '';
+}
+
 
 function getElementInfo(text, cursor) {
     const ls = lineStartOf(text, cursor);
@@ -352,6 +355,9 @@ class TmEditor extends HTMLElement {
         // 存储错误位置供 tooltip 使用
         this._errorPositions = [];
         this._textLines = [];
+        // 增量渲染缓存
+        this._prevLines = [];
+        this._prevDup   = new Map();
     }
 
     connectedCallback() {
@@ -373,10 +379,12 @@ class TmEditor extends HTMLElement {
         if (name === 'lang') {
             this._lang = val === 'en' ? 'en' : 'zh';
             this._applyLang();
+            this._resetCache();
             this._syncHighlight();
         }
         if (name === 'value') {
             this._textarea.value = val ?? '';
+            this._resetCache();
             this._syncHighlight();
         }
     }
@@ -385,7 +393,7 @@ class TmEditor extends HTMLElement {
 
     get value() { return this._textarea?.value ?? ''; }
     set value(v) {
-        if (this._textarea) { this._textarea.value = v; this._syncHighlight(); }
+        if (this._textarea) { this._textarea.value = v; this._resetCache(); this._syncHighlight(); }
         else this.setAttribute('value', v);
     }
 
@@ -459,6 +467,13 @@ class TmEditor extends HTMLElement {
 
     // ── 内部：渲染与同步 ──
 
+    // 清空增量缓存，下次 _syncHighlight 时全量重渲
+    _resetCache() {
+        this._prevLines = [];
+        this._prevDup   = new Map();
+        this._hlLayer.innerHTML = '';
+    }
+
     _syncScroll() {
         const ta = this._textarea;
         this._hlLayer.style.top  = -ta.scrollTop  + 'px';
@@ -468,26 +483,63 @@ class TmEditor extends HTMLElement {
 
     _syncHighlight() {
         const ta = this._textarea;
-        const { html, errors, lines } = highlightAll(ta.value);
-        this._hlLayer.innerHTML = html;
+        const newLines  = ta.value.split('\n');
+        const newParsed = newLines.map(l => parseLine(l));
+        const newDup    = computeDupLines(newLines, newParsed);
+        const oldLines  = this._prevLines;
+        const oldDup    = this._prevDup;
+
+        // ── 逐行增量更新高亮层 ──
+        const allErrors = [];
+        const layer = this._hlLayer;
+        const oldChildCount = layer.children.length;
+        const n = newLines.length;
+
+        for (let i = 0; i < n; i++) {
+            const lineChanged = oldLines[i] !== newLines[i];
+            const dupChanged  = dupKey(newDup, i) !== dupKey(oldDup, i);
+
+            if (lineChanged || dupChanged) {
+                const extra = newDup.has(i) ? [{ lineIdx: i, ...newDup.get(i), type: 'duplicate' }] : [];
+                const html  = highlightLine(i, newLines[i], allErrors, extra);
+                if (i < oldChildCount) {
+                    // 替换已有节点（用 innerHTML 赋值比 replaceChild 快）
+                    layer.children[i].innerHTML = html;
+                } else {
+                    const span = document.createElement('span');
+                    span.innerHTML = html;
+                    layer.appendChild(span);
+                }
+            } else {
+                // 行未变化：复用旧节点，但仍需收集其错误到 allErrors
+                const extra = newDup.has(i) ? [{ lineIdx: i, ...newDup.get(i), type: 'duplicate' }] : [];
+                highlightLine(i, newLines[i], allErrors, extra);
+            }
+        }
+        // 删除多余的旧行节点
+        while (layer.children.length > n) layer.removeChild(layer.lastChild);
+
+        this._prevLines = newLines;
+        this._prevDup   = newDup;
         this._syncScroll();
 
-        const n = (ta.value.match(/\n/g) || []).length + 1;
-        this._lineNumbers.innerHTML = Array.from({ length: n }, (_, i) => `<div>${i+1}</div>`).join('');
+        // ── 行号（只在行数变化时重建） ──
+        if (n !== oldLines.length) {
+            this._lineNumbers.innerHTML = Array.from({ length: n }, (_, i) => `<div>${i+1}</div>`).join('');
+        }
         this._lineNumbers.scrollTop = ta.scrollTop;
 
-        this._errorPositions = errors;
-        this._textLines = lines;
+        this._errorPositions = allErrors;
+        this._textLines = newLines;
 
-        // 更新错误计数，若有变化则派发 tm-errors 事件
         const prevCount = this._errorCount;
-        this._errorCount = errors.length;
+        this._errorCount = allErrors.length;
         this._updateErrorCounter(this._errorCount);
-        if (this._errorCount !== prevCount || JSON.stringify(errors) !== JSON.stringify(this._lastErrors)) {
-            this._lastErrors = errors;
+        if (this._errorCount !== prevCount || JSON.stringify(allErrors) !== JSON.stringify(this._lastErrors)) {
+            this._lastErrors = allErrors;
             this.dispatchEvent(new CustomEvent('tm-errors', {
                 bubbles: true, composed: true,
-                detail: { errorCount: this._errorCount, errors }
+                detail: { errorCount: this._errorCount, errors: allErrors }
             }));
         }
 
@@ -495,7 +547,6 @@ class TmEditor extends HTMLElement {
         this._refreshErrorTooltip();
         this._updateMatchHighlight();
 
-        // 派发 tm-change 事件
         this.dispatchEvent(new CustomEvent('tm-change', {
             bubbles: true, composed: true,
             detail: { value: ta.value, errorCount: this._errorCount }
