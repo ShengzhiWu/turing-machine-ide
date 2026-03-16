@@ -170,8 +170,7 @@ class ColormapEditor extends HTMLElement {
         const style = document.createElement('style');
         style.textContent = `
 ${sel} { display:flex; flex-direction:column; background:#151718;
-    border-radius:1.5em; overflow:hidden; font-size:13px;
-    height:100%;
+    border-radius:1.5em; overflow:hidden; font-size:13px; height:100%;
     font-family:'JetBrains Mono','Fira Code','Cascadia Code',Consolas,'Courier New',monospace;
     box-shadow:0 20px 40px rgba(0,0,0,0.6), 0 0 0 2px #2a2d2f inset; }
 ${sel} *, ${sel} *::before, ${sel} *::after { box-sizing:border-box; }
@@ -186,8 +185,10 @@ ${sel} .cm-fmt-item.active {
     background-color:rgba(255,255,255,0.1); box-shadow:0 0 0 1px rgba(255,255,255,0.15); color:#c8d0e0; }
 ${sel} .cm-fmt-comma { color:#3d4455; margin:0 0.15em; }
 
+/* 外层：纵向滚动容器，包裹行号+代码整体 */
 ${sel} .cm-host {
-    flex:1; min-height:0; overflow:auto;
+    flex:1; min-height:0;
+    overflow:auto;
     scrollbar-width:thin; scrollbar-color:#2e3a55 #151718; }
 ${sel} .cm-host::-webkit-scrollbar        { width:8px; height:8px; }
 ${sel} .cm-host::-webkit-scrollbar-track  { background:#151718; }
@@ -195,21 +196,40 @@ ${sel} .cm-host::-webkit-scrollbar-thumb  { background:#2e3a55; border-radius:4p
 ${sel} .cm-host::-webkit-scrollbar-thumb:hover { background:#4a5a80; }
 ${sel} .cm-host::-webkit-scrollbar-corner { background:#151718; }
 
+/* 行号+代码并排，整体宽度由代码内容撑开 */
+${sel} .cm-body {
+    display:inline-flex; flex-direction:row; min-width:100%; align-items:flex-start; }
+
+/* 行号列：sticky 固定在横向滚动的左侧 */
+${sel} .cm-gutters {
+    flex-shrink:0; position:sticky; left:0; z-index:2;
+    background:#1a1d1e;
+    border-right:1px solid rgba(255,255,255,0.07);
+    padding:0.4em 0; min-width:3em;
+    font-size:1em; line-height:1.75; color:#4a5060;
+    text-align:right; user-select:none; align-self:stretch; }
+${sel} .cm-gutters div { padding:0 0.6em; }
+
+/* CodeMirror 容器：自由伸展 */
+${sel} .cm-scroll-x { flex:1; min-width:0; }
+${sel} .cm-scroll-x::-webkit-scrollbar        { height:8px; }
+${sel} .cm-scroll-x::-webkit-scrollbar-track  { background:#151718; }
+${sel} .cm-scroll-x::-webkit-scrollbar-thumb  { background:#2e3a55; border-radius:4px; border:2px solid #151718; }
+${sel} .cm-scroll-x::-webkit-scrollbar-thumb:hover { background:#4a5a80; }
+
+/* CodeMirror：自由伸展，隐藏内置行号和滚动条 */
 ${sel} .CodeMirror {
     font-family:'JetBrains Mono','Fira Code','Cascadia Code',Consolas,'Courier New',monospace !important;
     font-size:1em; font-weight:normal; font-style:normal;
     height:auto; width:max-content; min-width:100%;
     background:#151718; color:#c8d0e0; line-height:1.75; }
-${sel} .CodeMirror-scroll {
-    overflow:hidden !important;
-    margin:0 !important; padding:0 !important; }
-${sel} .CodeMirror-sizer { min-height:unset !important; }
-${sel} .CodeMirror-lines { width:max-content; }
+${sel} .CodeMirror-scroll { overflow:hidden !important; margin:0 !important; padding:0 !important; }
+${sel} .CodeMirror-sizer  { min-height:unset !important; }
+${sel} .CodeMirror-gutters { display:none !important; }
+${sel} .CodeMirror-lines  { padding-left:0.4em; }
 ${sel} .CodeMirror-vscrollbar,
 ${sel} .CodeMirror-hscrollbar,
 ${sel} .CodeMirror-scrollbar-filler { display:none !important; }
-${sel} .CodeMirror-gutters { background:#1a1d1e !important; border-right:1px solid rgba(255,255,255,0.07) !important; }
-${sel} .CodeMirror-linenumber { color:#4a5060; padding:0 10px; font-size:0.9em; }
 ${sel} .CodeMirror-cursor { border-left:2px solid #f3f7ff !important; }
 ${sel} .CodeMirror-selected { background:rgba(120,150,220,0.25) !important; }
 ${sel} .CodeMirror-activeline-background { background:rgba(255,255,255,0.03) !important; }
@@ -261,9 +281,25 @@ ${sel} .cm-error-count.has-errors { background:#2e1a1a; color:#ffa7b5; border-le
         this.appendChild(this._fmtBar);
         this._fmtItems = this._fmtBar.querySelectorAll('[data-col]');
 
-        // CodeMirror 宿主
+        // 外层容器（纵向滚动）
         this._cmHost = document.createElement('div');
         this._cmHost.className = 'cm-host';
+
+        // 行号+代码并排层
+        this._cmBody = document.createElement('div');
+        this._cmBody.className = 'cm-body';
+
+        // 自绘行号列
+        this._gutters = document.createElement('div');
+        this._gutters.className = 'cm-gutters';
+        this._cmBody.appendChild(this._gutters);
+
+        // 横向滚动层
+        this._scrollX = document.createElement('div');
+        this._scrollX.className = 'cm-scroll-x';
+        this._cmBody.appendChild(this._scrollX);
+
+        this._cmHost.appendChild(this._cmBody);
         this.appendChild(this._cmHost);
 
         // 动态 markText 样式
@@ -284,11 +320,11 @@ ${sel} .cm-error-count.has-errors { background:#2e1a1a; color:#ffa7b5; border-le
 
     _initCodeMirror() {
         const ta = document.createElement('textarea');
-        this._cmHost.appendChild(ta);
+        this._scrollX.appendChild(ta);
 
         this._cm = CodeMirror.fromTextArea(ta, {
             mode:         'colormap',
-            lineNumbers:  true,
+            lineNumbers:  false,
             autofocus:    false,
             lineWrapping: false,
             colorpicker: {
@@ -297,6 +333,19 @@ ${sel} .cm-error-count.has-errors { background:#2e1a1a; color:#ffa7b5; border-le
                 onChange: () => setTimeout(() => this._applyMarks(), 0),
             },
         });
+
+        // CodeMirror 在光标移动时会通过 curOp.scrollTop 强制修改内部滚动位置。
+        // 我们用外部容器做滚动，必须阻止这个行为。
+        // 拦截 cursorActivity，在每次操作结束前把 scrollTop/scrollLeft 清掉。
+        this._cm.on('cursorActivity', () => {
+            const op = this._cm.curOp;
+            if (op) {
+                op.scrollTop  = null;
+                op.scrollLeft = null;
+                op.scrollToPos = null;
+            }
+        });
+        this._cm.on('scrollCursorIntoView', (cm, e) => { e.preventDefault(); });
     }
 
     // ── markText：第一元颜色 ──────────────────────────────────────────────────
@@ -311,7 +360,9 @@ ${sel} .cm-error-count.has-errors { background:#2e1a1a; color:#ffa7b5; border-le
         this._ruleCount = 0;
         this._lineErrors.clear();
 
-        cm.getValue().split('\n').forEach((raw, lineNo) => {
+        const lines = cm.getValue().split('\n');
+
+        lines.forEach((raw, lineNo) => {
             const r = _parseLine(raw);
             if (!r) return;
             if (r.error) { this._lineErrors.set(lineNo, r.msg); return; }
@@ -336,6 +387,11 @@ ${sel} .cm-error-count.has-errors { background:#2e1a1a; color:#ffa7b5; border-le
                 { className: cls }
             ));
         });
+
+        // 同步自绘行号
+        this._gutters.innerHTML = lines
+            .map((_, i) => `<div>${i + 1}</div>`)
+            .join('');
 
         this._updateCounter();
     }
