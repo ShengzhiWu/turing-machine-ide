@@ -45,16 +45,48 @@ function _splitTopLevel(str) {
 }
 
 function _parseLine(raw) {
-    const noComment = raw.replace(/\/\/.*$/, '').replace(/"[^"]*"/g, '').trim();
-    if (!noComment) return null;
-    const parts = _splitTopLevel(noComment);
-    const [token, fg, bg, ...rest] = parts;
-    if (!token)                   return { error: true, msg: '缺少第一元（token 名）' };
-    if (!fg)                      return { error: true, msg: '缺少第二元（前景色）' };
-    if (rest.length)               return { error: true, msg: `最多三个元素，得到 ${parts.length} 个` };
-    if (!_isCssColor(fg))          return { error: true, msg: `"${fg}" 不是有效的 CSS 颜色` };
-    if (bg && !_isCssColor(bg))    return { error: true, msg: `"${bg}" 不是有效的 CSS 颜色` };
-    return { token, fg, bg: bg || null };
+    const noComment = raw.replace(/\/\/.*$/, '').replace(/"[^"]*"/g, s => ' '.repeat(s.length));
+    const stripped  = noComment.trim();
+    if (!stripped) return null;
+
+    // 在原始行（去注释后）中定位各元素的起始偏移
+    // splitTopLevel 保留了原始字符，可以通过扫描 noComment 找偏移
+    function findParts(str) {
+        const result = []; // { text, from, to }
+        let depth = 0, cur = '', start = 0;
+        for (let i = 0; i < str.length; i++) {
+            const c = str[i];
+            if      (c === '(')           { depth++; cur += c; }
+            else if (c === ')')           { depth--; cur += c; }
+            else if (c === ',' && !depth) {
+                const t = cur.trim();
+                if (t) {
+                    const off = cur.indexOf(t);
+                    result.push({ text: t, from: start + off, to: start + off + t.length });
+                }
+                cur = ''; start = i + 1;
+            } else { cur += c; }
+        }
+        const t = cur.trim();
+        if (t) {
+            const off = cur.indexOf(t);
+            result.push({ text: t, from: start + off, to: start + off + t.length });
+        }
+        return result;
+    }
+
+    const parts = findParts(noComment);
+    if (!parts.length) return null;
+
+    const [p0, p1, p2, ...rest] = parts;
+
+    if (!p0)       return { error: true, msg: '缺少第一元（token 名）',   from: 0, to: raw.length };
+    if (!p1)       return { error: true, msg: '缺少第二元（前景色）',     from: p0.to, to: raw.length };
+    if (rest.length) return { error: true, msg: `最多三个元素，得到 ${parts.length} 个`, from: rest[0].from, to: rest[rest.length-1].to };
+    if (!_isCssColor(p1.text)) return { error: true, msg: `"${p1.text}" 不是有效的 CSS 颜色`, from: p1.from, to: p1.to };
+    if (p2 && !_isCssColor(p2.text)) return { error: true, msg: `"${p2.text}" 不是有效的 CSS 颜色`, from: p2.from, to: p2.to };
+
+    return { token: p0.text, fg: p1.text, bg: p2?.text || null };
 }
 
 // ── 注册 CodeMirror 语法模式（全局只需一次）──────────────────────────────────
@@ -366,7 +398,7 @@ ${sel} .cm-error-count.has-errors { background:#2e1a1a; color:#ffa7b5; border-le
         lines.forEach((raw, lineNo) => {
             const r = _parseLine(raw);
             if (!r) return;
-            if (r.error) { this._lineErrors.set(lineNo, r.msg); return; }
+            if (r.error) { this._lineErrors.set(lineNo, { msg: r.msg, from: r.from, to: r.to }); return; }
 
             let i = 0;
             while (i < raw.length && (raw[i] === ' ' || raw[i] === '\t')) i++;
@@ -404,7 +436,7 @@ ${sel} .cm-error-count.has-errors { background:#2e1a1a; color:#ffa7b5; border-le
         this._errorCounter.textContent = n ? `错误: ${n}` : '无错误';
         this._errorCounter.className   = `cm-error-count ${n ? 'has-errors' : 'no-errors'}`;
 
-        const errors = Array.from(this._lineErrors.entries()).map(([line, msg]) => ({ line, msg }));
+        const errors = Array.from(this._lineErrors.entries()).map(([line, e]) => ({ line, msg: e.msg }));
         if (n !== prevCount || JSON.stringify(errors) !== JSON.stringify(this._lastErrors)) {
             this._lastErrors = errors;
             this.dispatchEvent(new CustomEvent('cm-errors', {
@@ -428,19 +460,28 @@ ${sel} .cm-error-count.has-errors { background:#2e1a1a; color:#ffa7b5; border-le
         const wrapper = cm.getWrapperElement();
         wrapper.addEventListener('mousemove', e => {
             const pos = cm.coordsChar({ left: e.clientX, top: e.clientY }, 'window');
-            const msg = this._lineErrors.get(pos.line);
+            const err = this._lineErrors.get(pos.line);
             const tip = this._tooltip;
-            if (msg) {
-                tip.textContent = msg;
-                tip.style.display = 'block';
-                tip.style.left = (e.clientX + 14) + 'px';
-                tip.style.top  = (e.clientY + 14) + 'px';
-                const rect = tip.getBoundingClientRect();
-                if (rect.right > window.innerWidth - 8)
-                    tip.style.left = (e.clientX - rect.width - 8) + 'px';
-            } else {
-                tip.style.display = 'none';
+            if (err) {
+                // 把出错字符范围转成像素矩形，判断鼠标是否在其中
+                const startCoords = cm.charCoords({ line: pos.line, ch: err.from }, 'window');
+                const endCoords   = cm.charCoords({ line: pos.line, ch: err.to   }, 'window');
+                const inRange = e.clientX >= startCoords.left
+                             && e.clientX <= endCoords.right
+                             && e.clientY >= startCoords.top
+                             && e.clientY <= startCoords.bottom;
+                if (inRange) {
+                    tip.textContent = err.msg;
+                    tip.style.display = 'block';
+                    tip.style.left = (e.clientX + 14) + 'px';
+                    tip.style.top  = (e.clientY + 14) + 'px';
+                    const rect = tip.getBoundingClientRect();
+                    if (rect.right > window.innerWidth - 8)
+                        tip.style.left = (e.clientX - rect.width - 8) + 'px';
+                    return;
+                }
             }
+            tip.style.display = 'none';
         });
         wrapper.addEventListener('mouseleave', () => { this._tooltip.style.display = 'none'; });
 
