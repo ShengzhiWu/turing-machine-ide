@@ -750,7 +750,7 @@ start, other, N, R
             var step = 0;
             var position = 0;
             var state = "start";
-            var history = [[step, position, state, toArray(tape)]];
+            const history = [[step, position, undefined, state, toArray(tape)]];  // 步数, 位置, 上一个状态, 当前状态, 纸带
 
             tape = toArray(tape);  // Clone the tape, to avoid changing the original tape.
             while(state != "end" && state != "error") {
@@ -759,14 +759,14 @@ start, other, N, R
                 if(step > max_steps)
                     break;
 
-                var state_0 = state;
-                var actionDict = code[state];
+                const state_0 = state;
+                const actionDict = code[state];
                 if(actionDict == undefined) {
                     state = "error";
                     break;
                 }
 
-                var action = actionDict[tape[position]];
+                const action = actionDict[tape[position]];
                 if (action == undefined)
                     action = actionDict[OTHER];
                 if (action == undefined) {
@@ -784,7 +784,7 @@ start, other, N, R
                 }
 
                 if(need_record) {
-                    history.push([step, position, state_0, toArray(tape)]);
+                    history.push([step, position, state_0, state, toArray(tape)]);
                 }
 
                 if (action[1] == NOT_VALID) {
@@ -811,7 +811,7 @@ start, other, N, R
             s += '<td style="border:none; padding-right:1em; text-align:right">'+record[0]+'</td>';
 
             position = 0;
-            record[3].forEach(e => {
+            record[4].forEach(e => {
                 var style = "border:1px solid black;";
 
                 style_list = result_table_style[e];
@@ -881,6 +881,13 @@ start, other, N, R
                 // 保存原始内容，用于对比变化
                 cell.setAttribute('data-original-content', cell.textContent);
             }
+
+            // 鼠标悬停显示状态转移
+            const rows = history_table.querySelectorAll('tr');
+            rows.forEach((row, i) => {
+                const record = history[i];
+                row.title = `state: ${(record[2] != undefined ? record[2] + " → " : "")}${(record[3] != undefined ? record[3] : "")}`;
+            });
         }
 
         refresh_history_table(history_table, result);
