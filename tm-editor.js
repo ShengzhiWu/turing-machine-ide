@@ -19,7 +19,7 @@
 const LOCALES = {
     zh: {
         formatLabels: ['状态', '记号', '修改后的记号', '移动', '新状态（可省略）'],
-        statusHint:   '💡 悬停红色波浪线查看错误 · Tab/Enter 确认补全 · Esc 关闭补全',
+        statusHint:   '💡 每行一条五元组图灵机指令 | 用other表示其他的纸带记号',
         noErrors:     '无错误',
         errorCount:   n => `错误: ${n}`,
         placeholder:  '输入如: q0, "1", "X", R, q1  // 注释',
@@ -42,7 +42,7 @@ const LOCALES = {
     },
     en: {
         formatLabels: ['State', 'Symbol', 'Write', 'Move', 'New state (optional)'],
-        statusHint:   '💡 Hover red underlines for errors · Tab/Enter to complete · Esc to close',
+        statusHint:   '💡 Each line is a quintuple Turing machine instruction | Use "other" for other tape symbols',
         noErrors:     'No errors',
         errorCount:   n => `Errors: ${n}`,
         placeholder:  'e.g. q0, "1", "X", R, q1  // comment',
@@ -509,6 +509,11 @@ class TmEditor extends HTMLElement {
     }
 
     _updateFormatBar() {
+        // 无焦点时不高亮任何一项
+        if (this._shadow.activeElement !== this._textarea) {
+            this._fmtItems.forEach(el => el.classList.remove('active'));
+            return;
+        }
         const { value: text, selectionStart: cursor } = this._textarea;
         const ls = lineStartOf(text, cursor);
         let elemIdx = 0, inStr = false;
@@ -669,7 +674,7 @@ class TmEditor extends HTMLElement {
         ta.addEventListener('mouseleave', () => { this._lastMouseEvent = null; this._errorTooltip.style.display = 'none'; });
 
         ta.addEventListener('click',  () => { this._updateFormatBar(); this._hideSuggestions(); this._updateMatchHighlight(); });
-        ta.addEventListener('blur',   () => { setTimeout(() => { if (this._shadow.activeElement !== sb) this._hideSuggestions(); }, 150); });
+        ta.addEventListener('blur',   () => { setTimeout(() => { if (this._shadow.activeElement !== sb) { this._hideSuggestions(); this._updateFormatBar(); } }, 150); });
 
         ta.addEventListener('keyup', e => {
             if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && sb.style.display === 'block') return;

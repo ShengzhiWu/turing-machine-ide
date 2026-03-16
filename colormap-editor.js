@@ -180,10 +180,10 @@ ${sel} .cm-format-bar {
     font-size:1em; line-height:1.7; display:flex; gap:0.2em;
     color:#8a95a8; user-select:none; flex-shrink:0; }
 ${sel} .cm-fmt-item {
-    padding:0.1em 0.5em; border-radius:0.375em; transition:background-color 0.15s; color:#8a95a8; }
+    padding:0.1em 0.5em; border-radius:0.375em; transition:background-color 0.15s; color: #c8d0e0; }  /* 顶上提示行的文本样式 */
 ${sel} .cm-fmt-item.active {
     background-color:rgba(255,255,255,0.1); box-shadow:0 0 0 1px rgba(255,255,255,0.15); color:#c8d0e0; }
-${sel} .cm-fmt-comma { color:#3d4455; margin:0 0.15em; }
+${sel} .cm-fmt-comma { color: #8f97aa; margin:0 0.15em; }  /* 顶上提示行的逗号样式 */
 
 /* 外层：纵向滚动容器，包裹行号+代码整体 */
 ${sel} .cm-host {
@@ -206,7 +206,8 @@ ${sel} .cm-gutters {
     background:#1a1d1e;
     border-right:1px solid rgba(255,255,255,0.07);
     padding:0.4em 0; min-width:3em;
-    font-size:1em; line-height:1.75; color:#4a5060;
+    font-size:1em; line-height:1.75;
+    color: #707685;  /* 行号颜色 */
     text-align:right; user-select:none; align-self:stretch; }
 ${sel} .cm-gutters div { padding:0 0.6em; }
 
@@ -238,7 +239,7 @@ ${sel} .cm-comment,${sel} .cm-comma,${sel} .cm-colorval,${sel} .cm-error {
     font-family:'JetBrains Mono','Fira Code','Cascadia Code',Consolas,'Courier New',monospace !important;
     font-weight:normal !important; font-style:normal !important; }
 ${sel} .cm-comment  { color:#5a6680 !important; }
-${sel} .cm-comma    { color:#3d4455 !important; }
+${sel} .cm-comma    { color:#8f97aa !important; }  /* 代码中的逗号样式 */
 ${sel} .cm-colorval { color:#c8d0e0 !important; }
 ${sel} .cm-error    { color:#f87171 !important; text-decoration:underline wavy; }
 
@@ -249,7 +250,7 @@ ${sel} .cm-info-bar {
     padding:0.5em 1.25em; background:#1a1d1e; color:#6a7080;
     font-size:0.8125em; border-top:1px solid rgba(255,255,255,0.06);
     flex-shrink:0; gap:1em; }
-${sel} .cm-status-hint { color:#5a6476; flex:1; }
+${sel} .cm-status-hint { color: rgb(168, 169, 184); flex:1; }  /* 提示文本颜色 */
 ${sel} .cm-error-count { padding:0.2em 0.75em; border-radius:2em; white-space:nowrap; flex-shrink:0; }
 ${sel} .cm-error-count.no-errors  { background:#1b2e22; color:#7ee8a2; border-left:3px solid #3ecf6e; }
 ${sel} .cm-error-count.has-errors { background:#2e1a1a; color:#ffa7b5; border-left:3px solid #ff4d6d; }
@@ -310,7 +311,7 @@ ${sel} .cm-error-count.has-errors { background:#2e1a1a; color:#ffa7b5; border-le
         this._infoBar = document.createElement('div');
         this._infoBar.className = 'cm-info-bar';
         this._infoBar.innerHTML = `
-            <span class="cm-status-hint">💡 悬停红色波浪线查看错误 · 点击色块打开颜色选择器 &nbsp;|&nbsp; 颜色格式：#rgb · #rrggbb · #rrggbbaa · rgb(r,g,b) · rgba(r,g,b,a) · hsl(h,s%,l%) · hsla(h,s%,l%,a) · red · crimson…</span>
+            <span class="cm-status-hint">💡 点击色块打开颜色选择器 &nbsp;|&nbsp; 颜色格式（CSS）：#rrggbb · rgb(r,g,b) · hsl(h,s%,l%) · red · transparent …</span>
             <span class="cm-error-count no-errors">无错误</span>`;
         this.appendChild(this._infoBar);
         this._errorCounter = this._infoBar.querySelector('.cm-error-count');
@@ -442,6 +443,10 @@ ${sel} .cm-error-count.has-errors { background:#2e1a1a; color:#ffa7b5; border-le
             }
         });
         wrapper.addEventListener('mouseleave', () => { this._tooltip.style.display = 'none'; });
+
+        cm.on('blur', () => {
+            this._fmtItems.forEach(el => el.classList.remove('active'));
+        });
     }
 
     _updateFormatBar() {
