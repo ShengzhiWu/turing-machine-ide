@@ -734,6 +734,10 @@
 
         // Add event listeners
 
+        code_editor.addEventListener('tm-run', e => {
+            run_program();
+        });
+
         graph_view.addEventListener("mousedown", e => {  // Middle button dragging for moving the graph
             if(e.button == 1) {
                 var last_position = [e.offsetX, e.offsetY];

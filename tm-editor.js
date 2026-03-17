@@ -13,6 +13,7 @@
 // 事件（在元素上监听）：
 //   "tm-change"         内容变化时，detail: { value, errorCount }
 //   "tm-errors"         错误数量变化时，detail: { errorCount, errors }
+//   "tm-run"            用户按下 F5 时，detail: { value, errorCount }
 // ════════════════════════════════════════════════════════════
 
 // ── 多语言文本 ──
@@ -735,6 +736,16 @@ class TmEditor extends HTMLElement {
         });
 
         ta.addEventListener('keydown', e => {
+            if (e.key === 'F5') {
+                e.preventDefault();
+                this.dispatchEvent(new CustomEvent('tm-run', {
+                    bubbles: true,
+                    composed: true,
+                    detail: { value: this.value, errorCount: this._errorCount },
+                }));
+                return;
+            }
+
             const ctrl = e.ctrlKey || e.metaKey;
 
             if (ctrl && e.key === '/') {
