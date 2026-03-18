@@ -11,9 +11,11 @@
 //   el.errorCount       只读，当前错误数
 //
 // 事件（在元素上监听）：
-//   "tm-change"         内容变化时，detail: { value, errorCount }
-//   "tm-errors"         错误数量变化时，detail: { errorCount, errors }
-//   "tm-run"            用户按下 F5 时，detail: { value, errorCount }
+//   "tm-change"              内容变化时，detail: { value, errorCount, changedLines }
+//                            changedLines: [{ line: number, content: string }, ...]
+//   "tm-errors"              错误数量变化时，detail: { errorCount, errors }
+//   "tm-run"                 用户按下 F5 时，detail: { value, errorCount }
+//   "tm-cursor-line-change"  光标跨行时，detail: { line: number, content: string }
 // ════════════════════════════════════════════════════════════
 
 // ── 多语言文本 ──
@@ -359,6 +361,8 @@ class TmEditor extends HTMLElement {
         // 增量渲染缓存
         this._prevLines = [];
         this._prevDup   = new Map();
+        // 光标行追踪
+        this._currentCursorLine = -1;
     }
 
     connectedCallback() {
@@ -492,6 +496,7 @@ class TmEditor extends HTMLElement {
 
         // ── 逐行增量更新高亮层 ──
         const allErrors = [];
+        const changedLines = [];   // 收集本次变化的行
         const layer = this._hlLayer;
         const oldChildCount = layer.children.length;
         const n = newLines.length;
@@ -499,6 +504,7 @@ class TmEditor extends HTMLElement {
         for (let i = 0; i < n; i++) {
             const lineChanged = oldLines[i] !== newLines[i];
             const dupChanged  = dupKey(newDup, i) !== dupKey(oldDup, i);
+            if (lineChanged) changedLines.push({ line: i, content: newLines[i] });
 
             if (lineChanged || dupChanged) {
                 const extra = newDup.has(i) ? [{ lineIdx: i, ...newDup.get(i), type: 'duplicate' }] : [];
@@ -548,9 +554,12 @@ class TmEditor extends HTMLElement {
         this._refreshErrorTooltip();
         this._updateMatchHighlight();
 
+        // 若行数减少，旧的末尾行视为被删除（内容变为空），可按需加入 changedLines
+        // 此处仅记录新内容存在的行变化（删除的行已不存在于 newLines 中）
+
         this.dispatchEvent(new CustomEvent('tm-change', {
             bubbles: true, composed: true,
-            detail: { value: ta.value, errorCount: this._errorCount }
+            detail: { value: ta.value, errorCount: this._errorCount, changedLines }
         }));
     }
 
@@ -706,6 +715,27 @@ class TmEditor extends HTMLElement {
         this._hideSuggestions();
     }
 
+    // ── 内部：检测光标是否跨行，若跨行则触发 tm-cursor-line-change ──
+
+    _checkCursorLine() {
+        const ta = this._textarea;
+        const pos = ta.selectionStart;
+        const lines = ta.value.split('\n');
+        // 计算当前光标所在行号（0-based）
+        let lineIdx = 0, counted = 0;
+        for (let i = 0; i < lines.length; i++) {
+            counted += lines[i].length + 1; // +1 for '\n'
+            if (pos < counted) { lineIdx = i; break; }
+        }
+        if (lineIdx !== this._currentCursorLine) {
+            this._currentCursorLine = lineIdx;
+            this.dispatchEvent(new CustomEvent('tm-cursor-line-change', {
+                bubbles: true, composed: true,
+                detail: { line: lineIdx, content: lines[lineIdx] ?? '' }
+            }));
+        }
+    }
+
     // ── 内部：事件绑定（connectedCallback 调用一次） ──
 
     _bindEvents() {
@@ -715,6 +745,7 @@ class TmEditor extends HTMLElement {
             this._syncHighlight();
             const isNewline = e.inputType === 'insertLineBreak' || e.inputType === 'insertParagraph';
             if (!isNewline) this._triggerAutocomplete();
+            this._checkCursorLine();
         });
 
         ta.addEventListener('scroll', () => {
@@ -725,13 +756,14 @@ class TmEditor extends HTMLElement {
         ta.addEventListener('mousemove',  e => { this._lastMouseEvent = e; this._refreshErrorTooltip(); });
         ta.addEventListener('mouseleave', () => { this._lastMouseEvent = null; this._errorTooltip.style.display = 'none'; });
 
-        ta.addEventListener('click',  () => { this._updateFormatBar(); this._hideSuggestions(); this._updateMatchHighlight(); });
+        ta.addEventListener('click',  () => { this._updateFormatBar(); this._hideSuggestions(); this._updateMatchHighlight(); this._checkCursorLine(); });
         ta.addEventListener('blur',   () => { setTimeout(() => { if (this._shadow.activeElement !== sb) { this._hideSuggestions(); this._updateFormatBar(); } }, 150); });
 
         ta.addEventListener('keyup', e => {
             if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && sb.style.display === 'block') return;
             if (['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End'].includes(e.key)) {
                 this._updateFormatBar(); this._hideSuggestions(); this._updateMatchHighlight();
+                this._checkCursorLine();
             }
         });
 
