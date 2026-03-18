@@ -1,5 +1,25 @@
 # turing-machine-ide
 
+## 运行
+
+### 在浏览器中运行（便于测试）
+
+请直接运行`index.html`（方法是在文件管理器中双击此文件，或在VSCode中打开此文件然后点击 VSCode 右下角的 Go Live）
+
+### 作为 Electron 应用运行
+
+请执行（只需执行一次，下次运行无需再执行）
+
+```bash
+npm i
+```
+
+请执行如下指令
+
+```bash
+npx electron .
+```
+
 ## TODO
 
 - debug: 有的时候error节点不会显示出来
