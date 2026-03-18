@@ -98,7 +98,7 @@
         <button id="run-btn" title="Run Program" onclick="run_program();" style="color: white;">▶</button>
         <div>
             Max steps
-            <input id="max-steps-input" type="text" value="10000"/>
+            <input id="max-steps-input" type="text" value="3000"/>
         </div>
 
         <div style=" overflow: hidden;">
@@ -550,9 +550,12 @@
             return history;
         }
 
-        var tape = toArray(["", "1", "0", "1", "1", "1", "", "1", "1", "0", "", "", "", "", "", "", "", "", "", "", "", "", ""]);
+        var tape = toArray(["", "1", "0", "1", "1", "1", "", "1", "1", "0", "", "", "", "", "", "", "", "", "", "", "", "", ""]);  // 正确答案：11余101
+        // var tape = toArray(["", "1", "0", "1", "", "1", "1", "", "", "", "", "", "", "", "", "", "", ""]);  // 正确答案：1余10
+        // var tape = toArray(["", "1", "1", "", "1", "0", "", "", "", "", "", "", "", "", "", "", ""]);  // 正确答案：1余1
+        // var tape = toArray(["", "1", "", "1", "0", "", "", "", "", "", "", "", "", "", "", ""]);  // 正确答案：0余1
 
-        var result = run_turing_machine(code, tape, 10000, false);
+        var result = run_turing_machine(code, tape, 3000, false);
         // console.log(result);
 
         function generate_history_table_row(record) {
