@@ -340,17 +340,19 @@
                     if (direction == NOT_VALID)
                         direction = '*';
                     const edge_name = (input == "" ? '""': input) + (output != N ? '→'+ (output == "" ? '""': output): "") + ', ' + direction;
-                    if(nextState == state)  // Connect to self
-                    {
+                    if(nextState == state) {  // Connect to self
                         graph.push(["self-connection", get_random_point(), false, i]);  // Add the new node for displaying a self-connection
                         vertex[3].push([graph.length - 1, edge_name , self_connection_default_length, undefined]);  // Add a connection
                     }
-                    else  // Connection to another vertex
-                    {
+                    else {  // Connection to another vertex
                         var j = graph.findIndex(e => e[0] == nextState);
                         if(j == -1) {  // This is a connection to a new node.
+                            if (nextState == 'end')
+                                nextState = "end_from_" + i;
+                            if (nextState == 'error')
+                                nextState = "error_from_" + i;
                             graph.push([
-                                nextState == "end" ? "end_from_" + i : nextState,
+                                nextState,
                                 get_random_point(),
                                 true,
                                 []
@@ -505,10 +507,14 @@
             graph.forEach(node => {
                 if(node[2]) {
                     const p = vector_plus([frame.x, frame.y], vector_scale(frame.factor, node[1]));
-                    // const action = code[node[0]];
-                    s += '<circle cx="'+p[0]+'" cy="' + p[1] + '" r="' + vertex_r + '" fill="' + (node[0] == 'start' || node[0].startsWith('end') ? 'yellow' : 'white') + '" />'  // Disk
+                    let node_name = node[0];
+                    if (node_name.startsWith('end'))
+                        node_name = 'end';
+                    else if (node_name.startsWith('error'))
+                        node_name = 'error';
+                    s += '<circle cx="'+p[0]+'" cy="' + p[1] + '" r="' + vertex_r + '" fill="' + (node_name == 'start' || node_name == 'end' || node_name == 'error' ? 'yellow' : 'white') + '" />'  // Disk
                         + '<text x="' + (p[0]-3) + '" y="' + (p[1] + 4) + '" fill="black" style="font-size:12px">' + (node[4] || "") + '</text>'  // Test in the disk
-                        + '<text x="' + (p[0]+vertex_name_text_offset[0] - 3) + '" y="' + (p[1] + vertex_name_text_offset[1] + 4) + '" fill="black" style="font-size:12px">' + (node[0].startsWith('end') ? 'end' : node[0]) + '</text>';  // Name outside the disk
+                        + '<text x="' + (p[0]+vertex_name_text_offset[0] - 3) + '" y="' + (p[1] + vertex_name_text_offset[1] + 4) + '" fill="black" style="font-size:12px">' + node_name + '</text>';  // Name outside the disk
                 }
             });
 
