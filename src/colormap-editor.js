@@ -15,6 +15,7 @@
 //   el.errorCount       只读，当前错误行数
 //
 // 事件（在元素上监听）：
+//   "ready"             组件初始化完成，可以安全设置 value
 //   "cm-change"         内容变化时，detail: { value, errorCount }
 //   "cm-errors"         错误数量变化时，detail: { errorCount, errors }
 // ════════════════════════════════════════════════════════════
@@ -124,14 +125,7 @@ function _registerMode() {
 
 // ── 内置默认示例内容 ─────────────────────────────────────────────────────────
 
-const _DEFAULT_VALUE = `P, white, red  // 被除数左侧记号
-Q, white, green  // 除数右侧记号
-R, white, blue  // 商右侧记号
-A, white, gray  // 商占位记号
-0', brown
-0~, brown  // 余数已比较部分
-1', brown
-1~, brown  // 余数已比较部分`;
+const _DEFAULT_VALUE = "";
 
 // ════════════════════════════════════════════════════════════
 // 自定义元素
@@ -149,6 +143,7 @@ class ColormapEditor extends HTMLElement {
         this._ruleCount  = 0;
         this._cm         = null;
         this._pendingValue = null;
+        this._ready = false;  // 新增：标记是否已准备好
     }
 
     connectedCallback() {
@@ -169,6 +164,14 @@ class ColormapEditor extends HTMLElement {
             this._applyMarks();
             this._bindEvents();
             this._cm.refresh();
+            
+            // 新增：标记为已准备好并触发 ready 事件
+            this._ready = true;
+            this.dispatchEvent(new CustomEvent('ready', {
+                bubbles: true,
+                composed: true,
+                detail: { editor: this }
+            }));
         });
     }
 
@@ -189,6 +192,9 @@ class ColormapEditor extends HTMLElement {
     }
 
     get errorCount() { return this._errorCount; }
+    
+    // 新增：检查是否已准备好
+    get ready() { return this._ready; }
 
     // ── 构建普通 DOM（不用 Shadow DOM，避免 CodeMirror CSS 隔离问题）────────
 

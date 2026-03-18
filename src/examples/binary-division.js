@@ -3,7 +3,9 @@
 if (!examples)
     var examples = {};
 
-examples["binary-division"] = `// 二进制除法
+examples["binary-division"] = {};
+
+examples["binary-division"]['code'] = `// 二进制除法
 
 start, "", "P", R, 2  // 添加被除数左侧记号
 start, other, N, R
@@ -253,3 +255,12 @@ start, other, N, R
 39, "Q", "", L
 39, "P", "", N, end
 39, other, N, L`;
+
+examples["binary-division"]['style'] = `P, white, red  // 被除数左侧记号
+Q, white, green  // 除数右侧记号
+R, white, blue  // 商右侧记号
+A, white, gray  // 商占位记号
+0', brown
+0~, brown  // 余数已比较部分
+1', brown
+1~, brown  // 余数已比较部分`;
