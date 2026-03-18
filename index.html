@@ -632,10 +632,7 @@
             return history;
         }
 
-        var tape = toArray(["", "1", "0", "1", "1", "1", "", "1", "1", "0", "", "", "", "", "", "", "", "", "", "", "", "", ""]);  // 正确答案：11余101
-        // var tape = toArray(["", "1", "0", "1", "", "1", "1", "", "", "", "", "", "", "", "", "", "", ""]);  // 正确答案：1余10
-        // var tape = toArray(["", "1", "1", "", "1", "0", "", "", "", "", "", "", "", "", "", "", ""]);  // 正确答案：1余1
-        // var tape = toArray(["", "1", "", "1", "0", "", "", "", "", "", "", "", "", "", "", ""]);  // 正确答案：0余1
+        var tape = toArray(examples["binary-division"]["tapes"][0]);  // 正确答案：11余101
 
         var detailed_output = false;
         var result = run_turing_machine(code, tape, 3000, detailed_output);
