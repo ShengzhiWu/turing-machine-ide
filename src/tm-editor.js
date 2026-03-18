@@ -2,7 +2,7 @@
 // tm-editor.js — <tm-editor> 自定义元素
 //
 // 属性：
-//   lang="zh" | "en"   语言（默认 zh）
+//   lang="zh" | "en"   语言（默认 en；不支持的语言回退到 en）
 //   value               初始内容（attribute 或 property）
 //
 // Property（JS）：
@@ -346,7 +346,7 @@ class TmEditor extends HTMLElement {
     constructor() {
         super();
         this._shadow = this.attachShadow({ mode: 'open' });
-        this._lang = 'zh';
+        this._lang = 'en';
         this._errorCount = 0;
         this._lastErrors = [];
         // 补全状态
@@ -370,7 +370,7 @@ class TmEditor extends HTMLElement {
         this._bindEvents();
         // 读取 attribute 初始值
         if (this.hasAttribute('value')) this._textarea.value = this.getAttribute('value');
-        if (this.hasAttribute('lang'))  this._lang = this.getAttribute('lang') === 'en' ? 'en' : 'zh';
+        if (this.hasAttribute('lang'))  this._lang = LOCALES[this.getAttribute('lang')] ? this.getAttribute('lang') : 'en';
         this._applyLang();
         this._syncHighlight();
     }
@@ -382,7 +382,7 @@ class TmEditor extends HTMLElement {
     attributeChangedCallback(name, _old, val) {
         if (!this._textarea) return; // 还未 connectedCallback
         if (name === 'lang') {
-            this._lang = val === 'en' ? 'en' : 'zh';
+            this._lang = LOCALES[val] ? val : 'en';
             this._applyLang();
             this._resetCache();
             this._syncHighlight();
@@ -403,7 +403,7 @@ class TmEditor extends HTMLElement {
     }
 
     get lang() { return this._lang; }
-    set lang(v) { this.setAttribute('lang', v); }
+    set lang(v) { this.setAttribute('lang', LOCALES[v] ? v : 'en'); }
 
     get errorCount() { return this._errorCount; }
 

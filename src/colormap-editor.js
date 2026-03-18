@@ -9,16 +9,49 @@
 //
 // 属性：
 //   value               初始内容（attribute 或 property）
+//   lang                界面语言，"zh" 或 "en"（默认）；不支持的语言回退到 "en"
 //
 // Property（JS）：
 //   el.value            读写编辑器内容
 //   el.errorCount       只读，当前错误行数
+//   el.lang             读写界面语言（"zh" | "en"）；不支持的值回退到 "en"，赋值后立即刷新 UI
 //
 // 事件（在元素上监听）：
-//   "ready"             组件初始化完成，可以安全设置 value
+//   "ready"             组件初始化完成，可以安全设置 value / lang
 //   "cm-change"         内容变化时，detail: { value, errorCount }
 //   "cm-errors"         错误数量变化时，detail: { errorCount, errors }
 // ════════════════════════════════════════════════════════════
+
+// ── 国际化（i18n）────────────────────────────────────────────────────────────
+
+const _I18N = {
+    zh: {
+        fmtToken:      '记号',
+        fmtFg:         '前景色',
+        fmtBg:         '背景色',
+        hint:          '💡 点击色块打开颜色选择器 \u00a0|\u00a0 颜色格式（CSS）：#rrggbb · rgb(r,g,b) · hsl(h,s%,l%) · red · transparent …',
+        noErrors:      '无错误',
+        errorCount:    n => `错误: ${n}`,
+        errMissingP0:  '缺少第一元（token 名）',
+        errMissingP1:  '缺少第二元（前景色）',
+        errTooMany:    n => `最多三个元素，得到 ${n} 个`,
+        errBadColorP1: c => `"${c}" 不是有效的 CSS 颜色`,
+        errBadColorP2: c => `"${c}" 不是有效的 CSS 颜色`,
+    },
+    en: {
+        fmtToken:      'Token',
+        fmtFg:         'Foreground',
+        fmtBg:         'Background',
+        hint:          '💡 Click a swatch to open the color picker \u00a0|\u00a0 CSS formats: #rrggbb · rgb(r,g,b) · hsl(h,s%,l%) · red · transparent …',
+        noErrors:      'No errors',
+        errorCount:    n => `Errors: ${n}`,
+        errMissingP0:  'Missing column 1 (token name)',
+        errMissingP1:  'Missing column 2 (foreground color)',
+        errTooMany:    n => `At most 3 columns, got ${n}`,
+        errBadColorP1: c => `"${c}" is not a valid CSS color`,
+        errBadColorP2: c => `"${c}" is not a valid CSS color`,
+    },
+};
 
 // ── CSS 颜色关键字 ────────────────────────────────────────────────────────────
 
@@ -45,7 +78,7 @@ function _splitTopLevel(str) {
     return parts;
 }
 
-function _parseLine(raw) {
+function _parseLine(raw, t) {
     const noComment = raw.replace(/\/\/.*$/, '').replace(/"[^"]*"/g, s => ' '.repeat(s.length));
     const stripped  = noComment.trim();
     if (!stripped) return null;
@@ -81,11 +114,11 @@ function _parseLine(raw) {
 
     const [p0, p1, p2, ...rest] = parts;
 
-    if (!p0)       return { error: true, msg: '缺少第一元（token 名）',   from: 0, to: raw.length };
-    if (!p1)       return { error: true, msg: '缺少第二元（前景色）',     from: p0.to, to: raw.length };
-    if (rest.length) return { error: true, msg: `最多三个元素，得到 ${parts.length} 个`, from: rest[0].from, to: rest[rest.length-1].to };
-    if (!_isCssColor(p1.text)) return { error: true, msg: `"${p1.text}" 不是有效的 CSS 颜色`, from: p1.from, to: p1.to };
-    if (p2 && !_isCssColor(p2.text)) return { error: true, msg: `"${p2.text}" 不是有效的 CSS 颜色`, from: p2.from, to: p2.to };
+    if (!p0)       return { error: true, msg: t.errMissingP0,           from: 0, to: raw.length };
+    if (!p1)       return { error: true, msg: t.errMissingP1,           from: p0.to, to: raw.length };
+    if (rest.length) return { error: true, msg: t.errTooMany(parts.length), from: rest[0].from, to: rest[rest.length-1].to };
+    if (!_isCssColor(p1.text)) return { error: true, msg: t.errBadColorP1(p1.text), from: p1.from, to: p1.to };
+    if (p2 && !_isCssColor(p2.text)) return { error: true, msg: t.errBadColorP2(p2.text), from: p2.from, to: p2.to };
 
     return { token: p0.text, fg: p1.text, bg: p2?.text || null };
 }
@@ -132,7 +165,7 @@ const _DEFAULT_VALUE = "";
 // ════════════════════════════════════════════════════════════
 
 class ColormapEditor extends HTMLElement {
-    static get observedAttributes() { return ['value']; }
+    static get observedAttributes() { return ['value', 'lang']; }
 
     constructor() {
         super();
@@ -144,10 +177,16 @@ class ColormapEditor extends HTMLElement {
         this._cm         = null;
         this._pendingValue = null;
         this._ready = false;  // 新增：标记是否已准备好
+        this._lang  = 'en';   // 默认语言（不支持的语言也回退到此）
     }
 
     connectedCallback() {
         _registerMode();
+        // 读取初始语言（attribute 优先于默认值）
+        if (this.hasAttribute('lang')) {
+            const l = this.getAttribute('lang');
+            this._lang = _I18N[l] ? l : 'en';
+        }
         this._buildDOM();
         // 延迟一帧，确保元素已进入布局，CodeMirror 能正确读取尺寸
         requestAnimationFrame(() => {
@@ -176,6 +215,11 @@ class ColormapEditor extends HTMLElement {
     }
 
     attributeChangedCallback(name, _old, val) {
+        if (name === 'lang') {
+            const resolved = _I18N[val] ? val : 'en';
+            if (resolved !== this._lang) { this._lang = resolved; this._refreshUI(); }
+            return;
+        }
         if (name !== 'value') return;
         if (this._cm) {
             this._cm.setValue(val ?? '');
@@ -195,6 +239,41 @@ class ColormapEditor extends HTMLElement {
     
     // 新增：检查是否已准备好
     get ready() { return this._ready; }
+
+    // ── 语言支持 ──────────────────────────────────────────────────────────────
+
+    /** 当前语言代码（"zh" | "en"）*/
+    get lang() { return this._lang; }
+    set lang(v) {
+        const resolved = _I18N[v] ? v : 'en';
+        if (resolved === this._lang) return;
+        this._lang = resolved;
+        this.setAttribute('lang', resolved);   // 保持 attribute 同步
+        this._refreshUI();
+    }
+
+    /** 返回当前语言的翻译对象 */
+    get _t() { return _I18N[this._lang] || _I18N.zh; }
+
+    /** 用当前语言重新渲染所有静态文本节点 */
+    _refreshUI() {
+        if (!this._cm) return;          // 尚未初始化，_buildDOM 会用当前 _lang
+        const t = this._t;
+
+        // 格式栏文字
+        if (this._fmtItems) {
+            this._fmtItems.forEach(el => {
+                const col = +el.dataset.col;
+                el.textContent = col === 0 ? t.fmtToken : col === 1 ? t.fmtFg : t.fmtBg;
+            });
+        }
+
+        // 底部提示
+        if (this._statusHint)  this._statusHint.textContent  = t.hint;
+
+        // 错误计数（重新渲染当前数值）
+        this._updateCounter();
+    }
 
     // ── 构建普通 DOM（不用 Shadow DOM，避免 CodeMirror CSS 隔离问题）────────
 
@@ -311,12 +390,13 @@ ${sel} .cm-error-count.has-errors { background:#2e1a1a; color:#ffa7b5; border-le
         // 格式栏
         this._fmtBar = document.createElement('div');
         this._fmtBar.className = 'cm-format-bar';
+        const t0 = this._t;
         this._fmtBar.innerHTML = `
-            <span class="cm-fmt-item" data-col="0">记号</span>
+            <span class="cm-fmt-item" data-col="0">${t0.fmtToken}</span>
             <span class="cm-fmt-comma">,</span>
-            <span class="cm-fmt-item" data-col="1">前景色</span>
+            <span class="cm-fmt-item" data-col="1">${t0.fmtFg}</span>
             <span class="cm-fmt-comma">,</span>
-            <span class="cm-fmt-item" data-col="2">背景色</span>`;
+            <span class="cm-fmt-item" data-col="2">${t0.fmtBg}</span>`;
         this.appendChild(this._fmtBar);
         this._fmtItems = this._fmtBar.querySelectorAll('[data-col]');
 
@@ -348,11 +428,13 @@ ${sel} .cm-error-count.has-errors { background:#2e1a1a; color:#ffa7b5; border-le
         // 信息栏
         this._infoBar = document.createElement('div');
         this._infoBar.className = 'cm-info-bar';
+        const t1 = this._t;
         this._infoBar.innerHTML = `
-            <span class="cm-status-hint">💡 点击色块打开颜色选择器 &nbsp;|&nbsp; 颜色格式（CSS）：#rrggbb · rgb(r,g,b) · hsl(h,s%,l%) · red · transparent …</span>
-            <span class="cm-error-count no-errors">无错误</span>`;
+            <span class="cm-status-hint">${t1.hint}</span>
+            <span class="cm-error-count no-errors">${t1.noErrors}</span>`;
         this.appendChild(this._infoBar);
         this._errorCounter = this._infoBar.querySelector('.cm-error-count');
+        this._statusHint   = this._infoBar.querySelector('.cm-status-hint');
     }
 
     // ── 初始化 CodeMirror ─────────────────────────────────────────────────────
@@ -402,7 +484,7 @@ ${sel} .cm-error-count.has-errors { background:#2e1a1a; color:#ffa7b5; border-le
         const lines = cm.getValue().split('\n');
 
         lines.forEach((raw, lineNo) => {
-            const r = _parseLine(raw);
+            const r = _parseLine(raw, this._t);
             if (!r) return;
             if (r.error) { this._lineErrors.set(lineNo, { msg: r.msg, from: r.from, to: r.to }); return; }
 
@@ -439,7 +521,8 @@ ${sel} .cm-error-count.has-errors { background:#2e1a1a; color:#ffa7b5; border-le
         const n = this._lineErrors.size;
         const prevCount = this._errorCount;
         this._errorCount = n;
-        this._errorCounter.textContent = n ? `错误: ${n}` : '无错误';
+        const t = this._t;
+        this._errorCounter.textContent = n ? t.errorCount(n) : t.noErrors;
         this._errorCounter.className   = `cm-error-count ${n ? 'has-errors' : 'no-errors'}`;
 
         const errors = Array.from(this._lineErrors.entries()).map(([line, e]) => ({ line, msg: e.msg }));
