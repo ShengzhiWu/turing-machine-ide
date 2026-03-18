@@ -101,7 +101,7 @@
         <button id="run-btn" title="Run Program" onclick="run_program();" style="color: white;">▶</button>
         <div>
             Max steps
-            <input id="max-steps-input" type="text" value="10000"/>
+            <input id="max-steps-input" type="text" value="3000"/>
         </div>
 
         <div style=" overflow: hidden;">
@@ -628,9 +628,12 @@
             return history;
         }
 
-        var tape = toArray(["", "1", "0", "1", "1", "1", "", "1", "1", "0", "", "", "", "", "", "", "", "", "", "", "", "", ""]);
+        // var tape = toArray(["", "1", "0", "1", "1", "1", "", "1", "1", "0", "", "", "", "", "", "", "", "", "", "", "", "", ""]);  // 正确答案“11余101
+        var tape = toArray(["", "1", "0", "1", "", "1", "1", "", "", "", "", "", "", "", "", "", "", ""]);  // 正确答案：1余10
+        // var tape = toArray(["", "1", "1", "", "1", "0", "", "", "", "", "", "", "", "", "", "", ""]);
 
-        var result = run_turing_machine(code, tape, 10000, false);
+        var detailed_output = true;
+        var result = run_turing_machine(code, tape, 3000, detailed_output);
         // console.log(result);
 
         function generate_history_table_row(record) {
@@ -728,7 +731,7 @@
 
         function run_program() {
             // TODO: real-time compile
-            result = run_turing_machine(code, tape, max_steps_input.value, false);
+            result = run_turing_machine(code, tape, max_steps_input.value, detailed_output);
             refresh_history_table(history_table, result);
         }
 
