@@ -55,10 +55,20 @@
     </style>
 </head>
 <body style="margin: 0; display: flex; flex-direction: row; height: 100vh; overflow: hidden;">
+    <!-- 修复 Electron 中 jQuery 无法挂载到 window 的问题 -->
+    <script>
+        if (typeof module === 'object') { window.module = module; module = undefined; }
+    </script>
+
     <!-- jQuery and draggable / resizable functionality -->
     <script src="src/vendor/jquery/jquery-3.6.0.min.js"></script>
     <link rel="stylesheet" href="src/vendor/jquery/jquery-ui.css">
     <script src="src/vendor/jquery/jquery-ui.js"></script>
+
+    <!-- 加载完后恢复 module -->
+    <script>
+        if (window.module) module = window.module;
+    </script>
 
     <!-- CodeMirror 核心（本地文件） -->
     <link rel="stylesheet" href="src/vendor/codemirror/codemirror.min.css">
