@@ -5,7 +5,7 @@ if (!examples)
 
 examples["copy-bricks"] = {};
 
-examples["move-bricks"]["name"] = {
+examples["copy-bricks"]["name"] = {
     "zh": "复制砖块",
     "en": "Copy bricks"
 }

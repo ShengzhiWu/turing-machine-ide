@@ -1264,6 +1264,7 @@
             language:       '语言',
             langZh:         '中文',
             langEn:         'English',
+            examples:       '样例',
             openProject:    '打开工程',
             saveProject:    '保存工程',
             saveEmbedding:  '保存图嵌入',
@@ -1290,6 +1291,7 @@
             language:       'Language',
             langZh:         '中文',
             langEn:         'English',
+            examples:       'Examples',
             openProject:    'Open Project',
             saveProject:    'Save Project',
             saveEmbedding:  'Save Graph Embedding',
@@ -1327,6 +1329,14 @@
                     { label: t('openProject'),   action: menuOpenProject },
                     { label: t('saveProject'),   action: menuSaveProject },
                     { label: t('saveEmbedding'), action: menuSaveEmbedding },
+                    'separator',
+                    {
+                        label: t('examples'),
+                        submenu: Object.keys(examples).map(key => ({
+                            label: (examples[key]['name'][language] || examples[key]['name']['en']),
+                            action: () => menuLoadExample(key)
+                        }))
+                    },
                     'separator',
                     {
                         label: t('preferences'),
@@ -1632,6 +1642,39 @@
             // 重新运行
             if (typeof run_program === 'function') run_program();
         });
+    }
+
+    function menuLoadExample(key) {
+        const lang = (typeof language !== 'undefined') ? language : 'en';
+        const ex = examples[key];
+
+        // 载入图灵机代码
+        const code = ex['code'][lang] || ex['code']['en'];
+        code_editor_value = code;
+        code_editor.value = code;
+
+        // 载入样式代码
+        const styleCode = ex['style'][lang] || ex['style']['en'];
+        style_editor.value = styleCode;
+        result_table_style = parseStyleCode(styleCode);
+
+        // 载入纸带初值
+        tape = toArray(ex['tapes'][0]);
+        while (tape.length < 3 || tape[tape.length-1] !== '' || tape[tape.length-2] !== '' || tape[tape.length-3] !== '')
+            tape.push('');
+        while (tape[tape.length-1] === '' && tape[tape.length-2] === '' && tape[tape.length-3] === '' && tape[tape.length-4] === '')
+            tape.pop();
+
+        // 刷新有向图
+        refresh_graph_embedding();
+
+        // 若有预设嵌入坐标则应用
+        if (ex['embedding'] !== undefined) {
+            applyGraphEmbedding(ex['embedding']);
+        }
+
+        // 运行程序
+        if (typeof run_program === 'function') run_program();
     }
 
     // ── Language switching ────────────────────────────────────────────────
