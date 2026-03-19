@@ -138,7 +138,7 @@ textarea::-webkit-scrollbar-corner { background: #171c2b; }
 .token-pos-5, .format-pos-5 { color: #ffa1c0; }
 .token-keyword { color: #ffd966; }
 .token-comma   { color: #ffd966; font-weight: bold; }
-.token-comment { color: #6c7a9e; font-style: italic; }
+.token-comment { color: #6c7a9e; }
 .token-plain   { color: #d1dbf0; }
 .token-error   { text-decoration: red wavy underline; text-decoration-skip-ink: none; text-underline-position: under; }
 .token-match   { background: rgba(200,200,200,0.18); }
