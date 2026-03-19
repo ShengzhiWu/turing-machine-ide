@@ -190,14 +190,14 @@
 
         function parseProgramCode(code) { // 解析新格式代码
             const result = {};
-            code.split("\n").forEach(line => {  // 遍历行
+            code.split("\n").forEach((rawLine, lineIndex) => {  // 遍历行
                 // 去掉注释
-                line = line.split("//")[0].trim();
+                const trimmed = rawLine.split("//")[0].trim();
 
-                if (line.length == 0)
+                if (trimmed.length == 0)
                     return;
                 
-                const parts = line.split(",").map(part => part.trim());
+                const parts = trimmed.split(",").map(part => part.trim());
 
                 const state = parts[0];
                 let input = parts[1];
@@ -227,7 +227,8 @@
 
                 if (result[state] == undefined)
                     result[state] = {};
-                result[state][input] = [output, direction, nextState];
+                // 存规则值，同时附带行号和去注释后的行内容，供图跳转使用
+                result[state][input] = [output, direction, nextState, { lineIndex, lineContent: trimmed }];
             });
 
             return result;
@@ -354,12 +355,15 @@
                                 nextState = "end_from_" + i;
                             if (nextState == 'error')
                                 nextState = "error_from_" + i;
-                            graph.push([
+                            const newNode = [
                                 nextState,
                                 get_random_point(),
                                 true,
                                 []
-                            ]);  // Add the new node.
+                            ];  // Add the new node.
+                            // 记录此节点对应的代码行信息（第四元 action[3] 由 parseProgramCode 附带）
+                            if (action[3]) newNode._jumpInfo = action[3];
+                            graph.push(newNode);
                             j = graph.length - 1;
                         }
 
@@ -509,10 +513,69 @@
 
                 node._dom = dom;           // 将 DOM 引用挂在 node 上
                 node._display_name = node_name;
+
+                // ── 点击节点 → 编辑器光标跳转 ──────────────────────────
+                [dom.circle, dom.name].forEach(el => {
+                    el.style.cursor = 'pointer';
+                    el.addEventListener('click', e => {
+                        e.stopPropagation();
+                        // node[0] 是原始名称（如 error_from_3），node_name 是显示名（如 error）
+                        jumpEditorToState(node[0], node_name, node._jumpInfo);
+                    });
+                });
             });
         }
 
-        // ─── 阶段二：每帧只更新坐标属性（不碰 DOM 结构）───────────────
+        /**
+         * 在代码编辑器中找到目标节点对应的行，并将光标跳转过去。
+         *
+         * - 普通节点：匹配第一元 == state_name 的第一行。
+         * - end_from / error_from 节点：利用 source.fromState（第一元）+
+         *   source.fromInput（第二元）精确定位那条跳转到 end/error 的规则行。
+         *   若一个状态有多条跳到 error 的规则，可通过 input 符号区分。
+         *   fromInput 可能是字符串（已去掉引号）、Symbol OTHER、Symbol N，
+         *   比较时需还原为代码中的字面形式。
+         */
+        function jumpEditorToState(raw_name, state_name, jumpInfo) {
+            const lines = code_editor_value.split('\n');
+
+            // ── end_from / error_from 节点：用 jumpInfo 定位 ────────────
+            if (jumpInfo && (raw_name.startsWith('end_from_') || raw_name.startsWith('error_from_'))) {
+                let { lineIndex, lineContent } = jumpInfo;
+
+                // 先按行号快速匹配
+                if (lines[lineIndex] !== undefined &&
+                    lines[lineIndex].split('//')[0].trim() === lineContent) {
+                    code_editor.setCursor(lineIndex, 0, { focus: true });
+                    return;
+                }
+
+                // 行号处内容已变，全文搜索行内容
+                for (let i = 0; i < lines.length; i++) {
+                    if (lines[i].split('//')[0].trim() === lineContent) {
+                        jumpInfo.lineIndex = i;  // 更新缓存的行号
+                        code_editor.setCursor(i, 0, { focus: true });
+                        return;
+                    }
+                }
+
+                return;  // 找不到则不跳转
+            }
+
+            // ── 普通节点：匹配第一元 ─────────────────────────────────
+            for (let i = 0; i < lines.length; i++) {
+                const first_token = lines[i].split('//')[0].split(',')[0].trim();
+                if (first_token === state_name) {
+                    code_editor.setCursor(i, 0, { focus: true });
+                    return;
+                }
+            }
+
+            // 兜底：聚焦编辑器顶部
+            code_editor.setCursor(0, 0, { focus: true });
+        }
+
+                // ─── 阶段二：每帧只更新坐标属性（不碰 DOM 结构）───────────────
         function update_graph_dom(graph) {
             // 更新连线
             graph.forEach(node => {

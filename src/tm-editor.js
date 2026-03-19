@@ -9,6 +9,9 @@
 //   el.value            读写编辑器内容
 //   el.lang             读写语言
 //   el.errorCount       只读，当前错误数
+//   el.setCursor(line, col?, options?)
+//                       将光标跳转到指定行列；line/col 从 0 开始，支持负索引；
+//                       options: { focus=true, select=false }
 //
 // 事件（在元素上监听）：
 //   "tm-change"              内容变化时，detail: { value, errorCount, changedLines }
@@ -406,6 +409,71 @@ class TmEditor extends HTMLElement {
     set lang(v) { this.setAttribute('lang', LOCALES[v] ? v : 'en'); }
 
     get errorCount() { return this._errorCount; }
+
+    /**
+     * 将光标跳转到指定行和列位置，并将该行滚动到可见区域。
+     *
+     * @param {number} line   目标行号，从 0 开始（0 = 第一行）。
+     *                        传入负数时从末尾倒数（-1 = 最后一行）。
+     * @param {number} [col=0] 目标列号，从 0 开始（0 = 行首）。
+     *                         超出行长度时自动截断到行尾。
+     * @param {Object} [options={}]
+     * @param {boolean} [options.focus=true]  是否同时聚焦编辑器。
+     * @param {boolean} [options.select=false] 若为 true，则选中目标行的全部内容。
+     *
+     * @returns {boolean} 跳转成功返回 true，编辑器尚未初始化则返回 false。
+     *
+     * @example
+     * editor.setCursor(2);          // 第 3 行行首
+     * editor.setCursor(0, 5);       // 第 1 行第 6 列
+     * editor.setCursor(-1);         // 最后一行行首
+     * editor.setCursor(4, 0, { select: true }); // 选中第 5 行
+     */
+    setCursor(line, col = 0, { focus = true, select = false } = {}) {
+        if (!this._textarea) return false;
+
+        const ta    = this._textarea;
+        const lines = ta.value.split('\n');
+        const total = lines.length;
+
+        // 行号规范化（支持负索引）
+        let row = line < 0 ? total + line : line;
+        row = Math.max(0, Math.min(row, total - 1));
+
+        // 计算行在全文中的字符起始偏移
+        let offset = 0;
+        for (let i = 0; i < row; i++) offset += lines[i].length + 1; // +1 for '\n'
+
+        const lineLen  = lines[row].length;
+        const clampCol = Math.max(0, Math.min(col, lineLen));
+        const pos      = offset + clampCol;
+
+        // 设置选区
+        if (select) {
+            ta.setSelectionRange(offset, offset + lineLen);
+        } else {
+            ta.setSelectionRange(pos, pos);
+        }
+
+        // 滚动到可见区域
+        // 利用一个临时 mirror span 计算目标位置的像素高度
+        const lineHeight = parseFloat(getComputedStyle(ta).lineHeight) || 22;
+        const paddingTop = parseFloat(getComputedStyle(ta).paddingTop)  || 0;
+        const targetScrollTop = paddingTop + row * lineHeight - ta.clientHeight / 2 + lineHeight / 2;
+        ta.scrollTop = Math.max(0, targetScrollTop);
+
+        // 同步行号和高亮层滚动
+        this._syncScroll();
+
+        // 聚焦（在 setSelectionRange 之后，否则 Safari 会重置光标）
+        if (focus) ta.focus({ preventScroll: true });
+
+        // 同步格式栏与行追踪
+        this._updateFormatBar();
+        this._checkCursorLine();
+
+        return true;
+    }
 
     // ── 内部：渲染 Shadow DOM ──
 
