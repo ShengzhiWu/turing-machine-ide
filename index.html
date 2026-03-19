@@ -147,7 +147,7 @@
     <script src="src/examples/reverse-sequence.js"></script>
     <script>
         var language = 'zh';  // 默认语言，支持zh、en。如果设置了不支持的语言，将回退到en
-        var example = 'reverse-sequence';  // 默认样例
+        var example = 'binary-division';  // 默认样例
     </script>
 
     <script>
@@ -316,7 +316,7 @@
             }
         }
 
-        function construct_directed_graph_with_code(code, seed=0) {
+        function construct_directed_graph_with_code(code, seed=0) {  // 根据图灵机代码构建状态图
             const rng = new RandomGenerator(seed)
             const get_random_point = () => [rng.nextGaussion(), rng.nextGaussion()];
             var graph = [];
@@ -333,7 +333,8 @@
             Object.keys(code).forEach(state => {  // Traversal all states
                 i = graph.findIndex(e => e[0] == state);
                 const vertex = graph[i];
-                for (let [input, action] of Object.entries(code[state])) {  // Traversal all actions
+                for (let input of Reflect.ownKeys(code[state])) {  // Traversal all actions
+                    let action = code[state][input];
                     if (input == NOT_VALID)
                         input = '*';
                     let [output, direction, nextState] = action;
@@ -341,7 +342,7 @@
                         output = '*';
                     if (direction == NOT_VALID)
                         direction = '*';
-                    const edge_name = (input == "" ? '""': input) + (output != N ? '→'+ (output == "" ? '""': output): "") + ', ' + direction;
+                    const edge_name = (input == "" ? '""': (input == OTHER ? 'other': input)) + (output != N ? '→'+ (output == "" ? '""': output): "") + ', ' + direction;
                     if(nextState == state) {  // Connect to self
                         graph.push(["self-connection", get_random_point(), false, i]);  // Add the new node for displaying a self-connection
                         vertex[3].push([graph.length - 1, edge_name , self_connection_default_length, undefined]);  // Add a connection

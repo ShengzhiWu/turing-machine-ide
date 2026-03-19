@@ -43,13 +43,11 @@ start, other, N, R, 0
 3, "0", "0'", L, 5
 3, "1", "0'", L, 6
 3, "", "0'", L, 7  // 运算已经完成，接下来擦除标记
-3, other, N, N, error
 
 // 放下1
 4, "0", "1'", L, 5
 4, "1", "1'", L, 6
 4, "", "1'", L, 7  // 运算已经完成，接下来擦除标记
-4, other, N, N, error
 
 // 携带0去左边
 5, "", "0'", R, 0
@@ -94,13 +92,11 @@ start, other, N, R, 0
 3, "0", "0'", L, 5
 3, "1", "0'", L, 6
 3, "", "0'", L, 7  // The sequence has been reversed. Now we need to erase the marks.
-3, other, N, N, error
 
 // Put down 1
 4, "0", "1'", L, 5
 4, "1", "1'", L, 6
 4, "", "1'", L, 7  // The sequence has been reversed. Now we need to erase the marks.
-4, other, N, N, error
 
 // Carry 0 to the left
 5, "", "0'", R, 0
