@@ -179,7 +179,10 @@
         //     codeNew += newLine.join(", ") + "\n\n";
         // }
 
-        var code_text = examples[example]['code'][language] || examples[example]['code']['en'];  // 设置初始代码
+        var code_editor_value = examples[example]['code'][language] || examples[example]['code']['en'];  // 代码编辑器中的文本
+        code_editor.value = code_editor_value;  // 将代码编辑器的内容设置成指定内容
+        code_editor.lang = language;  // 设置语言，可选项有zh和en
+        style_editor.lang = language;  // 设置语言，可选项有zh和en
 
         const NOT_VALID = Symbol('not valid');
         const N = Symbol('N');
@@ -273,18 +276,12 @@
             return result;
         }
 
-        var code = parseProgramCode(code_text);  // 解析代码文本
-
-        code_editor.value = code_text;  // 将代码编辑器的内容设置成指定内容
-        code_editor.lang = language;  // 设置语言，可选项有zh和en
-
-        style_editor.lang = language;  // 设置语言，可选项有zh和en
+        var code = parseProgramCode(code_editor_value);  // 解析代码文本
 
         style_editor.addEventListener('ready', () => {  // 风格编辑器初始化完成监听
             style_editor.value = examples[example]['style'][language] || examples[example]['style']['en'];  // 设置初始风格代码
         });
 
-        var code_editor_value = "";  // 代码编辑器中的文本
         var editing_line = 0;  // 代码编辑器中光标落在的行的行号
         var highlighted_vertex_name;  // 高亮的节点的名称
         var result_table_style;  // 结果表格的风格（每种符号的前景色、背景色）
@@ -676,7 +673,7 @@
 
         // 用户编辑纸带初值完成回调函数
         function finishEditingTapeCallback(data) {
-            console.log('回调函数被触发:', data);
+            console.log('回调函数被触发:', data.value !== tape[data.cellIndex]);
             if (data.value !== tape[data.cellIndex]) {  // 有变化
                 tape[data.cellIndex] = data.value;  // 更新纸带数据
                 run_program();  // 重新运行程序
