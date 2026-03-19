@@ -768,6 +768,15 @@ class TmEditor extends HTMLElement {
         });
 
         ta.addEventListener('keydown', e => {
+            if (e.key === 'F4') {
+                e.preventDefault();
+                this.dispatchEvent(new CustomEvent('tm-refresh-graph', {
+                    bubbles: true,
+                    composed: true,
+                    detail: { value: this.value, errorCount: this._errorCount },
+                }));
+                return;
+            }
             if (e.key === 'F5') {
                 e.preventDefault();
                 this.dispatchEvent(new CustomEvent('tm-run', {

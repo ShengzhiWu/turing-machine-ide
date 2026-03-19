@@ -772,6 +772,10 @@
 
         // Add event listeners
 
+        code_editor.addEventListener('tm-refresh-graph', e => {  // 按 F4 刷新图
+            refresh_graph_embedding();
+        });
+
         code_editor.addEventListener('tm-run', e => {  // 按 F5 运行程序
             run_program();
         });
