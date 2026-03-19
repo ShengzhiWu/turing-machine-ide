@@ -52,9 +52,152 @@
         }
          
         td {width:1.5em;}
+
+        /* ── Menu Bar ── */
+        #menu-bar {
+            display: flex;
+            flex-direction: row;
+            align-items: stretch;
+            height: 28px;
+            background: linear-gradient(to right, hsl(222, 25%, 21%), hsl(0, 0%, 75%));
+            color: rgba(255,255,255,0.85);
+            font-size: 13px;
+            font-family: system-ui, sans-serif;
+            user-select: none;
+            flex-shrink: 0;
+            z-index: 1000;
+            position: relative;
+        }
+
+        .menu-item {
+            position: relative;
+            padding: 0 14px;
+            display: flex;
+            align-items: center;
+            cursor: default;
+            white-space: nowrap;
+        }
+
+        .menu-item:hover,
+        .menu-item.active {
+            background-color: hsl(210, 60%, 40%);
+            color: white;
+        }
+
+        .menu-dropdown {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            min-width: 200px;
+            background-color: hsl(224, 17%, 22%);
+            border: 1px solid hsl(0, 0%, 35%);
+            box-shadow: 2px 4px 12px rgba(0,0,0,0.5);
+            z-index: 1001;
+            padding: 3px 0;
+        }
+
+        .menu-item.active .menu-dropdown {
+            display: block;
+        }
+
+        .menu-dropdown-item {
+            padding: 6px 18px;
+            color: rgba(255,255,255,0.85);
+            cursor: default;
+            white-space: nowrap;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 30px;
+        }
+
+        .menu-dropdown-item:hover {
+            background-color: hsl(210, 60%, 40%);
+            color: white;
+        }
+
+        .menu-dropdown-item.disabled {
+            color: rgba(255,255,255,0.35);
+            pointer-events: none;
+        }
+
+        .menu-dropdown-separator {
+            border: none;
+            border-top: 1px solid hsl(0, 0%, 35%);
+            margin: 3px 0;
+        }
+
+        /* ── Main content area ── */
+        #main-area {
+            flex: 1;
+            display: flex;
+            flex-direction: row;
+            overflow: hidden;
+            min-height: 0;
+        }
+
+        /* ── About Modal ── */
+        #about-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.55);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+        }
+        #about-overlay.visible {
+            display: flex;
+        }
+
+        #about-dialog {
+            background: hsl(0, 0%, 14%);
+            color: rgba(255,255,255,0.88);
+            border: 1px solid hsl(0,0%,35%);
+            border-radius: 8px;
+            padding: 28px 34px;
+            min-width: 340px;
+            max-width: 480px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.7);
+            font-family: system-ui, sans-serif;
+            font-size: 13px;
+            line-height: 1.7;
+            position: relative;
+        }
+
+        #about-dialog h2 {
+            margin: 0 0 12px 0;
+            font-size: 16px;
+            font-weight: 600;
+            color: white;
+        }
+
+        #about-dialog .about-version {
+            color: rgba(255,255,255,0.5);
+            font-size: 12px;
+            margin-bottom: 16px;
+        }
+
+        #about-close-btn {
+            margin-top: 20px;
+            padding: 6px 22px;
+            background: hsl(210, 60%, 40%);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            display: block;
+            margin-left: auto;
+        }
+
+        #about-close-btn:hover {
+            background: hsl(210, 60%, 52%);
+        }
     </style>
 </head>
-<body style="margin: 0; display: flex; flex-direction: row; height: 100vh; overflow: hidden;">
+<body style="margin: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden;">
     <!-- 修复 Electron 中 jQuery 无法挂载到 window 的问题 -->
     <script>
         if (typeof module === 'object') { window.module = module; module = undefined; }
@@ -81,7 +224,22 @@
     <script src="src/tm-editor.js"></script>
     <script src="src/colormap-editor.js" defer></script>
 
-    <div id="code-panel" style="width: 33%; height: 100vh; overflow: hidden; display: flex; flex-direction: column; background-color: hsl(0, 0%, 0%);">
+    <!-- ── Menu Bar ── -->
+    <div id="menu-bar"></div>
+
+    <!-- ── About Dialog ── -->
+    <div id="about-overlay">
+        <div id="about-dialog">
+            <h2 id="about-title">Turing Machine IDE</h2>
+            <div class="about-version" id="about-version-line">Version 1.0</div>
+            <div id="about-body"></div>
+            <button id="about-close-btn" onclick="closeAbout()"></button>
+        </div>
+    </div>
+
+    <!-- ── Main content area (panels) ── -->
+    <div id="main-area">
+    <div id="code-panel" style="width: 33%; height: 100%; overflow: hidden; display: flex; flex-direction: column; background-color: hsl(0, 0%, 0%);">
         <div id="turing_machine_code-panel" style="flex: 0 0 auto; margin-bottom: 2px; height: 70%; overflow: hidden;">
             <div style="height: 100%;">
                 <tm-editor id="code-editor" value=''></tm-editor>
@@ -1027,6 +1185,301 @@
                 frame.y = e.offsetY + (1 / zoom_factor) * (frame.y - e.offsetY);
             }
         });
+    </script>
+
+    </div><!-- #main-area -->
+
+    <!-- ══ Menu Bar + File I/O ══════════════════════════════════════════ -->
+    <script>
+    // ── i18n strings ────────────────────────────────────────────────────
+    const MENU_I18N = {
+        zh: {
+            file:           '文件',
+            edit:           '编辑',
+            help:           '帮助',
+            openProject:    '打开工程',
+            saveProject:    '保存工程',
+            saveEmbedding:  '保存图嵌入',
+            about:          '关于',
+            aboutTitle:     'Turing Machine IDE',
+            aboutVersion:   '版本 1.0',
+            aboutBody:      `<p>这是一款基于 Electron 的图灵机程序编写与调试工具。</p>
+                             <p>您可以在左侧代码面板中编写图灵机程序，在中间面板中查看状态转移图，在右侧面板中观察纸带的运行历史。</p>
+                             <p><b>开发者：</b>武圣智<br>
+                             <b>许可证：</b>MIT</p>`,
+            closeBtn:       '关闭',
+            saveDialogTitle:'保存工程',
+            embedDialogTitle:'保存图嵌入',
+            openDialogTitle: '打开工程',
+        },
+        en: {
+            file:           'File',
+            edit:           'Edit',
+            help:           'Help',
+            openProject:    'Open Project',
+            saveProject:    'Save Project',
+            saveEmbedding:  'Save Graph Embedding',
+            about:          'About',
+            aboutTitle:     'Turing Machine IDE',
+            aboutVersion:   'Version 1.0',
+            aboutBody:      `<p>A Turing machine programming and debugging tool built with Electron.</p>
+                             <p>Write your Turing machine program in the code panel on the left, inspect the state-transition graph in the centre, and trace the tape history on the right.</p>
+                             <p><b>Developer:</b>Shengzhi Wu<br>
+                             <b>License:</b> MIT</p>`,
+            closeBtn:       'Close',
+            saveDialogTitle:'Save Project',
+            embedDialogTitle:'Save Graph Embedding',
+            openDialogTitle: 'Open Project',
+        }
+    };
+
+    function t(key) {
+        const lang = (typeof language !== 'undefined') ? language : 'en';
+        return (MENU_I18N[lang] || MENU_I18N['en'])[key] || MENU_I18N['en'][key] || key;
+    }
+
+    // ── Menu bar rendering ───────────────────────────────────────────────
+    function buildMenuBar() {
+        const bar = document.getElementById('menu-bar');
+        bar.innerHTML = '';
+
+        const menus = [
+            {
+                label: t('file'),
+                items: [
+                    { label: t('openProject'),   action: menuOpenProject },
+                    { label: t('saveProject'),   action: menuSaveProject },
+                    { label: t('saveEmbedding'), action: menuSaveEmbedding },
+                ]
+            },
+            {
+                label: t('edit'),
+                items: []  // 暂时空着
+            },
+            {
+                label: t('help'),
+                items: [
+                    { label: t('about'), action: menuAbout },
+                ]
+            }
+        ];
+
+        menus.forEach(menu => {
+            const item = document.createElement('div');
+            item.className = 'menu-item';
+            item.textContent = menu.label;
+
+            if (menu.items.length > 0) {
+                const dropdown = document.createElement('div');
+                dropdown.className = 'menu-dropdown';
+
+                menu.items.forEach(entry => {
+                    if (entry === 'separator') {
+                        const sep = document.createElement('hr');
+                        sep.className = 'menu-dropdown-separator';
+                        dropdown.appendChild(sep);
+                    } else {
+                        const di = document.createElement('div');
+                        di.className = 'menu-dropdown-item';
+                        di.textContent = entry.label;
+                        di.addEventListener('mousedown', e => {
+                            e.preventDefault();
+                            e.stopPropagation();  // 阻止冒泡到 .menu-item，避免菜单重新打开
+                            closeAllMenus();
+                            entry.action();
+                        });
+                        dropdown.appendChild(di);
+                    }
+                });
+
+                item.appendChild(dropdown);
+            }
+
+            item.addEventListener('mousedown', e => {
+                e.preventDefault();
+                const wasActive = item.classList.contains('active');
+                closeAllMenus();
+                if (!wasActive) item.classList.add('active');
+            });
+
+            bar.appendChild(item);
+        });
+
+        // Click outside → close
+        document.addEventListener('mousedown', e => {
+            if (!bar.contains(e.target)) closeAllMenus();
+        });
+    }
+
+    function closeAllMenus() {
+        document.querySelectorAll('.menu-item.active').forEach(el => el.classList.remove('active'));
+    }
+
+    // ── About dialog ─────────────────────────────────────────────────────
+    function menuAbout() {
+        document.getElementById('about-title').textContent   = t('aboutTitle');
+        document.getElementById('about-version-line').textContent = t('aboutVersion');
+        document.getElementById('about-body').innerHTML      = t('aboutBody');
+        document.getElementById('about-close-btn').textContent = t('closeBtn');
+        document.getElementById('about-overlay').classList.add('visible');
+    }
+
+    function closeAbout() {
+        document.getElementById('about-overlay').classList.remove('visible');
+    }
+
+    // Close about dialog when clicking outside
+    document.getElementById('about-overlay').addEventListener('mousedown', function(e) {
+        if (e.target === this) closeAbout();
+    });
+
+    // ── JSON project serialisation ───────────────────────────────────────
+    // JSON 标准本身天然支持字符串中的单引号和双引号（双引号在 JSON 值中会被转义
+    // 为 \"），因此直接用 JSON.stringify / JSON.parse 即可，无需任何额外处理。
+
+    function getGraphEmbedding() {
+        // 返回所有可见节点的名称 + 坐标，格式为 { "name": [x, y], ... }
+        if (typeof graph === 'undefined') return {};
+        const result = {};
+        graph.filter(node => node[2]).forEach(node => {
+            result[node[0]] = [node[1][0], node[1][1]];
+        });
+        return result;
+    }
+
+    function applyGraphEmbedding(embedding) {
+        if (typeof embedding !== 'object' || Array.isArray(embedding) || typeof graph === 'undefined') return;
+        for (const [name, coords] of Object.entries(embedding)) {
+            const node = graph.find(n => n[0] === name);
+            if (node) node[1] = [coords[0], coords[1]];
+        }
+    }
+
+    function getTapeInitial() {
+        // tape 是当前纸带数组（含末尾空格），取有效内容部分
+        if (typeof tape === 'undefined') return [];
+        // 去掉末尾的空字符串
+        let t = [...tape];
+        while (t.length > 0 && t[t.length - 1] === '') t.pop();
+        return t;
+    }
+
+    function buildProjectJSON() {
+        return {
+            version: '1.0',
+            code:      (typeof code_editor_value !== 'undefined') ? code_editor_value : '',
+            style:     (typeof style_editor      !== 'undefined') ? style_editor.value : '',
+            embedding: getGraphEmbedding(),
+            tape:      getTapeInitial(),
+        };
+    }
+
+    function buildEmbeddingJSON() {
+        return {
+            version: '1.0',
+            embedding: getGraphEmbedding(),
+        };
+    }
+
+    // ── File save / open via Electron dialog or fallback ────────────────
+    function saveJSONFile(obj, defaultName) {
+        const json = JSON.stringify(obj, null, 2);
+
+        // Electron IPC path
+        if (typeof window !== 'undefined' && window.electronAPI && window.electronAPI.saveFile) {
+            window.electronAPI.saveFile({ defaultName, content: json });
+            return;
+        }
+
+        // Browser fallback: <a download>
+        const blob = new Blob([json], { type: 'application/json' });
+        const url  = URL.createObjectURL(blob);
+        const a    = document.createElement('a');
+        a.href     = url;
+        a.download = defaultName;
+        a.click();
+        URL.revokeObjectURL(url);
+    }
+
+    function openJSONFile(callback) {
+        // Electron IPC path
+        if (typeof window !== 'undefined' && window.electronAPI && window.electronAPI.openFile) {
+            window.electronAPI.openFile().then(result => {
+                if (result) callback(JSON.parse(result));
+            });
+            return;
+        }
+
+        // Browser fallback: <input type=file>
+        const input = document.createElement('input');
+        input.type   = 'file';
+        input.accept = '.json,application/json';
+        input.addEventListener('change', () => {
+            const file = input.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = e => {
+                try {
+                    callback(JSON.parse(e.target.result));
+                } catch(err) {
+                    alert('Failed to parse JSON: ' + err.message);
+                }
+            };
+            reader.readAsText(file);
+        });
+        input.click();
+    }
+
+    // ── Menu actions ─────────────────────────────────────────────────────
+    function menuSaveProject() {
+        saveJSONFile(buildProjectJSON(), 'project.json');
+    }
+
+    function menuSaveEmbedding() {
+        saveJSONFile(buildEmbeddingJSON(), 'embedding.json');
+    }
+
+    function menuOpenProject() {
+        openJSONFile(obj => {
+            if (!obj || !obj.version) { alert('Invalid project file.'); return; }
+
+            // 恢复代码
+            if (typeof obj.code === 'string' && typeof code_editor !== 'undefined') {
+                code_editor.value = obj.code;
+                code_editor_value = obj.code;
+            }
+
+            // 恢复样式代码
+            if (typeof obj.style === 'string' && typeof style_editor !== 'undefined') {
+                style_editor.value = obj.style;
+                result_table_style = parseStyleCode(obj.style);
+            }
+
+            // 恢复图嵌入（先刷新图结构，再覆盖坐标）
+            if (typeof refresh_graph_embedding === 'function') {
+                refresh_graph_embedding();
+            }
+            if (obj.embedding && typeof obj.embedding === 'object') {
+                applyGraphEmbedding(obj.embedding);
+            }
+
+            // 恢复纸带
+            if (Array.isArray(obj.tape) && typeof tape !== 'undefined') {
+                tape = [...obj.tape];
+                // 保持末尾至少三个空格
+                while (tape.length < 3 || tape[tape.length-1] !== '' || tape[tape.length-2] !== '' || tape[tape.length-3] !== '')
+                    tape.push('');
+                while (tape[tape.length-1] === '' && tape[tape.length-2] === '' && tape[tape.length-3] === '' && tape[tape.length-4] === '')
+                    tape.pop();
+            }
+
+            // 重新运行
+            if (typeof run_program === 'function') run_program();
+        });
+    }
+
+    // ── Init ─────────────────────────────────────────────────────────────
+    buildMenuBar();
     </script>
 </body>
 </html>
