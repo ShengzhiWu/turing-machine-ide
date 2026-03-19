@@ -394,7 +394,7 @@
 
         // Display parameters
         var frame = {"x": 400, "y": 450, "factor": 200};  // Frame for visualization.
-        var vertex_r = 10;  // (px)
+        var vertex_r = 7;  // 有向图节点显示半径(px)
         var arrow_head_length = 10;  // (px)
         var arrow_head_width = 7;  // (px)
         var self_connection_angle = 1.;
@@ -496,7 +496,7 @@
                 const dom = {};
                 dom.circle = svgEl("circle", {r: vertex_r, fill: color, stroke:"black","stroke-width":"1"});
                 // 高亮圆环（默认隐藏）
-                dom.highlight = svgEl("circle", {r: vertex_r+8, fill:"none", stroke:color, "stroke-width":"2", visibility:"hidden"});
+                dom.highlight = svgEl("circle", {r: vertex_r + 8, fill:"none", stroke:color, "stroke-width":"2", visibility:"hidden"});
                 dom.label  = svgEl("text", {fill:"black", style:"font-size:12px"});
                 dom.label.textContent = node[4] || "";
                 dom.name   = svgEl("text", {fill:"black", style:"font-size:12px"});
