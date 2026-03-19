@@ -522,31 +522,25 @@
         var vertex_repel_strength = 0.01*global_force_factor;  // 0.02
         var connection_length_preserve_strength = 0.01*global_force_factor;  // 0.02
 
-        class RandomGenerator {
-            constructor(seed) {
-                this.seed = seed;
-                this.multiplier = 1664525;
-                this.increment = 1013904223;
-                this.modulus = Math.pow(2, 32);
-                this.state = seed;
-            }
-
-            next() {  // 0~1
-                this.state = (this.state * this.multiplier + this.increment) % this.modulus;
-                return this.state / this.modulus;
-            }
-
-            nextGaussion(quality=4) {  // Standard normal distribution
-                result = 0.;
-                for(var i=0;i<quality;i++)
-                    result += this.next();
-                return (result-quality*0.5)/Math.sqrt(quality/12.);
-            }
+        function makeRng(seed) {
+            let state = seed;
+            const MOD = Math.pow(2, 32);
+            return {
+                next() {
+                    state = (state * 1664525 + 1013904223) % MOD;
+                    return state / MOD;
+                },
+                nextGaussian(quality = 4) {
+                    let r = 0;
+                    for (let i = 0; i < quality; i++) r += this.next();
+                    return (r - quality * 0.5) / Math.sqrt(quality / 12);
+                }
+            };
         }
 
         function construct_directed_graph_with_code(code, seed=0) {  // 根据图灵机代码构建状态图
-            const rng = new RandomGenerator(seed)
-            const get_random_point = () => [rng.nextGaussion(), rng.nextGaussion()];
+            const rng = makeRng(seed);
+            const get_random_point = () => [rng.nextGaussian(), rng.nextGaussian()];
             var graph = [];
             for (const [state, action] of Object.entries(code)) {
                 graph.push([
@@ -692,23 +686,13 @@
                     const target_node = graph[connection[0]];
                     const dom = {};  // 该 connection 对应的 DOM 元素引用
 
-                    if (target_node[0].startsWith('self-connection')) {
-                        dom.path = svgEl("path", {stroke:"black","stroke-width":"1",fill:"none"});
-                        dom.arrow = svgEl("polygon", {fill:"black"});
-                        dom.text  = svgEl("text",   {fill:"black",style:"font-size:12px"});
-                        dom.text.textContent = connection[1];
-                        conn_group.appendChild(dom.path);
-                        conn_group.appendChild(dom.arrow);
-                        conn_group.appendChild(dom.text);
-                    } else {
-                        dom.path = svgEl("path", {stroke:"black","stroke-width":"1",fill:"none"});
-                        dom.arrow = svgEl("polygon", {fill:"black"});
-                        dom.text  = svgEl("text",   {fill:"black",style:"font-size:12px"});
-                        dom.text.textContent = connection[1];
-                        conn_group.appendChild(dom.path);
-                        conn_group.appendChild(dom.arrow);
-                        conn_group.appendChild(dom.text);
-                    }
+                    dom.path = svgEl("path", {stroke:"black","stroke-width":"1",fill:"none"});
+                    dom.arrow = svgEl("polygon", {fill:"black"});
+                    dom.text  = svgEl("text",   {fill:"black",style:"font-size:12px"});
+                    dom.text.textContent = connection[1];
+                    conn_group.appendChild(dom.path);
+                    conn_group.appendChild(dom.arrow);
+                    conn_group.appendChild(dom.text);
                     connection._dom = dom;  // 将 DOM 引用挂在 connection 上
                 });
             });
@@ -970,20 +954,13 @@
 
         update_graph_view();
 
-        function toArray(list) {  // Converts list to array. Also can be used to clone an array.
-            a = new Array(list.length);
-            for(var i=0;i<list.length;i++)
-                a[i] = list[i];
-            return a;
-        }
-
         function run_turing_machine(code, tape, max_steps, detailed_output) {  // 运行图灵机
             var step = 0;
             var position = 0;
             var state = "start";
-            const history = [[step, position, undefined, state, toArray(tape)]];  // 步数, 位置, 上一个状态, 当前状态, 纸带
+            const history = [[step, position, undefined, state, [...tape]]];  // 步数, 位置, 上一个状态, 当前状态, 纸带
 
-            tape = toArray(tape);  // Clone the tape, to avoid changing the original tape.
+            tape = [...tape];  // Clone the tape, to avoid changing the original tape.
             while(state != "end" && state != "error") {
                 var need_record = detailed_output;
                 step ++;
@@ -1017,7 +994,7 @@
                 }
 
                 if(need_record) {
-                    history.push([step, position, state_0, state, toArray(tape)]);
+                    history.push([step, position, state_0, state, [...tape]]);
                 }
 
                 if (action[1] == NOT_VALID) {
@@ -1043,17 +1020,19 @@
             return history;
         }
 
-        var tape = toArray(examples[example]["tapes"][0]);
-
         // 保持纸带右侧有适当数量的空格，方便编辑
-        while (tape.length < 3 || tape[tape.length - 1] != '' || tape[tape.length - 2] != '' || tape[tape.length - 3] != '')  // 纸带很短或者右侧没有三个空格
-            tape.push('');
-        while (tape[tape.length - 1] == '' && tape[tape.length - 2] == '' && tape[tape.length - 3] == '' && tape[tape.length - 4] == '')  // 最后4格全是空的
-            tape.pop();
+        function normalizeTape(t) {
+            while (t.length < 3 || t[t.length-1] !== '' || t[t.length-2] !== '' || t[t.length-3] !== '')
+                t.push('');
+            while (t[t.length-1] === '' && t[t.length-2] === '' && t[t.length-3] === '' && t[t.length-4] === '')
+                t.pop();
+            return t;
+        }
+
+        var tape = normalizeTape([...examples[example]["tapes"][0]]);
 
         var detailed_output = false;
         var result = run_turing_machine(code, tape, 3000, detailed_output);
-        // console.log(result);
 
         function generate_history_table_row(record) {
             var s = "";
@@ -1088,12 +1067,11 @@
                 tape[data.cellIndex] = data.value;  // 更新纸带数据
 
                 // 如果纸带最后三格有内容，往后延续。这是为了让用户总可以往后编辑
-                if (data.value != '')  // 用户在一格填进了非空内容
+                if (data.value != '')
                     while (tape.length - data.cellIndex <= 3)
                         tape.push('');
-                else  // 用户清空了一个的内容
-                    while (tape[tape.length - 1] == '' && tape[tape.length - 2] == '' && tape[tape.length - 3] == '' && tape[tape.length - 4] == '')  // 最后4格全是空的
-                        tape.pop();
+                else
+                    normalizeTape(tape);
 
                 run_program();  // 重新运行程序
             }
@@ -1230,10 +1208,10 @@
         //     console.log('errors:', e.detail.errors);
         // });
 
-        graph_view.addEventListener("mousedown", e => {  // Middle button dragging for moving the graph
+        graph_view.addEventListener("mousedown", e => {  // 鼠标中键拖动图
             if(e.button == 1) {
                 var last_position = [e.offsetX, e.offsetY];
-                graph_view.style.cursor = "grabbing";  // Change cursor to grabbing
+                graph_view.style.cursor = "grabbing";
                 var on_mouse_move = e => {
                     const new_position = [e.offsetX, e.offsetY];
                     frame.x += new_position[0] - last_position[0];
@@ -1243,14 +1221,14 @@
                 var on_mouse_up = e => {
                     window.removeEventListener("mousemove", on_mouse_move);  // Remove listeners after dragging is done
                     window.removeEventListener("mouseup", on_mouse_up);
-                    graph_view.style.cursor = "default";  // Change cursor back to default
+                    graph_view.style.cursor = "default";
                 };
                 window.addEventListener("mousemove", on_mouse_move);
                 window.addEventListener("mouseup", on_mouse_up);
             }
         });
 
-        graph_view.addEventListener("wheel", e => {  // Wheel scrolling for zooming the graph
+        graph_view.addEventListener("wheel", e => {  // 滚轮缩放图
             const zoom_factor = 1.1;
             if(e.deltaY < 0) {  // Zoom in
                 frame.factor *= zoom_factor;
@@ -1387,78 +1365,39 @@
             }
         ];
 
-        function buildDropdownItems(items, container) {
+        function buildMenuItems(items, container, isSubmenu = false) {
             items.forEach(entry => {
                 if (entry === 'separator') {
                     const sep = document.createElement('hr');
                     sep.className = 'menu-dropdown-separator';
                     container.appendChild(sep);
-                } else if (entry.submenu) {
-                    // Item with submenu
-                    const di = document.createElement('div');
-                    di.className = 'menu-dropdown-item has-submenu';
-
-                    const labelSpan = document.createElement('span');
-                    labelSpan.textContent = entry.label;
-                    di.appendChild(labelSpan);
-
-                    const sub = document.createElement('div');
-                    sub.className = 'menu-submenu';
-                    buildSubmenuItems(entry.submenu, sub);
-                    di.appendChild(sub);
-
-                    container.appendChild(di);
-                } else {
-                    const di = document.createElement('div');
-                    di.className = 'menu-dropdown-item';
-                    di.textContent = entry.label;
-                    di.addEventListener('mousedown', e => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        closeAllMenus();
-                        entry.action();
-                    });
-                    container.appendChild(di);
+                    return;
                 }
-            });
-        }
-
-        function buildSubmenuItems(items, container) {
-            items.forEach(entry => {
+                const di = document.createElement('div');
                 if (entry.submenu) {
-                    // Nested submenu
-                    const di = document.createElement('div');
-                    di.className = 'menu-submenu-item has-submenu';
-                    const labelSpan = document.createElement('span');
-                    labelSpan.textContent = entry.label;
-                    di.appendChild(labelSpan);
-
+                    di.className = (isSubmenu ? 'menu-submenu-item' : 'menu-dropdown-item') + ' has-submenu';
+                    di.appendChild(Object.assign(document.createElement('span'), { textContent: entry.label }));
                     const sub = document.createElement('div');
                     sub.className = 'menu-submenu';
-                    buildSubmenuItems(entry.submenu, sub);
+                    buildMenuItems(entry.submenu, sub, true);
                     di.appendChild(sub);
-                    container.appendChild(di);
                 } else {
-                    const di = document.createElement('div');
-                    di.className = 'menu-submenu-item';
-
-                    const check = document.createElement('span');
-                    check.className = 'checkmark';
-                    check.textContent = entry.checked && entry.checked() ? '✓' : '';
-                    di.appendChild(check);
-
-                    const labelSpan = document.createElement('span');
-                    labelSpan.textContent = entry.label;
-                    di.appendChild(labelSpan);
-
+                    di.className = isSubmenu ? 'menu-submenu-item' : 'menu-dropdown-item';
+                    if (isSubmenu) {
+                        const check = Object.assign(document.createElement('span'), {
+                            className: 'checkmark',
+                            textContent: entry.checked && entry.checked() ? '✓' : ''
+                        });
+                        di.appendChild(check);
+                    }
+                    di.appendChild(Object.assign(document.createElement('span'), { textContent: entry.label }));
                     di.addEventListener('mousedown', e => {
-                        e.preventDefault();
-                        e.stopPropagation();
+                        e.preventDefault(); e.stopPropagation();
                         closeAllMenus();
                         entry.action();
                     });
-                    container.appendChild(di);
                 }
+                container.appendChild(di);
             });
         }
 
@@ -1471,7 +1410,7 @@
                 const dropdown = document.createElement('div');
                 dropdown.className = 'menu-dropdown';
 
-                buildDropdownItems(menu.items, dropdown);
+                buildMenuItems(menu.items, dropdown);
 
                 item.appendChild(dropdown);
             }
@@ -1515,32 +1454,24 @@
     });
 
     // ── JSON project serialisation ───────────────────────────────────────
-    // JSON 标准本身天然支持字符串中的单引号和双引号（双引号在 JSON 值中会被转义
-    // 为 \"），因此直接用 JSON.stringify / JSON.parse 即可，无需任何额外处理。
 
     function getGraphEmbedding() {
-        // 返回所有节点（含 self-connection）的名称 + 坐标
         if (typeof graph === 'undefined') return {};
         const result = {};
-        graph.forEach(node => {
-            result[node[0]] = [node[1][0], node[1][1]];
-        });
+        graph.forEach(node => { result[node[0]] = [...node[1]]; });
         return result;
     }
 
     function applyGraphEmbedding(embedding) {
-        if (typeof embedding !== 'object' || Array.isArray(embedding) || typeof graph === 'undefined') return;
-        for (const [name, coords] of Object.entries(embedding)) {
-            const node = graph.find(n => n[0] === name);
-            if (node) node[1] = [coords[0], coords[1]];
-        }
+        if (typeof graph === 'undefined' || typeof embedding !== 'object' || Array.isArray(embedding)) return;
+        graph.forEach(node => {
+            if (embedding[node[0]]) node[1] = [...embedding[node[0]]];
+        });
     }
 
     function getTapeInitial() {
-        // tape 是当前纸带数组（含末尾空格），取有效内容部分
         if (typeof tape === 'undefined') return [];
-        // 去掉末尾的空字符串
-        let t = [...tape];
+        const t = [...tape];
         while (t.length > 0 && t[t.length - 1] === '') t.pop();
         return t;
     }
@@ -1625,34 +1556,22 @@
             if (!obj || !obj.version) { alert('Invalid project file.'); return; }
 
             // 恢复代码
-            if (typeof obj.code === 'string' && typeof code_editor !== 'undefined') {
+            if (typeof obj.code === 'string') {
                 code_editor.value = obj.code;
                 code_editor_value = obj.code;
             }
-
             // 恢复样式代码
-            if (typeof obj.style === 'string' && typeof style_editor !== 'undefined') {
+            if (typeof obj.style === 'string') {
                 style_editor.value = obj.style;
                 result_table_style = parseStyleCode(obj.style);
             }
 
             // 恢复图嵌入（先刷新图结构，再覆盖坐标）
-            if (typeof refresh_graph_embedding === 'function') {
-                refresh_graph_embedding();
-            }
-            if (obj.embedding && typeof obj.embedding === 'object') {
-                applyGraphEmbedding(obj.embedding);
-            }
+            refresh_graph_embedding();
+            if (obj.embedding) applyGraphEmbedding(obj.embedding);
 
             // 恢复纸带
-            if (Array.isArray(obj.tape) && typeof tape !== 'undefined') {
-                tape = [...obj.tape];
-                // 保持末尾至少三个空格
-                while (tape.length < 3 || tape[tape.length-1] !== '' || tape[tape.length-2] !== '' || tape[tape.length-3] !== '')
-                    tape.push('');
-                while (tape[tape.length-1] === '' && tape[tape.length-2] === '' && tape[tape.length-3] === '' && tape[tape.length-4] === '')
-                    tape.pop();
-            }
+            if (Array.isArray(obj.tape)) tape = normalizeTape([...obj.tape]);
 
             // 重新运行
             if (typeof run_program === 'function') run_program();
@@ -1675,11 +1594,7 @@
         result_table_style = parseStyleCode(styleCode);
 
         // 载入纸带初值
-        tape = toArray(ex['tapes'][0]);
-        while (tape.length < 3 || tape[tape.length-1] !== '' || tape[tape.length-2] !== '' || tape[tape.length-3] !== '')
-            tape.push('');
-        while (tape[tape.length-1] === '' && tape[tape.length-2] === '' && tape[tape.length-3] === '' && tape[tape.length-4] === '')
-            tape.pop();
+        tape = normalizeTape([...ex['tapes'][0]]);
 
         // 刷新有向图
         refresh_graph_embedding();
@@ -1699,7 +1614,6 @@
 
     // ── Language switching ────────────────────────────────────────────────
     function applyLanguageToUI() {
-        // Update non-menu UI elements
         const runBtn = document.getElementById('run-btn');
         if (runBtn) runBtn.title = ' ' + t('runBtnTitle');
 
@@ -1709,11 +1623,8 @@
         const maxStepsLabel = document.getElementById('max-steps-label');
         if (maxStepsLabel) maxStepsLabel.textContent = t('maxSteps');
 
-        // Update code/style editor lang attribute (for placeholder/hint text only, not content)
-        const code_ed = document.querySelector('#code-editor');
-        const style_ed = document.querySelector('#style-textarea');
-        if (code_ed) code_ed.lang = language;
-        if (style_ed) style_ed.lang = language;
+        if (typeof code_editor !== 'undefined') code_editor.lang = language;
+        if (typeof style_editor !== 'undefined') style_editor.lang = language;
     }
 
     function switchLanguage(lang) {
