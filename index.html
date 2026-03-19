@@ -81,10 +81,6 @@
     <script src="src/tm-editor.js"></script>
     <script src="src/colormap-editor.js" defer></script>
 
-    <script>
-        var language = 'zh';  // 默认语言，支持zh、en。如果设置了不支持的语言，将回退到en
-    </script>
-
     <div id="code-panel" style="width: 33%; height: 100vh; overflow: hidden; display: flex; flex-direction: column; background-color: hsl(0, 0%, 0%);">
         <div id="turing_machine_code-panel" style="flex: 0 0 auto; margin-bottom: 2px; height: 70%; overflow: hidden;">
             <div style="height: 100%;">
@@ -146,6 +142,13 @@
 
     <!-- 加载样例代码 -->
     <script src="src/examples/binary-division.js"></script>
+    <script src="src/examples/move-bricks.js"></script>
+    <script src="src/examples/copy-bricks.js"></script>
+    <script src="src/examples/reverse-sequence.js"></script>
+    <script>
+        var language = 'zh';  // 默认语言，支持zh、en。如果设置了不支持的语言，将回退到en
+        var example = 'reverse-sequence';  // 默认样例
+    </script>
 
     <script>
         const code_editor = document.querySelector('#code-editor');
@@ -176,7 +179,7 @@
         //     codeNew += newLine.join(", ") + "\n\n";
         // }
 
-        var code_text = examples['binary-division']['code'][language] || examples['binary-division']['code']['en'];  // 设置初始代码
+        var code_text = examples[example]['code'][language] || examples[example]['code']['en'];  // 设置初始代码
 
         const NOT_VALID = Symbol('not valid');
         const N = Symbol('N');
@@ -278,7 +281,7 @@
         style_editor.lang = language;  // 设置语言，可选项有zh和en
 
         style_editor.addEventListener('ready', () => {  // 风格编辑器初始化完成监听
-            style_editor.value = examples['binary-division']['style'][language] || examples['binary-division']['style']['en'];  // 设置初始风格代码
+            style_editor.value = examples[example]['style'][language] || examples[example]['style']['en'];  // 设置初始风格代码
         });
 
         var code_editor_value = "";  // 代码编辑器中的文本
@@ -638,7 +641,7 @@
             return history;
         }
 
-        var tape = toArray(examples["binary-division"]["tapes"][0]);  // 正确答案：11余101
+        var tape = toArray(examples[example]["tapes"][0]);
 
         var detailed_output = false;
         var result = run_turing_machine(code, tape, 3000, detailed_output);
