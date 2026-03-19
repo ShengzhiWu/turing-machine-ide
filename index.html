@@ -633,8 +633,11 @@
                 }
                 if(action[1]=="R")
                     position ++;
-                else if (action[1]=="L")
+                else if (action[1]=="L") {
                     position --;
+                    if (position < 0)
+                        state = "error";  // 不允许移出纸带左边缘
+                }
             }
 
             // 将纸带补到每次记录一样长
