@@ -604,6 +604,8 @@
                     break;
                 }
 
+                if (position >= tape.length)
+                    tape.push('');  // Infinite tape to the right
                 var action = actionDict[tape[position]];
                 if (action == undefined)
                     action = actionDict[OTHER];
@@ -635,10 +637,23 @@
                     position --;
             }
 
+            // 将纸带补到每次记录一样长
+            const tapeLength = history[history.length - 1][4].length;
+            history.forEach(record => {
+                while (record[4].length < tapeLength)
+                    record[4].push('');
+            });
+
             return history;
         }
 
         var tape = toArray(examples[example]["tapes"][0]);
+
+        // 保持纸带右侧有适当数量的空格，方便编辑
+        while (tape.length < 3 || tape[tape.length - 1] != '' || tape[tape.length - 2] != '' || tape[tape.length - 3] != '')  // 纸带很短或者右侧没有三个空格
+            tape.push('');
+        while (tape[tape.length - 1] == '' && tape[tape.length - 2] == '' && tape[tape.length - 3] == '' && tape[tape.length - 4] == '')  // 最后4格全是空的
+            tape.pop();
 
         var detailed_output = false;
         var result = run_turing_machine(code, tape, 3000, detailed_output);
@@ -673,9 +688,17 @@
 
         // 用户编辑纸带初值完成回调函数
         function finishEditingTapeCallback(data) {
-            console.log('回调函数被触发:', data.value !== tape[data.cellIndex]);
             if (data.value !== tape[data.cellIndex]) {  // 有变化
                 tape[data.cellIndex] = data.value;  // 更新纸带数据
+
+                // 如果纸带最后三格有内容，往后延续。这是为了让用户总可以往后编辑
+                if (data.value != '')  // 用户在一格填进了非空内容
+                    while (tape.length - data.cellIndex <= 3)
+                        tape.push('');
+                else  // 用户清空了一个的内容
+                    while (tape[tape.length - 1] == '' && tape[tape.length - 2] == '' && tape[tape.length - 3] == '' && tape[tape.length - 4] == '')  // 最后4格全是空的
+                        tape.pop();
+
                 run_program();  // 重新运行程序
             }
         }
