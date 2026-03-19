@@ -168,11 +168,11 @@ textarea::-webkit-scrollbar-corner { background: #171c2b; }
     font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', Consolas, 'Courier New', monospace;
 }
 .info-bar {
-    display: flex; justify-content: space-between; padding: 0.625em 1.5em;
+    display: flex; justify-content: space-between; padding: 0.625em 1.5em; align-items: center;
     background: #1b2132; color: #a0b0d0; font-size: 0.8125em;
     border-top: 1px solid #2f384f; flex-shrink: 0;
 }
-.error-count { padding: 0.25em 0.75em; border-radius: 2em; }
+.error-count { padding: 0.4em 0.75em; border-radius: 2em; }
 .error-count.has-errors { background: #44232e; color: #ffa7b5; border-left: 3px solid #ff4d6d; }
 .error-count.no-errors  { background: #1e3a2a; color: #7ee8a2; border-left: 3px solid #3ecf6e; }
 `;

@@ -368,7 +368,7 @@ ${sel} .cm-info-bar {
     font-size:0.8125em; border-top:1px solid rgba(255,255,255,0.06);
     flex-shrink:0; gap:1em; }
 ${sel} .cm-status-hint { color: rgb(168, 169, 184); flex:1; }  /* 提示文本颜色 */
-${sel} .cm-error-count { padding:0.2em 0.75em; border-radius:2em; white-space:nowrap; flex-shrink:0; }
+${sel} .cm-error-count { padding:0.4em 0.75em; border-radius:2em; white-space:nowrap; flex-shrink:0; }
 ${sel} .cm-error-count.no-errors  { background:#1b2e22; color:#7ee8a2; border-left:3px solid #3ecf6e; }
 ${sel} .cm-error-count.has-errors { background:#2e1a1a; color:#ffa7b5; border-left:3px solid #ff4d6d; }
 `;
