@@ -427,47 +427,111 @@
             return [v[0] * cos - v[1] * sin, v[0] * sin + v[1] * cos];
         }
 
-        function generate_arrow_head_svg(top, direction) {
-            const arrow_head_root = vector_subtract(top, vector_scale(arrow_head_length, direction));
-            return '<polygon points="'
-                + (arrow_head_root[0] + direction[1] * arrow_head_width*0.5) + ',' + (arrow_head_root[1] - direction[0]*arrow_head_width*0.5) + ' '
+        // ─── DOM 辅助 ────────────────────────────────────────────────
+        const SVG_NS = "http://www.w3.org/2000/svg";
+        function svgEl(tag, attrs) {
+            const el = document.createElementNS(SVG_NS, tag);
+            for (const [k, v] of Object.entries(attrs))
+                el.setAttribute(k, v);
+            return el;
+        }
+
+        // 更新箭头头部多边形的 points 属性（复用已有元素）
+        function update_arrow_head_el(el, top, direction) {
+            const root = vector_subtract(top, vector_scale(arrow_head_length, direction));
+            el.setAttribute("points",
+                (root[0] + direction[1]*arrow_head_width*0.5) + ',' + (root[1] - direction[0]*arrow_head_width*0.5) + ' '
                 + top[0] + ',' + top[1] + ' '
-                + (arrow_head_root[0] - direction[1] * arrow_head_width*0.5) + ',' + (arrow_head_root[1] + direction[0]*arrow_head_width*0.5) + '" fill="black"/>';
+                + (root[0] - direction[1]*arrow_head_width*0.5) + ',' + (root[1] + direction[0]*arrow_head_width*0.5));
         }
 
-        function generate_arrow_svg(a, b) {
-            var s = '<line x1="' + a[0] + '" y1="'+a[1] + '" x2="' + b[0] + '" y2="' + b[1] + '" stroke="black" stroke-width="1"/>';
+        // ─── 阶段一：构建 DOM 结构（仅在图结构改变时调用）──────────────
+        function build_graph_dom(graph) {
+            // 清空 graph_view，但保留已有的非图内容（无）
+            while (graph_view.firstChild) graph_view.removeChild(graph_view.lastChild);
 
-            const v = vector_subtract(b, a);
-            const l = vector_length(v);
-            if(l>=arrow_head_length)
-            {
-                const v_normalized = vector_scale(1./l, v);
-                s += generate_arrow_head_svg(b, v_normalized);
-            }
-
-            return s;
-        }
-
-        function generate_connections_svg(frame, graph) {
-            var s = "";
+            // 连线层
+            const conn_group = svgEl("g", {});
+            graph_view.appendChild(conn_group);
 
             graph.forEach(node => {
-                if(node[0]=='self-connection')
-                    return;
+                if (node[0] === 'self-connection') return;
+                node[3].forEach(connection => {
+                    const target_node = graph[connection[0]];
+                    const dom = {};  // 该 connection 对应的 DOM 元素引用
+
+                    if (target_node[0] === "self-connection") {
+                        dom.path = svgEl("path", {stroke:"black","stroke-width":"1",fill:"none"});
+                        dom.arrow = svgEl("polygon", {fill:"black"});
+                        dom.text  = svgEl("text",   {fill:"black",style:"font-size:12px"});
+                        dom.text.textContent = connection[1];
+                        conn_group.appendChild(dom.path);
+                        conn_group.appendChild(dom.arrow);
+                        conn_group.appendChild(dom.text);
+                    } else {
+                        dom.path = svgEl("path", {stroke:"black","stroke-width":"1",fill:"none"});
+                        dom.arrow = svgEl("polygon", {fill:"black"});
+                        dom.text  = svgEl("text",   {fill:"black",style:"font-size:12px"});
+                        dom.text.textContent = connection[1];
+                        conn_group.appendChild(dom.path);
+                        conn_group.appendChild(dom.arrow);
+                        conn_group.appendChild(dom.text);
+                    }
+                    connection._dom = dom;  // 将 DOM 引用挂在 connection 上
+                });
+            });
+
+            // 节点层
+            const vert_group = svgEl("g", {fill:"white"});
+            graph_view.appendChild(vert_group);
+
+            graph.forEach(node => {
+                if (!node[2]) return;  // 不可见节点跳过
+
+                let node_name = node[0];
+                if (node_name.startsWith('end'))   node_name = 'end';
+                else if (node_name.startsWith('error')) node_name = 'error';
+                const color = (node_name==='start'||node_name==='end'||node_name==='error') ? 'yellow' : 'white';
+
+                const dom = {};
+                dom.circle = svgEl("circle", {r: vertex_r, fill: color, stroke:"black","stroke-width":"1"});
+                // 高亮圆环（默认隐藏）
+                dom.highlight = svgEl("circle", {r: vertex_r+8, fill:"none", stroke:color, "stroke-width":"2", visibility:"hidden"});
+                dom.label  = svgEl("text", {fill:"black", style:"font-size:12px"});
+                dom.label.textContent = node[4] || "";
+                dom.name   = svgEl("text", {fill:"black", style:"font-size:12px"});
+                dom.name.textContent = node_name;
+
+                vert_group.appendChild(dom.circle);
+                vert_group.appendChild(dom.highlight);
+                vert_group.appendChild(dom.label);
+                vert_group.appendChild(dom.name);
+
+                node._dom = dom;           // 将 DOM 引用挂在 node 上
+                node._display_name = node_name;
+            });
+        }
+
+        // ─── 阶段二：每帧只更新坐标属性（不碰 DOM 结构）───────────────
+        function update_graph_dom(graph) {
+            // 更新连线
+            graph.forEach(node => {
+                if (node[0] === 'self-connection') return;
                 const a = vector_plus([frame.x, frame.y], vector_scale(frame.factor, node[1]));
                 node[3].forEach(connection => {
                     const target_node = graph[connection[0]];
                     const b = vector_plus([frame.x, frame.y], vector_scale(frame.factor, target_node[1]));
-                    const name = connection[1];
+                    const dom = connection._dom;
+                    if (!dom) return;
+
                     const v = vector_subtract(b, a);
                     const l = vector_length(v);
                     const v_normalized = vector_scale(1./l, v);
                     const normal = [-v_normalized[1], v_normalized[0]];
                     const c = vector_scale(vertex_r, v_normalized);
-                    if(target_node[0]=="self-connection")  // Self-connection
-                    {
-                        const c1 = vector_rotate(c, self_connection_angle*0.5);
+
+                    if (target_node[0] === "self-connection") {
+                        const c1 = vector_rotate(c,  self_connection_angle*0.5);
                         const c2 = vector_rotate(c, -self_connection_angle*0.5);
                         const c3 = vector_scale(l/vertex_r, c1);
                         const c4 = vector_scale(l/vertex_r, c2);
@@ -475,70 +539,57 @@
                         const p2 = vector_plus(a, c2);
                         const p3 = vector_plus(a, c3);
                         const p4 = vector_plus(a, c4);
-                        const text_location = vector_plus(a, vector_scale(self_connection_text_distance_factor, v));
-                        s += '<path d="M '+p1[0]+' '+p1[1]+' C '+p3[0]+' '+p3[1]+' '+p4[0]+' '+p4[1]+' '+p2[0]+' '+p2[1]+'" stroke="black" stroke-width="1" fill="none"/>'
-                            +generate_arrow_head_svg(p2, vector_scale(-1./vertex_r, c2))
-                            +'<text x="'+(text_location[0]-3)+'" y="'+(text_location[1]+4)+'" fill="black" style="font-size:12px">'+name+'</text>';
-                    }
-                    else {  // Normal connection
-                        if(l>vertex_r*2) {
+                        const tl = vector_plus(a, vector_scale(self_connection_text_distance_factor, v));
+                        dom.path.setAttribute("d", `M ${p1[0]} ${p1[1]} C ${p3[0]} ${p3[1]} ${p4[0]} ${p4[1]} ${p2[0]} ${p2[1]}`);
+                        update_arrow_head_el(dom.arrow, p2, vector_scale(-1./vertex_r, c2));
+                        dom.text.setAttribute("x", tl[0]-3);
+                        dom.text.setAttribute("y", tl[1]+4);
+                    } else {
+                        if (l > vertex_r*2) {
                             const offset = connection[3];
                             const l_cramp = Math.min(multiple_edges_shape_param2, l);
-                            const c1 = vector_rotate(c, multiple_edges_gap_angle*offset*0.5);
+                            const c1 = vector_rotate(c,  multiple_edges_gap_angle*offset*0.5);
                             const c2 = vector_rotate(c, -multiple_edges_gap_angle*offset*0.5);
                             const p1 = vector_plus(a, c1);
                             const p2 = vector_subtract(b, c2);
-                            const p3 = vector_plus(p1, vector_scale(multiple_edges_shape_param1*l_cramp/vertex_r, c1));
+                            const p3 = vector_plus(p1,  vector_scale(multiple_edges_shape_param1*l_cramp/vertex_r, c1));
                             const p4 = vector_subtract(p2, vector_scale(multiple_edges_shape_param1*l_cramp/vertex_r, c2));
-                            const text_location = vector_plus(vector_scale(0.5, vector_plus(p3, p4)), vector_scale(connection_text_offset*Math.sign(offset+0.1), normal));
-                            // s += generate_arrow_svg(vector_plus(a, c), vector_subtract(b, c))
-                            //     +'<text x="'+(text_location[0]-3)+'" y="'+(text_location[1]+4)+'" fill="black" style="font-size:12px">'+name+'</text>';
-                            s += '<path d="M '+p1[0]+' '+p1[1]+' C '+p3[0]+' '+p3[1]+' '+p4[0]+' '+p4[1]+' '+p2[0]+' '+p2[1]+'" stroke="black" stroke-width="1" fill="none"/>'
-                                +generate_arrow_head_svg(p2, vector_scale(1./vertex_r, c2))
-                                +'<text x="'+(text_location[0]-3)+'" y="'+(text_location[1]+4)+'" fill="black" style="font-size:12px">'+name+'</text>';
+                            const tl = vector_plus(vector_scale(0.5, vector_plus(p3, p4)), vector_scale(connection_text_offset*Math.sign(offset+0.1), normal));
+                            dom.path.setAttribute("d", `M ${p1[0]} ${p1[1]} C ${p3[0]} ${p3[1]} ${p4[0]} ${p4[1]} ${p2[0]} ${p2[1]}`);
+                            update_arrow_head_el(dom.arrow, p2, vector_scale(1./vertex_r, c2));
+                            dom.text.setAttribute("x", tl[0]-3);
+                            dom.text.setAttribute("y", tl[1]+4);
+                            dom.path.setAttribute("visibility", "visible");
+                            dom.arrow.setAttribute("visibility", "visible");
+                        } else {
+                            dom.path.setAttribute("visibility", "hidden");
+                            dom.arrow.setAttribute("visibility", "hidden");
                         }
                     }
                 });
             });
 
-            return s;
-        }
-
-        function generate_vertices_svg(frame, graph, highlighted_vertex_name) {
-            var s = '<g fill="white">';
-
-            graph.forEach((node, i) => {
-                if(node[2]) {
-                    const p = vector_plus([frame.x, frame.y], vector_scale(frame.factor, node[1]));
-                    let node_name = node[0];
-                    if (node_name.startsWith('end'))
-                        node_name = 'end';
-                    else if (node_name.startsWith('error'))
-                        node_name = 'error';
-                    const color = node_name == 'start' || node_name == 'end' || node_name == 'error' ? 'yellow' : 'white';
-                    s += '<circle cx="' + p[0] + '" cy="' + p[1] + '" r="' + vertex_r + '" fill="' + color + '" />'  // Disk
-                        + (node_name == highlighted_vertex_name ? '<circle cx="' + p[0] + '" cy="' + p[1] + '" r="' + (vertex_r + 8) + '" fill="none" stroke="' + color + '" stroke-width="2"/>' : '')  // 对于要强调的节点，在周围加圆环
-                        + '<text x="' + (p[0] - 3) + '" y="' + (p[1] + 4) + '" fill="black" style="font-size:12px">' + (node[4] || "") + '</text>'  // Test in the disk
-                        + '<text x="' + (p[0] + vertex_name_text_offset[0] - 3) + '" y="' + (p[1] + vertex_name_text_offset[1] + 4) + '" fill="black" style="font-size:12px">' + node_name + '</text>';  // Name outside the disk
-                }
+            // 更新节点
+            graph.forEach(node => {
+                if (!node[2] || !node._dom) return;
+                const p = vector_plus([frame.x, frame.y], vector_scale(frame.factor, node[1]));
+                const dom = node._dom;
+                dom.circle.setAttribute("cx", p[0]);
+                dom.circle.setAttribute("cy", p[1]);
+                dom.highlight.setAttribute("cx", p[0]);
+                dom.highlight.setAttribute("cy", p[1]);
+                // 高亮圆环显隐
+                dom.highlight.setAttribute("visibility",
+                    node._display_name === highlighted_vertex_name ? "visible" : "hidden");
+                dom.label.setAttribute("x", p[0]-3);
+                dom.label.setAttribute("y", p[1]+4);
+                dom.name.setAttribute("x",  p[0]+vertex_name_text_offset[0]-3);
+                dom.name.setAttribute("y",  p[1]+vertex_name_text_offset[1]+4);
             });
-
-            s += '</g>';
-
-            return s;
-        }
-
-        function generate_graph_view_content(graph) {  // TODO: 这个函数每帧都会执行一次，且其中包含大量字符串操作，这可能会导致性能问题
-            var s = "";
-
-            s += generate_connections_svg(frame, graph);
-            s += generate_vertices_svg(frame, graph, highlighted_vertex_name);
-
-            return s;
         }
 
         var graph = construct_directed_graph_with_code(code);
-        graph_view.innerHTML = generate_graph_view_content(graph);
+        build_graph_dom(graph);
 
         function graph_evolve() {
             // Vertices repeling
@@ -569,9 +620,9 @@
             });
         }
 
-        function update_graph_view() {
+        function update_graph_view() {  // 更新图（每帧执行）
             graph_evolve();
-            graph_view.innerHTML = generate_graph_view_content(graph);
+            update_graph_dom(graph);  // 只更新坐标属性，不重建 DOM
             
             requestAnimationFrame(update_graph_view);  // 由运行环境决定下次执行的时间（通常与画面刷新率保持一致）
         }
@@ -759,10 +810,11 @@
 
         refresh_history_table(history_table, result);
 
-        function refresh_graph_embedding() {
+        function refresh_graph_embedding() {  // 根据代码重建有向图（这个函数不用每帧执行，只在图架构有变化时才需要执行）
             // TODO: real-time compile
             code = parseProgramCode(code_editor_value);  // 解析代码文本
             graph = construct_directed_graph_with_code(code);
+            build_graph_dom(graph);  // 图结构变了，重建 DOM
         }
 
         function run_program() {
