@@ -566,7 +566,8 @@
                         direction = '*';
                     const edge_name = (input == "" ? '""': (input == OTHER ? 'other': input)) + (output != N ? '→'+ (output == "" ? '""': output): "") + ', ' + direction;
                     if(nextState == state) {  // Connect to self
-                        graph.push(["self-connection", get_random_point(), false, i]);  // Add the new node for displaying a self-connection
+                        const scIndex = graph.filter(n => n[0].startsWith('self-connection')).length;
+                        graph.push([`self-connection-${scIndex}`, get_random_point(), false, i]);  // Add the new node for displaying a self-connection
                         vertex[3].push([graph.length - 1, edge_name , self_connection_default_length, undefined]);  // Add a connection
                     }
                     else {  // Connection to another vertex
@@ -598,7 +599,7 @@
                             }
                         });
                         const nextStateVertex = graph[j];
-                        if(nextStateVertex[0]=='self-connection')
+                        if(nextStateVertex[0].startsWith('self-connection'))
                             return;
                         nextStateVertex[3].forEach(connection => {
                             if(connection[0] == i) {  // Found multiple edge of opposite direction
@@ -680,12 +681,12 @@
             graph_view.appendChild(conn_group);
 
             graph.forEach(node => {
-                if (node[0] === 'self-connection') return;
+                if (node[0].startsWith('self-connection')) return;
                 node[3].forEach(connection => {
                     const target_node = graph[connection[0]];
                     const dom = {};  // 该 connection 对应的 DOM 元素引用
 
-                    if (target_node[0] === "self-connection") {
+                    if (target_node[0].startsWith('self-connection')) {
                         dom.path = svgEl("path", {stroke:"black","stroke-width":"1",fill:"none"});
                         dom.arrow = svgEl("polygon", {fill:"black"});
                         dom.text  = svgEl("text",   {fill:"black",style:"font-size:12px"});
@@ -842,7 +843,7 @@
         function update_graph_dom(graph) {
             // 更新连线
             graph.forEach(node => {
-                if (node[0] === 'self-connection') return;
+                if (node[0].startsWith('self-connection')) return;
                 const a = vector_plus([frame.x, frame.y], vector_scale(frame.factor, node[1]));
                 node[3].forEach(connection => {
                     const target_node = graph[connection[0]];
@@ -856,7 +857,7 @@
                     const normal = [-v_normalized[1], v_normalized[0]];
                     const c = vector_scale(vertex_r, v_normalized);
 
-                    if (target_node[0] === "self-connection") {
+                    if (target_node[0].startsWith('self-connection')) {
                         const c1 = vector_rotate(c,  self_connection_angle*0.5);
                         const c2 = vector_rotate(c, -self_connection_angle*0.5);
                         const c3 = vector_scale(l/vertex_r, c1);
@@ -917,6 +918,12 @@
         var dragging_node = null;  // 正在被拖动的节点，null 表示没有拖动
 
         var graph = construct_directed_graph_with_code(code);
+        if (examples[example]["embedding"] != undefined)  // 如果样例中有预设的节点坐标（embedding），则使用它们覆盖随机生成的坐标，以便每次打开页面时都能看到相同的布局
+            graph.forEach(node => {
+                const pos = examples[example]["embedding"][node[0]];
+                if (pos != undefined)
+                    node[1] = pos;
+            });
         build_graph_dom(graph);
 
         function graph_evolve() {
@@ -934,7 +941,7 @@
 
             // Connections length preserving
             graph.forEach(node1 => {
-                if(node1[0] == "self-connection")
+                if(node1[0].startsWith('self-connection'))
                     return;
                 node1[3].forEach(connection => {
                     const node2 = graph[connection[0]];
@@ -1504,10 +1511,10 @@
     // 为 \"），因此直接用 JSON.stringify / JSON.parse 即可，无需任何额外处理。
 
     function getGraphEmbedding() {
-        // 返回所有可见节点的名称 + 坐标，格式为 { "name": [x, y], ... }
+        // 返回所有节点（含 self-connection）的名称 + 坐标
         if (typeof graph === 'undefined') return {};
         const result = {};
-        graph.filter(node => node[2]).forEach(node => {
+        graph.forEach(node => {
             result[node[0]] = [node[1][0], node[1][1]];
         });
         return result;
