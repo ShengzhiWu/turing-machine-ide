@@ -128,6 +128,69 @@
             margin: 3px 0;
         }
 
+        /* ── Submenu ── */
+        .menu-dropdown-item.has-submenu {
+            position: relative;
+        }
+
+        .menu-dropdown-item.has-submenu::after {
+            content: '▶';
+            font-size: 9px;
+            opacity: 0.7;
+            margin-left: auto;
+            padding-left: 8px;
+        }
+
+        .menu-submenu {
+            display: none;
+            position: absolute;
+            top: -3px;
+            left: 100%;
+            min-width: 140px;
+            background-color: hsl(224, 17%, 22%);
+            border: 1px solid hsl(0, 0%, 35%);
+            box-shadow: 2px 4px 12px rgba(0,0,0,0.5);
+            z-index: 1002;
+            padding: 3px 0;
+        }
+
+        .menu-dropdown-item.has-submenu:hover > .menu-submenu {
+            display: block;
+        }
+
+        .menu-submenu-item {
+            padding: 6px 18px;
+            color: rgba(255,255,255,0.85);
+            cursor: default;
+            white-space: nowrap;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .menu-submenu-item:hover {
+            background-color: hsl(210, 60%, 40%);
+            color: white;
+        }
+
+        .menu-submenu-item.has-submenu::after {
+            content: '▶';
+            font-size: 9px;
+            opacity: 0.7;
+            margin-left: auto;
+            padding-left: 8px;
+        }
+
+        .menu-submenu-item.has-submenu:hover > .menu-submenu {
+            display: block;
+        }
+
+        .menu-submenu-item .checkmark {
+            width: 12px;
+            display: inline-block;
+            font-size: 11px;
+        }
+
         /* ── Main content area ── */
         #main-area {
             flex: 1;
@@ -268,7 +331,7 @@
     <div id="tape-panel" style="padding-top: 0.5em; flex: 1; overflow: hidden; display: flex; flex-direction: column; gap: 0.5em; background-color: hsl(0, 0%, 90%);">
         <button id="run-btn" title=" Run Program (F5)" onclick="run_program();" style="color: white;">▶</button>
         <div>
-            Max steps
+            <span id="max-steps-label">Max steps</span>
             <input id="max-steps-input" type="text" value="3000"/>
         </div>
 
@@ -1197,6 +1260,10 @@
             file:           '文件',
             edit:           '编辑',
             help:           '帮助',
+            preferences:    '偏好',
+            language:       '语言',
+            langZh:         '中文',
+            langEn:         'English',
             openProject:    '打开工程',
             saveProject:    '保存工程',
             saveEmbedding:  '保存图嵌入',
@@ -1211,11 +1278,18 @@
             saveDialogTitle:'保存工程',
             embedDialogTitle:'保存图嵌入',
             openDialogTitle: '打开工程',
+            maxSteps:       '最大步数',
+            runBtnTitle:    '运行程序 (F5)',
+            refreshBtnTitle:'重置图嵌入',
         },
         en: {
             file:           'File',
             edit:           'Edit',
             help:           'Help',
+            preferences:    'Preferences',
+            language:       'Language',
+            langZh:         '中文',
+            langEn:         'English',
             openProject:    'Open Project',
             saveProject:    'Save Project',
             saveEmbedding:  'Save Graph Embedding',
@@ -1230,6 +1304,9 @@
             saveDialogTitle:'Save Project',
             embedDialogTitle:'Save Graph Embedding',
             openDialogTitle: 'Open Project',
+            maxSteps:       'Max steps',
+            runBtnTitle:    'Run Program (F5)',
+            refreshBtnTitle:'Initialize Graph Embedding',
         }
     };
 
@@ -1250,6 +1327,27 @@
                     { label: t('openProject'),   action: menuOpenProject },
                     { label: t('saveProject'),   action: menuSaveProject },
                     { label: t('saveEmbedding'), action: menuSaveEmbedding },
+                    'separator',
+                    {
+                        label: t('preferences'),
+                        submenu: [
+                            {
+                                label: t('language'),
+                                submenu: [
+                                    {
+                                        label: t('langZh'),
+                                        checked: () => language === 'zh',
+                                        action: () => switchLanguage('zh')
+                                    },
+                                    {
+                                        label: t('langEn'),
+                                        checked: () => language === 'en',
+                                        action: () => switchLanguage('en')
+                                    },
+                                ]
+                            },
+                        ]
+                    },
                 ]
             },
             {
@@ -1264,6 +1362,81 @@
             }
         ];
 
+        function buildDropdownItems(items, container) {
+            items.forEach(entry => {
+                if (entry === 'separator') {
+                    const sep = document.createElement('hr');
+                    sep.className = 'menu-dropdown-separator';
+                    container.appendChild(sep);
+                } else if (entry.submenu) {
+                    // Item with submenu
+                    const di = document.createElement('div');
+                    di.className = 'menu-dropdown-item has-submenu';
+
+                    const labelSpan = document.createElement('span');
+                    labelSpan.textContent = entry.label;
+                    di.appendChild(labelSpan);
+
+                    const sub = document.createElement('div');
+                    sub.className = 'menu-submenu';
+                    buildSubmenuItems(entry.submenu, sub);
+                    di.appendChild(sub);
+
+                    container.appendChild(di);
+                } else {
+                    const di = document.createElement('div');
+                    di.className = 'menu-dropdown-item';
+                    di.textContent = entry.label;
+                    di.addEventListener('mousedown', e => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        closeAllMenus();
+                        entry.action();
+                    });
+                    container.appendChild(di);
+                }
+            });
+        }
+
+        function buildSubmenuItems(items, container) {
+            items.forEach(entry => {
+                if (entry.submenu) {
+                    // Nested submenu
+                    const di = document.createElement('div');
+                    di.className = 'menu-submenu-item has-submenu';
+                    const labelSpan = document.createElement('span');
+                    labelSpan.textContent = entry.label;
+                    di.appendChild(labelSpan);
+
+                    const sub = document.createElement('div');
+                    sub.className = 'menu-submenu';
+                    buildSubmenuItems(entry.submenu, sub);
+                    di.appendChild(sub);
+                    container.appendChild(di);
+                } else {
+                    const di = document.createElement('div');
+                    di.className = 'menu-submenu-item';
+
+                    const check = document.createElement('span');
+                    check.className = 'checkmark';
+                    check.textContent = entry.checked && entry.checked() ? '✓' : '';
+                    di.appendChild(check);
+
+                    const labelSpan = document.createElement('span');
+                    labelSpan.textContent = entry.label;
+                    di.appendChild(labelSpan);
+
+                    di.addEventListener('mousedown', e => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        closeAllMenus();
+                        entry.action();
+                    });
+                    container.appendChild(di);
+                }
+            });
+        }
+
         menus.forEach(menu => {
             const item = document.createElement('div');
             item.className = 'menu-item';
@@ -1273,24 +1446,7 @@
                 const dropdown = document.createElement('div');
                 dropdown.className = 'menu-dropdown';
 
-                menu.items.forEach(entry => {
-                    if (entry === 'separator') {
-                        const sep = document.createElement('hr');
-                        sep.className = 'menu-dropdown-separator';
-                        dropdown.appendChild(sep);
-                    } else {
-                        const di = document.createElement('div');
-                        di.className = 'menu-dropdown-item';
-                        di.textContent = entry.label;
-                        di.addEventListener('mousedown', e => {
-                            e.preventDefault();
-                            e.stopPropagation();  // 阻止冒泡到 .menu-item，避免菜单重新打开
-                            closeAllMenus();
-                            entry.action();
-                        });
-                        dropdown.appendChild(di);
-                    }
-                });
+                buildDropdownItems(menu.items, dropdown);
 
                 item.appendChild(dropdown);
             }
@@ -1478,8 +1634,34 @@
         });
     }
 
+    // ── Language switching ────────────────────────────────────────────────
+    function applyLanguageToUI() {
+        // Update non-menu UI elements
+        const runBtn = document.getElementById('run-btn');
+        if (runBtn) runBtn.title = ' ' + t('runBtnTitle');
+
+        const refreshBtn = document.getElementById('refresh-btn');
+        if (refreshBtn) refreshBtn.title = t('refreshBtnTitle');
+
+        const maxStepsLabel = document.getElementById('max-steps-label');
+        if (maxStepsLabel) maxStepsLabel.textContent = t('maxSteps');
+
+        // Update code/style editor lang attribute (for placeholder/hint text only, not content)
+        const code_ed = document.querySelector('#code-editor');
+        const style_ed = document.querySelector('#style-textarea');
+        if (code_ed) code_ed.lang = language;
+        if (style_ed) style_ed.lang = language;
+    }
+
+    function switchLanguage(lang) {
+        language = lang;
+        buildMenuBar();       // 重建菜单栏（含新语言的标签和勾选状态）
+        applyLanguageToUI();  // 更新其他界面元素（不动编辑器内容）
+    }
+
     // ── Init ─────────────────────────────────────────────────────────────
     buildMenuBar();
+    applyLanguageToUI();
     </script>
 </body>
 </html>
