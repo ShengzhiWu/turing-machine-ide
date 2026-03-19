@@ -369,6 +369,8 @@
     <script>
         var language = 'zh';  // 默认语言，支持zh、en。如果设置了不支持的语言，将回退到en
         var example = 'binary-division';  // 默认样例
+        var codeModified;   // 用户是否修改过图灵机代码
+        var styleModified;  // 用户是否修改过样式代码
     </script>
 
     <script>
@@ -402,6 +404,9 @@
 
         var code_editor_value = examples[example]['code'][language] || examples[example]['code']['en'];  // 代码编辑器中的文本
         code_editor.value = code_editor_value;  // 将代码编辑器的内容设置成指定内容
+        setTimeout(() => {  // 不知道为什么要延时，不延时这个值会被初始自动发出的修改事件覆盖掉
+            codeModified = false;  // 标记为未编辑过
+        }, 10);
         code_editor.lang = language;  // 设置语言，可选项有zh和en
         style_editor.lang = language;  // 设置语言，可选项有zh和en
 
@@ -502,6 +507,7 @@
 
         style_editor.addEventListener('ready', () => {  // 风格编辑器初始化完成监听
             style_editor.value = examples[example]['style'][language] || examples[example]['style']['en'];  // 设置初始风格代码
+            styleModified = false;  // 标记为未编辑过
         });
 
         var editing_line = 0;  // 代码编辑器中光标落在的行的行号
@@ -918,7 +924,7 @@
         var dragging_node = null;  // 正在被拖动的节点，null 表示没有拖动
 
         var graph = construct_directed_graph_with_code(code);
-        if (examples[example]["embedding"] != undefined)  // 如果样例中有预设的节点坐标（embedding），则使用它们覆盖随机生成的坐标，以便每次打开页面时都能看到相同的布局
+        if (examples[example]["embedding"] != undefined)  // 如果样例中有预设的节点坐标（embedding），则使用它们覆盖随机生成的坐标
             graph.forEach(node => {
                 const pos = examples[example]["embedding"][node[0]];
                 if (pos != undefined)
@@ -1175,6 +1181,7 @@
                 changedLines  // 变化的行的列表。当用户键入换行符时，这一行以及下面所有的行都会被判定为发生了变化
             } = e.detail;
             code_editor_value = value;  // 更新代码文本
+            codeModified = true;  // 标记用户已修改代码
             
             // 遍历变化的行，更新高亮的节点
             changedLines.forEach(line => {
@@ -1216,6 +1223,7 @@
             const result_table_style_text = style_editor.value;
             result_table_style = parseStyleCode(result_table_style_text);
             refresh_history_table(history_table, result);
+            styleModified = true;  // 标记用户已修改样式代码
         });
 
         // style_textarea.addEventListener('cm-errors', e => {  // 风格编辑器语法错误监听器
@@ -1654,6 +1662,7 @@
     function menuLoadExample(key) {
         const lang = (typeof language !== 'undefined') ? language : 'en';
         const ex = examples[key];
+        example = key;  // 记录当前样例
 
         // 载入图灵机代码
         const code = ex['code'][lang] || ex['code']['en'];
@@ -1682,6 +1691,10 @@
 
         // 运行程序
         if (typeof run_program === 'function') run_program();
+
+        // 重置修改标记
+        codeModified = false;
+        styleModified = false;
     }
 
     // ── Language switching ────────────────────────────────────────────────
@@ -1705,8 +1718,22 @@
 
     function switchLanguage(lang) {
         language = lang;
+
+        // 若用户未修改过代码，替换成新语言版本的样例代码
+        // 若用户已修改，为了避免丢失修改，保持现有代码不变
+        if (!codeModified && typeof example !== 'undefined' && examples[example]) {
+            const code = examples[example]['code'][lang] || examples[example]['code']['en'];
+            code_editor_value = code;
+            code_editor.value = code;
+        }
+        if (!styleModified && typeof example !== 'undefined' && examples[example]) {
+            const styleCode = examples[example]['style'][lang] || examples[example]['style']['en'];
+            style_editor.value = styleCode;
+            result_table_style = parseStyleCode(styleCode);
+        }
+
         buildMenuBar();       // 重建菜单栏（含新语言的标签和勾选状态）
-        applyLanguageToUI();  // 更新其他界面元素（不动编辑器内容）
+        applyLanguageToUI();  // 更新其他界面元素
     }
 
     // ── Init ─────────────────────────────────────────────────────────────
