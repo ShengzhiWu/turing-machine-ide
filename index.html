@@ -514,13 +514,55 @@
                 node._dom = dom;           // 将 DOM 引用挂在 node 上
                 node._display_name = node_name;
 
-                // ── 点击节点 → 编辑器光标跳转 ──────────────────────────
+                // ── 点击节点 → 编辑器光标跳转 / 拖动节点 ───────────────
                 [dom.circle, dom.name].forEach(el => {
                     el.style.cursor = 'pointer';
-                    el.addEventListener('click', e => {
+                    el.addEventListener('mousedown', e => {
+                        if (e.button !== 0) return;  // 只响应左键
                         e.stopPropagation();
-                        // node[0] 是原始名称（如 error_from_3），node_name 是显示名（如 error）
-                        jumpEditorToState(node[0], node_name, node._jumpInfo);
+                        e.preventDefault();
+
+                        const startScreenX = e.clientX;
+                        const startScreenY = e.clientY;
+                        let dragged = false;
+                        const DRAG_THRESHOLD = 4;  // 超过这个像素才算拖动
+
+                        const onMouseMove = e => {
+                            const totalDx = e.clientX - startScreenX;
+                            const totalDy = e.clientY - startScreenY;
+                            if (!dragged && Math.sqrt(totalDx*totalDx + totalDy*totalDy) > DRAG_THRESHOLD) {
+                                dragged = true;
+                                dragging_node = node;
+                                graph_view.style.cursor = 'grabbing';
+                                el.style.cursor = 'grabbing';
+                            }
+                            if (dragged) {
+                                // 将屏幕坐标直接反算为图坐标，节点始终吸附在鼠标下
+                                const rect = graph_view.getBoundingClientRect();
+                                const screenX = e.clientX - rect.left;
+                                const screenY = e.clientY - rect.top;
+                                node[1] = [
+                                    (screenX - frame.x) / frame.factor,
+                                    (screenY - frame.y) / frame.factor
+                                ];
+                            }
+                        };
+
+                        const onMouseUp = e => {
+                            window.removeEventListener('mousemove', onMouseMove);
+                            window.removeEventListener('mouseup', onMouseUp);
+                            dragging_node = null;
+                            graph_view.style.cursor = '';
+                            el.style.cursor = 'pointer';
+
+                            if (!dragged) {
+                                // 没有拖动 → 触发跳转
+                                jumpEditorToState(node[0], node_name, node._jumpInfo);
+                            }
+                        };
+
+                        window.addEventListener('mousemove', onMouseMove);
+                        window.addEventListener('mouseup', onMouseUp);
                     });
                 });
             });
@@ -651,6 +693,8 @@
             });
         }
 
+        var dragging_node = null;  // 正在被拖动的节点，null 表示没有拖动
+
         var graph = construct_directed_graph_with_code(code);
         build_graph_dom(graph);
 
@@ -662,8 +706,8 @@
                     const d = vector_length(v);
                     if(d<vertex_prefered_distance) {
                         const force = vector_scale((1-d/vertex_prefered_distance)*vertex_repel_strength/d, v);
-                        graph[j][1] = vector_plus(graph[j][1], force);
-                        graph[i][1] = vector_subtract(graph[i][1], force);
+                        if(graph[j] !== dragging_node) graph[j][1] = vector_plus(graph[j][1], force);
+                        if(graph[i] !== dragging_node) graph[i][1] = vector_subtract(graph[i][1], force);
                     }
                 }
 
@@ -677,8 +721,8 @@
                     const v = vector_subtract(node2[1], node1[1]);
                     const d = vector_length(v);
                     const force = vector_scale((1-d/prefered_length)*connection_length_preserve_strength/d, v);
-                    node2[1] = vector_plus(node2[1], force);
-                    node1[1] = vector_subtract(node1[1], force);
+                    if(node2 !== dragging_node) node2[1] = vector_plus(node2[1], force);
+                    if(node1 !== dragging_node) node1[1] = vector_subtract(node1[1], force);
                 });
             });
         }
