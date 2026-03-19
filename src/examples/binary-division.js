@@ -5,6 +5,16 @@ if (!examples)
 
 examples["binary-division"] = {};
 
+examples["binary-division"]["name"] = {
+    "zh": "二进制除法",
+    "en": "Binary division"
+}
+;
+examples["binary-division"]["description"] = {
+    "zh": "这个图灵机实现了二进制除法。约定初始纸带格式：空格，被除数，空格，除数。被除数和除数首位必须为1。",
+    "en": "This Turing machine implements binary division. The initial tape format is as follows: blank, dividend, blank, divisor. The first digit of both the dividend and divisor must be 1."
+};
+
 examples["binary-division"]["code"] = {};
 
 examples["binary-division"]["code"]["zh"] = `// 二进制除法
@@ -535,8 +545,3 @@ examples["binary-division"]["tapes"] = [  // 样例初始纸带
     ["", "1", "1", "", "1", "0", "", "", "", "", "", "", "", "", "", "", ""],  // 正确答案：1余1
     ["", "1", "", "1", "0", "", "", "", "", "", "", "", "", "", "", ""]  // 正确答案：0余1
 ];
-
-examples["binary-division"]["description"] = {
-    "zh": "这个图灵机实现了二进制除法。约定初始纸带格式：空格，被除数，空格，除数。被除数和除数首位必须为1。",
-    "en": "This Turing machine implements binary division. The initial tape format is as follows: blank, dividend, blank, divisor. The first digit of both the dividend and divisor must be 1."
-};
