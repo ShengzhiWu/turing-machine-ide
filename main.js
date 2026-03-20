@@ -1,8 +1,15 @@
 const electron = require('electron');
 const app = electron.app;  // 引用app
 const BrowserWindow = electron.BrowserWindow;  // 窗口引用
+const { ipcMain, dialog } = electron;
 
 var mainWindow = null;  // 主窗口
+
+// Handle folder browse dialog requests from renderer
+ipcMain.handle('show-open-dialog', async (event, options) => {
+    const result = await dialog.showOpenDialog(mainWindow, options);
+    return result;
+});
 
 app.on('ready', ()=>{
     mainWindow = new BrowserWindow({
