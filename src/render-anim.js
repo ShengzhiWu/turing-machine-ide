@@ -369,10 +369,11 @@ function drawRenderFrame(ctx, p, snapGraph, frame, nodeBrightness, edgeBrightnes
 function drawGraphOnCanvas(ctx, snapGraph, W, H, animFrame, nodeBrightness, edgeBrightness, renderParams) {
     if (!snapGraph || snapGraph.length === 0) return;
 
-    // Compute bounding box of all visible nodes in graph space
+    // Compute bounding box of ALL nodes (including hidden self-connection helper nodes),
+    // so that self-loop curves anchored to those positions don't extend outside the frame.
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     snapGraph.forEach(node => {
-        if (!node.visible || !node.name || node.name.startsWith('self-connection')) return;
+        if (!node.name) return;
         minX = Math.min(minX, node.pos[0]);
         minY = Math.min(minY, node.pos[1]);
         maxX = Math.max(maxX, node.pos[0]);
