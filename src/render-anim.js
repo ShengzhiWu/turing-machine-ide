@@ -1,241 +1,166 @@
 // ── Render Animation: dialog logic, frame generation, canvas drawing ────────
 
-function menuRenderAnimation() {
-    // Localise dialog text
-    document.getElementById('render-dialog-title').textContent  = t('renderDialogTitle');
-    document.getElementById('render-sec-size').textContent      = t('renderSecSize');
-    document.getElementById('render-sec-timing').textContent    = t('renderSecTiming');
-    document.getElementById('render-sec-output').textContent    = t('renderSecOutput');
-    document.getElementById('render-label-width').textContent   = t('renderLabelWidth');
-    document.getElementById('render-label-height').textContent  = t('renderLabelHeight');
-    document.getElementById('render-label-move-frames').textContent  = t('renderLabelMoveFrames');
-    document.getElementById('render-label-pause-frames').textContent = t('renderLabelPauseFrames');
-    document.getElementById('render-label-halflife').textContent = t('renderLabelHalflife');
-    document.getElementById('render-label-total-frames').textContent = t('renderLabelTotalFrames') + '0';
-    document.getElementById('render-output-path').placeholder   = t('renderOutputPlaceholder');
-    document.getElementById('render-browse-btn').textContent    = t('renderBrowse');
-    document.getElementById('render-start-btn').textContent     = t('renderStart');
-    document.getElementById('render-close-btn').textContent     = t('renderClose');
+// Persisted render params (so the settings window remembers values between opens)
+const _renderDefaultParams = {
+    width: 1920, height: 1080,
+    moveFrames: 10, pauseFrames: 5, halflife: 10,
+    graphicScale: 1.0, outputPath: '',
+};
+let _lastRenderParams = Object.assign({}, _renderDefaultParams);
 
-    // Compute run history (detailed mode = every step)
-    const renderCode = parseProgramCode(code_editor_value);
+function menuRenderAnimation() {
+    const { ipcRenderer } = require('electron');
+
+    // Compute run history
+    const renderCode    = parseProgramCode(code_editor_value);
     const renderHistory = run_turing_machine(renderCode, tape,
         parseInt(max_steps_input.value) || 3000, true);
 
-    // Store on the overlay element for use by render functions
-    const overlay = document.getElementById('render-overlay');
-    overlay._renderHistory = renderHistory;
-    overlay._renderCode    = renderCode;
+    // Stash history on a module-level variable for use during render
+    window._renderHistory = renderHistory;
+    window._renderCode    = renderCode;
 
-    updateRenderTotalFrames(renderHistory);
-    resetRenderProgress();
+    const totalFrames = computeTotalFrames(renderHistory, _lastRenderParams);
 
-    overlay.classList.add('visible');
+    ipcRenderer.invoke('open-render-settings', {
+        params: _lastRenderParams,
+        totalFrames,
+        strings: {
+            title:            t('renderDialogTitle'),
+            secSize:          t('renderSecSize'),
+            secTiming:        t('renderSecTiming'),
+            secStyle:         t('renderSecStyle') || 'Visual Style',
+            secOutput:        t('renderSecOutput'),
+            lblWidth:         t('renderLabelWidth'),
+            lblHeight:        t('renderLabelHeight'),
+            lblMoveFrames:    t('renderLabelMoveFrames'),
+            lblPauseFrames:   t('renderLabelPauseFrames'),
+            lblHalflife:      t('renderLabelHalflife'),
+            lblGraphicScale:  t('renderLabelGraphicScale') || 'Graphic scale',
+            btnStart:         t('renderStart'),
+            btnClose:         t('renderClose'),
+            btnBrowse:        t('renderBrowse'),
+            outputPlaceholder: t('renderOutputPlaceholder'),
+        },
+    });
 }
 
 function getRenderParams() {
-    return {
-        width:        Math.max(1, parseInt(document.getElementById('render-width').value)  || 1920),
-        height:       Math.max(1, parseInt(document.getElementById('render-height').value) || 1080),
-        moveFrames:   Math.max(1, parseInt(document.getElementById('render-move-frames').value)  || 10),
-        pauseFrames:  Math.max(0, parseInt(document.getElementById('render-pause-frames').value) || 5),
-        halflife:     Math.max(1, parseInt(document.getElementById('render-halflife').value) || 10),
-        graphicScale: Math.max(0.1, parseFloat(document.getElementById('render-graphic-scale').value) || 1.0),
-        outputPath:   document.getElementById('render-output-path').value.trim(),
-    };
+    // Return last-known params (updated via IPC from settings window)
+    return Object.assign({}, _lastRenderParams);
 }
 
 function computeTotalFrames(history, p) {
     // Matches buildFrameSequence exactly.
-    // history is the full run history array (or its length won't suffice — we need positions).
     const pause = Math.max(1, p.pauseFrames);
     const move  = Math.max(1, p.moveFrames);
     if (!history || history.length === 0) return 0;
     if (history.length === 1) return pause + pause;
-    let total = pause;  // initial pause
+    let total = pause;
     for (let i = 1; i < history.length; i++) {
-        total += pause;  // post-transition pause
-        if (history[i][1] !== history[i-1][1]) total += move;  // movement frames (skipped when pos unchanged)
+        if (history[i][1] !== history[i-1][1]) total += move;
+        total += pause;
     }
-    total += pause;  // final pause
+    total += pause;
     return total;
 }
 
-function updateRenderTotalFrames(history) {
-    const p = getRenderParams();
-    const n = computeTotalFrames(history || [], p);
-    document.getElementById('render-label-total-frames').textContent =
-        t('renderLabelTotalFrames') + n;
-    document.getElementById('render-frame-counter').textContent = '0 / ' + n;
-}
+// ── IPC listeners (from settings window via main process) ────────────
+{
+    const { ipcRenderer } = require('electron');
 
-function resetRenderProgress() {
-    document.getElementById('render-progress-bar').style.width = '0%';
-    const overlay = document.getElementById('render-overlay');
-    const n = computeTotalFrames(overlay._renderHistory || [], getRenderParams());
-    document.getElementById('render-frame-counter').textContent = '0 / ' + n;
-}
-
-// Wire up timing input changes → update total frames
-['render-move-frames','render-pause-frames','render-halflife',
-    'render-width','render-height','render-graphic-scale'].forEach(id => {
-    document.getElementById(id).addEventListener('input', () => {
-        const overlay = document.getElementById('render-overlay');
-        if (overlay._renderHistory) updateRenderTotalFrames(overlay._renderHistory);
+    // Settings window changed params → recompute total frames and send back
+    ipcRenderer.on('render-params-changed', (event, params) => {
+        Object.assign(_lastRenderParams, params);
+        const n = computeTotalFrames(window._renderHistory || [], _lastRenderParams);
+        ipcRenderer.send('render-total-frames', n);
     });
-});
 
-// Browse button
-document.getElementById('render-browse-btn').addEventListener('click', () => {
-    if (typeof require !== 'undefined') {
-        const { dialog } = require('electron').remote || require('@electron/remote') || {};
-        if (dialog) {
-            dialog.showOpenDialog({ title: t('renderBrowseTitle'), properties: ['openDirectory'] })
-                .then(result => {
-                    if (!result.canceled && result.filePaths.length > 0)
-                        document.getElementById('render-output-path').value = result.filePaths[0];
-                });
-            return;
-        }
-        // Fallback: try ipcRenderer
-        try {
-            const { ipcRenderer } = require('electron');
-            ipcRenderer.invoke('show-open-dialog', {
-                title: t('renderBrowseTitle'),
-                properties: ['openDirectory']
-            }).then(result => {
-                if (result && !result.canceled && result.filePaths.length > 0)
-                    document.getElementById('render-output-path').value = result.filePaths[0];
-            });
-        } catch(e) { console.warn('No dialog API available', e); }
-    }
-});
+    // Settings window closed without rendering
+    ipcRenderer.on('render-settings-closed', () => {
+        // nothing to clean up in main window for now
+    });
 
-// Close button
-document.getElementById('render-close-btn').addEventListener('click', () => {
-    if (!document.getElementById('render-overlay')._rendering)
-        document.getElementById('render-overlay').classList.remove('visible');
-});
-document.getElementById('render-overlay').addEventListener('mousedown', function(e) {
-    if (e.target === this && !this._rendering) this.classList.remove('visible');
-});
+    // Settings window clicked Render
+    ipcRenderer.on('render-start', (event, params) => {
+        Object.assign(_lastRenderParams, params);
+        startRender(params);
+    });
+}
 
 // ── Main render function ──────────────────────────────────────────────
-document.getElementById('render-start-btn').addEventListener('click', () => {
-    const overlay = document.getElementById('render-overlay');
-    if (overlay._rendering) return;
-    const outputPath = document.getElementById('render-output-path').value.trim();
-    if (!outputPath) { alert(t('renderOutputPlaceholder')); return; }
+async function startRender(p) {
+    const { ipcRenderer } = require('electron');
+    const fs      = require('fs');
+    const pathMod = require('path');
+    const history = window._renderHistory;
+    if (!history) return;
 
-    overlay._rendering = true;
-    document.getElementById('render-start-btn').disabled = true;
-    document.getElementById('render-close-btn').disabled = true;
+    ipcRenderer.send('render-ui-lock', true);
+    await ipcRenderer.invoke('open-render-preview', { width: p.width, height: p.height });
 
-    const previewOverlay = document.getElementById('render-preview-overlay');
-    const previewCanvas  = document.getElementById('render-preview-canvas');
-    const previewLabel   = document.getElementById('render-preview-label');
-    previewLabel.textContent = t('renderRendering');
-    previewOverlay.classList.add('visible');
-
-    const p = getRenderParams();
-    const history = overlay._renderHistory;
-
-    // Build the render graph snapshot (freeze current positions)
     const renderGraph = buildRenderGraphSnapshot();
-    previewCanvas.width  = p.width;
-    previewCanvas.height = p.height;
-    // Scale preview canvas display
-    const maxW = window.innerWidth  * 0.78;
-    const maxH = window.innerHeight * 0.58;
-    const scale = Math.min(1, maxW / p.width, maxH / p.height);
-    previewCanvas.style.width  = Math.round(p.width  * scale) + 'px';
-    previewCanvas.style.height = Math.round(p.height * scale) + 'px';
+    const frames      = buildFrameSequence(history, p);
 
-    const ctx = previewCanvas.getContext('2d');
+    const offCanvas = document.createElement('canvas');
+    offCanvas.width  = p.width;
+    offCanvas.height = p.height;
+    const ctx = offCanvas.getContext('2d');
 
-    // Highlight brightness state: { nodeKey: brightness, edgeKey: brightness }
-    const nodeBrightness = {};  // key = node[0] (state name)
-    const edgeBrightness = {};  // key = "fromState|toState|edgeName"
+    const nodeBrightness = {};
+    const edgeBrightness = {};
+    const decay = Math.pow(0.5, 1 / p.halflife);
 
-    const decay = Math.pow(0.5, 1 / p.halflife);  // per-frame brightness multiplier
+    // Preview throttle: send at most one preview update every ~150 ms
+    let lastPreviewTime = 0;
 
-    const frames = buildFrameSequence(history, p);
-
-    function saveFrame(blob, idx) {
-        return new Promise((resolve, reject) => {
-            if (typeof require !== 'undefined') {
-                try {
-                    const path = require('path');
-                    const fs   = require('fs');
-                    const num  = String(idx).padStart(6, '0');
-                    const fp   = path.join(outputPath, `frame_${num}.png`);
-                    const reader = new FileReader();
-                    reader.onload = () => {
-                        const buf = Buffer.from(reader.result);
-                        fs.writeFileSync(fp, buf);
-                        resolve();
-                    };
-                    reader.onerror = reject;
-                    reader.readAsArrayBuffer(blob);
-                } catch(e) { reject(e); }
-            } else {
-                // Browser: just skip saving (preview only)
-                resolve();
-            }
-        });
-    }
-
-    async function renderLoop() {
+    try {
         for (let fi = 0; fi < frames.length; fi++) {
             const frame = frames[fi];
 
-            // Decay all brightnesses
             for (const k of Object.keys(nodeBrightness)) nodeBrightness[k] *= decay;
             for (const k of Object.keys(edgeBrightness)) edgeBrightness[k] *= decay;
-
-            // Apply activations
             if (frame.activateNode) nodeBrightness[frame.activateNode] = 1.0;
             if (frame.activateEdge) edgeBrightness[frame.activateEdge] = 1.0;
 
-            // Draw
             drawRenderFrame(ctx, p, renderGraph, frame, nodeBrightness, edgeBrightness);
 
-            // Save
-            await new Promise(res => previewCanvas.toBlob(async blob => {
-                await saveFrame(blob, fi);
-                res();
-            }, 'image/png'));
+            // ── Save frame to disk ────────────────────────────────────────
+            const dataURL = offCanvas.toDataURL('image/png');
+            const base64  = dataURL.slice(dataURL.indexOf(',') + 1);
+            const pngBuf  = Buffer.from(base64, 'base64');
+            const num = String(fi).padStart(6, '0');
+            fs.writeFileSync(pathMod.join(p.outputPath, `frame_${num}.png`), pngBuf);
 
-            // Update progress
+            // ── Send preview: throttled, reuse the dataURL already computed ──
+            const now = Date.now();
+            if (now - lastPreviewTime >= 150) {
+                lastPreviewTime = now;
+                ipcRenderer.send('render-preview-dataurl', dataURL);
+            }
+
+            // ── Send progress (fire-and-forget) ──────────────────────────
             const pct = ((fi + 1) / frames.length * 100).toFixed(1);
-            document.getElementById('render-progress-bar').style.width = pct + '%';
-            document.getElementById('render-frame-counter').textContent = (fi+1) + ' / ' + frames.length;
+            ipcRenderer.send('render-progress', { pct, current: fi + 1, total: frames.length });
 
-            // Yield to UI
-            await new Promise(res => setTimeout(res, 0));
+            // Yield once every 10 frames to keep Electron responsive
+            if (fi % 10 === 0) await new Promise(res => setTimeout(res, 0));
         }
 
-        // Done
-        previewLabel.textContent = t('renderDone');
+        ipcRenderer.send('render-preview-status', t('renderDone') || 'Done');
         setTimeout(() => {
-            previewOverlay.classList.remove('visible');
-            overlay.classList.remove('visible');
-            overlay._rendering = false;
-            document.getElementById('render-start-btn').disabled = false;
-            document.getElementById('render-close-btn').disabled = false;
-            resetRenderProgress();
+            ipcRenderer.send('close-render-preview');
+            ipcRenderer.send('render-settings-close');
         }, 800);
-    }
 
-    renderLoop().catch(e => {
+    } catch(e) {
         console.error('Render error', e);
-        overlay._rendering = false;
-        document.getElementById('render-start-btn').disabled = false;
-        document.getElementById('render-close-btn').disabled = false;
-        previewOverlay.classList.remove('visible');
+        ipcRenderer.send('render-preview-status', 'Error: ' + e.message);
         alert('Render error: ' + e.message);
-    });
-});
+    } finally {
+        ipcRenderer.send('render-ui-lock', false);
+    }
+}
 
 // ── Build frame sequence ──────────────────────────────────────────────
 function buildFrameSequence(history, p) {
@@ -360,7 +285,7 @@ function drawRenderFrame(ctx, p, snapGraph, frame, nodeBrightness, edgeBrightnes
     drawGraphOnCanvas(ctx, snapGraph, W, graphH, frame, nodeBrightness, edgeBrightness, p);
 
     // ── Draw Tape ───────────────────────────────────────────────────
-    const hist = document.getElementById('render-overlay')._renderHistory;
+    const hist = window._renderHistory;
     const record = hist[Math.min(frame.historyIndex, hist.length - 1)];
     drawTapeOnCanvas(ctx, p, record, frame.headPos, frame.currentState,
         tapeAreaY, tapeAreaH, W);
