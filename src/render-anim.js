@@ -35,12 +35,13 @@ function menuRenderAnimation() {
 
 function getRenderParams() {
     return {
-        width:       Math.max(1, parseInt(document.getElementById('render-width').value)  || 1920),
-        height:      Math.max(1, parseInt(document.getElementById('render-height').value) || 1080),
-        moveFrames:  Math.max(1, parseInt(document.getElementById('render-move-frames').value)  || 10),
-        pauseFrames: Math.max(0, parseInt(document.getElementById('render-pause-frames').value) || 5),
-        halflife:    Math.max(1, parseInt(document.getElementById('render-halflife').value) || 10),
-        outputPath:  document.getElementById('render-output-path').value.trim(),
+        width:        Math.max(1, parseInt(document.getElementById('render-width').value)  || 1920),
+        height:       Math.max(1, parseInt(document.getElementById('render-height').value) || 1080),
+        moveFrames:   Math.max(1, parseInt(document.getElementById('render-move-frames').value)  || 10),
+        pauseFrames:  Math.max(0, parseInt(document.getElementById('render-pause-frames').value) || 5),
+        halflife:     Math.max(1, parseInt(document.getElementById('render-halflife').value) || 10),
+        graphicScale: Math.max(0.1, parseFloat(document.getElementById('render-graphic-scale').value) || 1.0),
+        outputPath:   document.getElementById('render-output-path').value.trim(),
     };
 }
 
@@ -77,7 +78,7 @@ function resetRenderProgress() {
 
 // Wire up timing input changes → update total frames
 ['render-move-frames','render-pause-frames','render-halflife',
-    'render-width','render-height'].forEach(id => {
+    'render-width','render-height','render-graphic-scale'].forEach(id => {
     document.getElementById(id).addEventListener('input', () => {
         const overlay = document.getElementById('render-overlay');
         if (overlay._renderHistory) updateRenderTotalFrames(overlay._renderHistory);
@@ -342,23 +343,19 @@ function buildRenderGraphSnapshot() {
 function drawRenderFrame(ctx, p, snapGraph, frame, nodeBrightness, edgeBrightness) {
     const W = p.width, H = p.height;
 
-    // Layout: top portion = graph (60%), bottom = tape area (40%)
-    const graphH = Math.round(H * 0.60);
+    // Layout: graph area takes most of the frame; tape strip is compact at the bottom.
+    // tapeAreaH is computed to just fit: top-padding + headBox + tape strip + bottom-padding.
+    // We use a fixed fraction that keeps it tight. Approx 22% of total height.
+    const graphH    = Math.round(H * 0.78);
     const tapeAreaY = graphH;
     const tapeAreaH = H - graphH;
 
     // ── Background ───────────────────────────────────────────────────
     ctx.fillStyle = 'hsl(0,0%,60%)';  // matches graph-panel background
-    ctx.fillRect(0, 0, W, graphH);
-
-    ctx.fillStyle = 'hsl(0,0%,90%)';  // matches tape-panel background
-    ctx.fillRect(0, tapeAreaY, W, tapeAreaH);
+    ctx.fillRect(0, 0, W, H);  // fill whole frame with graph color; tape area has no separate bg
 
     // ── Draw Graph ───────────────────────────────────────────────────
     drawGraphOnCanvas(ctx, snapGraph, W, graphH, frame, nodeBrightness, edgeBrightness, p);
-    // ── Divider ──────────────────────────────────────────────────────
-    ctx.fillStyle = 'hsl(0,0%,22%)';
-    ctx.fillRect(0, graphH - 1, W, 2);
 
     // ── Draw Tape ───────────────────────────────────────────────────
     const hist = document.getElementById('render-overlay')._renderHistory;
@@ -370,27 +367,57 @@ function drawRenderFrame(ctx, p, snapGraph, frame, nodeBrightness, edgeBrightnes
 function drawGraphOnCanvas(ctx, snapGraph, W, H, animFrame, nodeBrightness, edgeBrightness, renderParams) {
     if (!snapGraph || snapGraph.length === 0) return;
 
-    // Compute coordinate transform: scale the live graph 'frame' to fit the render canvas graph area
-    const graphPanel = document.getElementById('graph-panel');
-    const gpW = graphPanel ? graphPanel.clientWidth  : 640;
-    const gpH = graphPanel ? graphPanel.clientHeight : 400;
-    const scaleX = W / gpW;
-    const scaleY = H / gpH;
-    const s = Math.min(scaleX, scaleY);
-    const rf = {
-        x:      frame.x * scaleX,
-        y:      frame.y * scaleY,
-        factor: frame.factor * s,
-    };
+    // Compute bounding box of all visible nodes in graph space
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    snapGraph.forEach(node => {
+        if (!node.visible || !node.name || node.name.startsWith('self-connection')) return;
+        minX = Math.min(minX, node.pos[0]);
+        minY = Math.min(minY, node.pos[1]);
+        maxX = Math.max(maxX, node.pos[0]);
+        maxY = Math.max(maxY, node.pos[1]);
+    });
+
+    // GRAPH_MARGIN: blank space (in graph-space units × fitFactor) around the node bounding box.
+    // Increase this value to add more whitespace around the graph in the rendered output.
+    const GRAPH_MARGIN_FACTOR = 0.18;  // fraction of the smaller canvas dimension used as margin
+    const rf = (() => {
+        if (!isFinite(minX) || maxX === minX || maxY === minY) {
+            // Fallback: use live frame transform
+            const graphPanel = document.getElementById('graph-panel');
+            const gpW = graphPanel ? graphPanel.clientWidth  : 640;
+            const gpH = graphPanel ? graphPanel.clientHeight : 400;
+            const scaleX = W / gpW;
+            const scaleY = H / gpH;
+            const s = Math.min(scaleX, scaleY);
+            return { x: frame.x * scaleX, y: frame.y * scaleY, factor: frame.factor * s };
+        }
+        const margin = Math.min(W, H) * GRAPH_MARGIN_FACTOR;
+        const drawW = W - margin * 2;
+        const drawH = H - margin * 2;
+        const graphSpanX = maxX - minX;
+        const graphSpanY = maxY - minY;
+        const fitFactor = Math.min(drawW / graphSpanX, drawH / graphSpanY);
+        // Center the graph in the area
+        const centerX = (minX + maxX) / 2;
+        const centerY = (minY + maxY) / 2;
+        return {
+            x: W / 2 - centerX * fitFactor,
+            y: H / 2 - centerY * fitFactor,
+            factor: fitFactor,
+        };
+    })();
 
     function toScreen(pos) {
         return [rf.x + pos[0] * rf.factor,
                 rf.y + pos[1] * rf.factor];
     }
 
-    const vr = vertex_r;  // reuse same constant
-    const ahL = arrow_head_length;
-    const ahW = arrow_head_width;
+    const gs  = (renderParams && renderParams.graphicScale) ? renderParams.graphicScale : 1.0;
+    const vr  = vertex_r * gs;          // scaled node radius
+    const ahL = arrow_head_length * gs; // scaled arrowhead length
+    const ahW = arrow_head_width  * gs; // scaled arrowhead width
+    const fontSize   = Math.round(12 * gs);
+    const lineWidth  = 1.2 * gs;
 
     // Draw connections
     snapGraph.forEach(node => {
@@ -424,7 +451,7 @@ function drawGraphOnCanvas(ctx, snapGraph, W, H, animFrame, nodeBrightness, edge
                 : 'black';
             ctx.strokeStyle = edgeColor;
             ctx.fillStyle   = edgeColor;
-            ctx.lineWidth   = 1.2;
+            ctx.lineWidth   = lineWidth;
 
             if (isSelfLoop) {
                 // Self-loop
@@ -446,7 +473,7 @@ function drawGraphOnCanvas(ctx, snapGraph, W, H, animFrame, nodeBrightness, edge
                 // Text
                 const tl = vector_plus(a, vector_scale(self_connection_text_distance_factor, v));
                 ctx.fillStyle = edgeColor;
-                ctx.font = '12px system-ui,sans-serif';
+                ctx.font = `${fontSize}px system-ui,sans-serif`;
                 ctx.fillText(conn.edgeName, tl[0]-3, tl[1]+4);
             } else {
                 if (l > vr*2) {
@@ -466,7 +493,7 @@ function drawGraphOnCanvas(ctx, snapGraph, W, H, animFrame, nodeBrightness, edge
                     ctx.stroke();
                     drawArrowHead(ctx, p2, vector_scale(1/vr, c2), ahL, ahW);
                     ctx.fillStyle = edgeColor;
-                    ctx.font = '12px system-ui,sans-serif';
+                    ctx.font = `${fontSize}px system-ui,sans-serif`;
                     ctx.fillText(conn.edgeName, tl[0]-3, tl[1]+4);
                 }
             }
@@ -484,7 +511,7 @@ function drawGraphOnCanvas(ctx, snapGraph, W, H, animFrame, nodeBrightness, edge
         // Glow halo based on brightness
         const bright = nodeBrightness[dn] || nodeBrightness[node.name] || 0;
         if (bright > 0.02) {
-            const glowR = vr + 8 + bright * 6;
+            const glowR = vr + (8 + bright * 6) * gs;
             const grad = ctx.createRadialGradient(p2[0], p2[1], vr, p2[0], p2[1], glowR);
             grad.addColorStop(0, `rgba(255,255,255,${(bright * 0.8).toFixed(3)})`);
             grad.addColorStop(1, 'rgba(255,255,255,0)');
@@ -500,15 +527,15 @@ function drawGraphOnCanvas(ctx, snapGraph, W, H, animFrame, nodeBrightness, edge
         ctx.fillStyle = nodeColor;
         ctx.fill();
         ctx.strokeStyle = 'black';
-        ctx.lineWidth = 1;
+        ctx.lineWidth = gs;
         ctx.stroke();
 
         // Label (inside) and name (beside)
         ctx.fillStyle = 'black';
-        ctx.font = '12px system-ui,sans-serif';
-        if (node.label) ctx.fillText(node.label, p2[0]-3, p2[1]+4);
-        ctx.fillText(dn, p2[0] + vertex_name_text_offset[0] - 3,
-                            p2[1] + vertex_name_text_offset[1] + 4);
+        ctx.font = `${fontSize}px system-ui,sans-serif`;
+        if (node.label) ctx.fillText(node.label, p2[0]-3*gs, p2[1]+4*gs);
+        ctx.fillText(dn, p2[0] + vertex_name_text_offset[0]*gs - 3,
+                            p2[1] + vertex_name_text_offset[1]*gs + 4);
     });
 }
 
@@ -553,9 +580,8 @@ function drawTapeOnCanvas(ctx, p, record, headPos, currentState, areaY, areaH, W
     const tapeCenterY  = areaY + Math.round(areaH * 0.78);
     const tapeTopY     = tapeCenterY - Math.round(cellH / 2);
 
-    // Head box sits above the tape; pointer triangle bridges the gap
-    const headBoxX = W / 2 - headBoxW / 2;
-    const headBoxY = tapeTopY - headBoxH;   // head box bottom touches tape top
+    // Head box sits above the tape; pentagon tip points down to cell center
+    const headBoxY = tapeTopY - headBoxH;   // head box top
 
     // ── Tape background strip ─────────────────────────────────────────
     ctx.fillStyle = 'hsl(0,0%,98%)';
@@ -563,7 +589,8 @@ function drawTapeOnCanvas(ctx, p, record, headPos, currentState, areaY, areaH, W
 
     // ── Tape cells ────────────────────────────────────────────────────
     // Cell at index headPos is horizontally centred at W/2
-    const cellScreenX  = ci => W / 2 + (ci - headPos) * cellW;
+    // cx is the LEFT edge of cell ci; the center of cell headPos is at W/2
+    const cellScreenX  = ci => W / 2 - cellW / 2 + (ci - headPos) * cellW;
     const visibleCells = Math.ceil(W / cellW) + 4;
     const startCell    = Math.round(headPos) - Math.floor(visibleCells / 2);
     const endCell      = startCell + visibleCells;
@@ -597,30 +624,33 @@ function drawTapeOnCanvas(ctx, p, record, headPos, currentState, areaY, areaH, W
     ctx.textAlign    = 'left';
     ctx.textBaseline = 'alphabetic';
 
-    // ── Read-head box (dark-grey rounded rect) ────────────────────────
+    // ── Read-head: pentagon (rectangle top + downward point at bottom) ──
+    // The tip of the pentagon points down to the center of the current cell (always W/2).
+    const tipX = W / 2;  // screen center = center of current cell
+    const tipY = tapeTopY;
+    const pentPointW = Math.max(8, Math.round(headBoxW * 0.30));
+    const rectL = tipX - headBoxW / 2;
+    const rectR = tipX + headBoxW / 2;
+    const hr = Math.max(3, Math.round(headBoxH * 0.18));
     ctx.fillStyle = 'hsl(0,0%,22%)';
-    const hr = Math.max(3, Math.round(headBoxH * 0.12));
     ctx.beginPath();
-    ctx.moveTo(headBoxX + hr,            headBoxY);
-    ctx.lineTo(headBoxX + headBoxW - hr, headBoxY);
-    ctx.quadraticCurveTo(headBoxX + headBoxW, headBoxY,            headBoxX + headBoxW, headBoxY + hr);
-    ctx.lineTo(headBoxX + headBoxW,      headBoxY + headBoxH - hr);
-    ctx.quadraticCurveTo(headBoxX + headBoxW, headBoxY + headBoxH, headBoxX + headBoxW - hr, headBoxY + headBoxH);
-    ctx.lineTo(headBoxX + hr,            headBoxY + headBoxH);
-    ctx.quadraticCurveTo(headBoxX,       headBoxY + headBoxH,      headBoxX, headBoxY + headBoxH - hr);
-    ctx.lineTo(headBoxX,                 headBoxY + hr);
-    ctx.quadraticCurveTo(headBoxX,       headBoxY,                 headBoxX + hr, headBoxY);
+    // Top-left corner (rounded)
+    ctx.moveTo(rectL + hr, headBoxY);
+    // Top-right corner (rounded)
+    ctx.lineTo(rectR - hr, headBoxY);
+    ctx.quadraticCurveTo(rectR, headBoxY, rectR, headBoxY + hr);
+    // Right side down to where the pentagon shoulder starts
+    ctx.lineTo(rectR, headBoxY + headBoxH);
+    // Right shoulder → tip
+    ctx.lineTo(tipX + pentPointW / 2, headBoxY + headBoxH);
+    ctx.lineTo(tipX, tipY);
+    // Left shoulder ← tip
+    ctx.lineTo(tipX - pentPointW / 2, headBoxY + headBoxH);
+    // Left side back up
+    ctx.lineTo(rectL, headBoxY + headBoxH);
+    ctx.lineTo(rectL, headBoxY + hr);
+    ctx.quadraticCurveTo(rectL, headBoxY, rectL + hr, headBoxY);
     ctx.closePath();
-    ctx.fill();
-
-    // ── Pointer triangle: base at head-box bottom, tip at tape top ────
-    const triW = Math.max(8, Math.round(headBoxW * 0.16));
-    ctx.beginPath();
-    ctx.moveTo(W / 2 - triW / 2, headBoxY + headBoxH);
-    ctx.lineTo(W / 2 + triW / 2, headBoxY + headBoxH);
-    ctx.lineTo(W / 2,            tapeTopY);
-    ctx.closePath();
-    ctx.fillStyle = 'hsl(0,0%,22%)';
     ctx.fill();
 
     // ── State name (white bold text inside head box) ──────────────────
@@ -629,7 +659,7 @@ function drawTapeOnCanvas(ctx, p, record, headPos, currentState, areaY, areaH, W
     ctx.font         = `bold ${headFontSize}px system-ui, sans-serif`;
     ctx.textAlign    = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(displayState, headBoxX + headBoxW / 2, headBoxY + headBoxH / 2);
+    ctx.fillText(displayState, tipX, headBoxY + headBoxH / 2);
     ctx.textAlign    = 'left';
     ctx.textBaseline = 'alphabetic';
 }
