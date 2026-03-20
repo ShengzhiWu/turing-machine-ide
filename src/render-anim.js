@@ -3,8 +3,13 @@
 // Persisted render params (so the settings window remembers values between opens)
 const _renderDefaultParams = {
     width: 1920, height: 1080,
+    fps: 30,
     moveFrames: 10, pauseFrames: 5, halflife: 10,
-    graphicScale: 1.0, outputPath: '',
+    graphicScale: 1.0,
+    renderImage: true, renderMusic: false,
+    musicMode: 'major', musicRoot: 'C4', musicLoNote: 'C3', musicHiNote: 'C6',
+    musicSeed: 0, samplesDir: '',
+    outputPath: '',
 };
 let _lastRenderParams = Object.assign({}, _renderDefaultParams);
 
@@ -87,6 +92,21 @@ function computeTotalFrames(history, p) {
         Object.assign(_lastRenderParams, params);
         startRender(params);
     });
+
+    // Settings window requested audio preview
+    ipcRenderer.on('render-music-preview', (event, params) => {
+        Object.assign(_lastRenderParams, params);
+        try {
+            const { bakeAudio } = require('./src/audio-render.js');
+            const stateNames = _getStateNames();
+            const wavBuf = bakeAudio(window._renderHistory || [], params, stateNames);
+            ipcRenderer.send('render-music-preview-result', {
+                wavBase64: wavBuf.toString('base64')
+            });
+        } catch(e) {
+            ipcRenderer.send('render-music-preview-result', { error: e.message });
+        }
+    });
 }
 
 // ── Main render function ──────────────────────────────────────────────
@@ -98,24 +118,27 @@ async function startRender(p) {
     if (!history) return;
 
     ipcRenderer.send('render-ui-lock', true);
-    await ipcRenderer.invoke('open-render-preview', { width: p.width, height: p.height });
 
     const renderGraph = buildRenderGraphSnapshot();
     const frames      = buildFrameSequence(history, p);
+    const totalSteps  = frames.length;
 
-    const offCanvas = document.createElement('canvas');
-    offCanvas.width  = p.width;
-    offCanvas.height = p.height;
-    const ctx = offCanvas.getContext('2d');
+    // ── Open preview window only when rendering images ────────────────
+    if (p.renderImage) {
+        await ipcRenderer.invoke('open-render-preview', { width: p.width, height: p.height });
+    }
+
+    const offCanvas = p.renderImage ? document.createElement('canvas') : null;
+    if (offCanvas) { offCanvas.width = p.width; offCanvas.height = p.height; }
+    const ctx = offCanvas ? offCanvas.getContext('2d') : null;
 
     const nodeBrightness = {};
     const edgeBrightness = {};
     const decay = Math.pow(0.5, 1 / p.halflife);
-
-    // Preview throttle: send at most one preview update every ~150 ms
     let lastPreviewTime = 0;
 
     try {
+        // ── Image render loop ─────────────────────────────────────────
         for (let fi = 0; fi < frames.length; fi++) {
             const frame = frames[fi];
 
@@ -124,43 +147,61 @@ async function startRender(p) {
             if (frame.activateNode) nodeBrightness[frame.activateNode] = 1.0;
             if (frame.activateEdge) edgeBrightness[frame.activateEdge] = 1.0;
 
-            drawRenderFrame(ctx, p, renderGraph, frame, nodeBrightness, edgeBrightness);
+            if (p.renderImage) {
+                drawRenderFrame(ctx, p, renderGraph, frame, nodeBrightness, edgeBrightness);
 
-            // ── Save frame to disk ────────────────────────────────────────
-            const dataURL = offCanvas.toDataURL('image/png');
-            const base64  = dataURL.slice(dataURL.indexOf(',') + 1);
-            const pngBuf  = Buffer.from(base64, 'base64');
-            const num = String(fi).padStart(6, '0');
-            fs.writeFileSync(pathMod.join(p.outputPath, `frame_${num}.png`), pngBuf);
+                const dataURL = offCanvas.toDataURL('image/png');
+                const base64  = dataURL.slice(dataURL.indexOf(',') + 1);
+                const pngBuf  = Buffer.from(base64, 'base64');
+                const num = String(fi).padStart(6, '0');
+                fs.writeFileSync(pathMod.join(p.outputPath, `frame_${num}.png`), pngBuf);
 
-            // ── Send preview: throttled, reuse the dataURL already computed ──
-            const now = Date.now();
-            if (now - lastPreviewTime >= 150) {
-                lastPreviewTime = now;
-                ipcRenderer.send('render-preview-dataurl', dataURL);
+                const now = Date.now();
+                if (now - lastPreviewTime >= 150) {
+                    lastPreviewTime = now;
+                    ipcRenderer.send('render-preview-dataurl', dataURL);
+                }
             }
 
-            // ── Send progress (fire-and-forget) ──────────────────────────
-            const pct = ((fi + 1) / frames.length * 100).toFixed(1);
-            ipcRenderer.send('render-progress', { pct, current: fi + 1, total: frames.length });
+            const pct = ((fi + 1) / totalSteps * 100).toFixed(1);
+            ipcRenderer.send('render-progress', { pct, current: fi + 1, total: totalSteps });
 
-            // Yield once every 10 frames to keep Electron responsive
             if (fi % 10 === 0) await new Promise(res => setTimeout(res, 0));
         }
 
-        ipcRenderer.send('render-preview-status', t('renderDone') || 'Done');
+        // ── Audio bake ────────────────────────────────────────────────
+        if (p.renderMusic) {
+            ipcRenderer.send('render-preview-status', 'Baking audio…');
+            await new Promise(res => setTimeout(res, 0));  // yield so status shows
+
+            const { bakeAudio } = require('./src/audio-render.js');
+            const stateNames = _getStateNames();
+            const wavBuf = bakeAudio(history, p, stateNames);
+            const wavPath = pathMod.join(p.outputPath, 'audio.wav');
+            fs.writeFileSync(wavPath, wavBuf);
+        }
+
+        if (p.renderImage) ipcRenderer.send('render-preview-status', t('renderDone') || 'Done');
         setTimeout(() => {
-            ipcRenderer.send('close-render-preview');
+            if (p.renderImage) ipcRenderer.send('close-render-preview');
             ipcRenderer.send('render-settings-close');
-        }, 800);
+        }, p.renderImage ? 800 : 0);
 
     } catch(e) {
         console.error('Render error', e);
-        ipcRenderer.send('render-preview-status', 'Error: ' + e.message);
+        if (p.renderImage) ipcRenderer.send('render-preview-status', 'Error: ' + e.message);
         alert('Render error: ' + e.message);
     } finally {
         ipcRenderer.send('render-ui-lock', false);
     }
+}
+
+// Collect all unique state names from current run history for note mapping
+function _getStateNames() {
+    const hist = window._renderHistory || [];
+    const names = new Set();
+    hist.forEach(entry => { if (entry[3]) names.add(entry[3]); });
+    return [...names];
 }
 
 // ── Build frame sequence ──────────────────────────────────────────────

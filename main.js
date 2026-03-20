@@ -29,7 +29,7 @@ ipcMain.handle('open-render-settings', async (event, initData) => {
     }
     settingsWindow = new BrowserWindow({
         width: 540,
-        height: 540,
+        height: 760,
         resizable: false,
         minimizable: false,
         maximizable: false,
@@ -113,7 +113,16 @@ ipcMain.on('close-render-preview', () => {
     if (previewWindow && !previewWindow.isDestroyed()) previewWindow.close();
 });
 
-// ── Forward preview dataURL to preview window (throttled JPEG, small payload) ─
+// ── Music preview: main window bakes WAV, relay result to settings window ──
+ipcMain.on('render-music-preview-result', (event, data) => {
+    sendTo(settingsWindow, 'render-music-preview-ready', data);
+});
+
+// ── Relay music-preview request from settings window to main window ──
+ipcMain.on('render-music-preview', (event, params) => {
+    sendTo(mainWindow, 'render-music-preview', params);
+});
+
 ipcMain.on('render-preview-dataurl', (event, dataurl) => {
     sendTo(previewWindow, 'render-preview-dataurl', dataurl);
 });

@@ -1,5 +1,7 @@
 # turing-machine-ide
 
+这是一款用于图灵机编程、测试、可视化的应用软件。还支持渲染输出动画、烘焙音乐。
+
 ## 运行
 
 ### 在浏览器中运行（便于测试）
@@ -22,26 +24,27 @@ npx electron .
 
 ## 项目结构
 
-| 文件                     | 具体内容                                                     | 相关功能                                                     |
-| ------------------------ | ------------------------------------------------------------ | ------------------------------------------------------------ |
-| `index.html`             | CSS样式（菜单栏、对话框、面板布局）；全部HTML结构（菜单栏占位、About对话框、渲染动画对话框、三栏面板）；全局变量初始化（`language`、`example`、`code`、`tape`、`graph` 等）；各外部脚本的加载顺序 | 界面布局、样式调整、新增HTML元素、修改初始默认值             |
-| `src/tm-core.js`         | 图灵机语言解析（`parseProgramCode`）；样式代码解析（`parseStyleCode`）；图灵机运行引擎（`run_turing_machine`）；纸带规范化（`normalizeTape`）；`NOT_VALID`/`N`/`OTHER` Symbol常量 | 图灵机语法规则、运行逻辑、纸带行为、样式代码格式             |
-| `src/graph.js`           | 向量数学工具（`vector_plus` 等）；图布局物理参数；随机数生成器（`makeRng`）；状态转移图的数据结构构建（`construct_directed_graph_with_code`）；SVG DOM 渲染（`build_graph_dom`、`update_graph_dom`）；节点拖拽交互；弹簧物理模拟（`graph_evolve`）；动画帧循环（`update_graph_view`）；编辑器光标跳转（`jumpEditorToState`） | 有向图的外观、布局算法、节点/边的交互行为、高亮显示逻辑      |
-| `src/app.js`             | 历史表格行生成与渲染（`refresh_history_table`）；纸带格子点击编辑（`finishEditingTapeCallback`）；图重建（`refresh_graph_embedding`）；`run_program`；代码编辑器事件（F4刷新图、F5运行、内容变化、光标移动）；样式编辑器变化事件；图面板拖拽与滚轮缩放事件 | 运行结果表格的显示、纸带编辑交互、键盘快捷键、图面板的鼠标操作 |
-| `src/menu.js`            | 中英文 i18n 字符串（`MENU_I18N`）；翻译函数 `t()`；菜单栏动态构建（`buildMenuBar`、`buildMenuItems`）；About 对话框；工程文件的保存/打开（JSON序列化）；图嵌入保存；样例加载（`menuLoadExample`）；语言切换（`switchLanguage`）；界面语言刷新（`applyLanguageToUI`） | 菜单项增删、i18n文案、文件格式、样例管理、新增偏好设置项     |
-| `src/render-anim.js`     | 渲染设置对话框的全部交互逻辑；帧序列生成（`buildFrameSequence`，含缓入缓出插值）；Canvas 绘图：有向图区域（含高亮光晕衰减）、纸带区域（含机头、指针三角形、符号样式）；PNG 帧文件写入；预览窗口；帧计数与进度条 | 渲染动画的视觉效果、动画节奏逻辑、输出格式、渲染进度显示     |
-| `src/tm-editor.js`       | 图灵机代码文本框、高亮、自动补全、生成交互事件               | 图灵机代码编辑器                                             |
-| `src/colormap-editor.js` | 纸带风格风格代码文本框、高亮、生成交互事件                   | 纸带风格代码编辑器                                           |
-| `src/vendor`             | 依赖库                                                       | 依赖库                                                       |
+| 文件                       | 具体内容                                                     | 相关功能                                                     |
+| -------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
+| `index.html`               | CSS样式（菜单栏、对话框、面板布局）；全部HTML结构（菜单栏占位、About对话框、渲染动画对话框、三栏面板）；全局变量初始化（`language`、`example`、`code`、`tape`、`graph` 等）；各外部脚本的加载顺序 | 界面布局、样式调整、新增HTML元素、修改初始默认值             |
+| `src/tm-core.js`           | 图灵机语言解析（`parseProgramCode`）；样式代码解析（`parseStyleCode`）；图灵机运行引擎（`run_turing_machine`）；纸带规范化（`normalizeTape`）；`NOT_VALID`/`N`/`OTHER` Symbol常量 | 图灵机语法规则、运行逻辑、纸带行为、样式代码格式             |
+| `src/graph.js`             | 向量数学工具（`vector_plus` 等）；图布局物理参数；随机数生成器（`makeRng`）；状态转移图的数据结构构建（`construct_directed_graph_with_code`）；SVG DOM 渲染（`build_graph_dom`、`update_graph_dom`）；节点拖拽交互；弹簧物理模拟（`graph_evolve`）；动画帧循环（`update_graph_view`）；编辑器光标跳转（`jumpEditorToState`） | 有向图的外观、布局算法、节点/边的交互行为、高亮显示逻辑      |
+| `src/app.js`               | 历史表格行生成与渲染（`refresh_history_table`）；纸带格子点击编辑（`finishEditingTapeCallback`）；图重建（`refresh_graph_embedding`）；`run_program`；代码编辑器事件（F4刷新图、F5运行、内容变化、光标移动）；样式编辑器变化事件；图面板拖拽与滚轮缩放事件 | 运行结果表格的显示、纸带编辑交互、键盘快捷键、图面板的鼠标操作 |
+| `src/menu.js`              | 中英文 i18n 字符串（`MENU_I18N`）；翻译函数 `t()`；菜单栏动态构建（`buildMenuBar`、`buildMenuItems`）；About 对话框；工程文件的保存/打开（JSON序列化）；图嵌入保存；样例加载（`menuLoadExample`）；语言切换（`switchLanguage`）；界面语言刷新（`applyLanguageToUI`） | 菜单项增删、i18n文案、文件格式、样例管理、新增偏好设置项     |
+| `src/render-anim.js`       | `menuRenderAnimation()` — 入口，打开设置窗口`startRender()` — 图像渲染主循环`buildFrameSequence()` — 构建帧序列`drawRenderFrame()` / `drawGraphOnCanvas()` / `drawTapeOnCanvas()` — 绘制逻辑IPC监听：`render-params-changed` / `render-start` / `render-music-preview` | 渲染流程控制；帧序列时序；画面内容和风格；与设置窗口的数据交换 |
+| `src/render-settings.html` | `getParams()` — 收集所有参数IPC监听：`render-settings-init` / `render-ui-lock` / `render-music-preview-ready` | 所有渲染参数的UI；参数变动通知；触发渲染/音频预览；渲染期间禁用UI |
+| `src/render-preview.html`  | IPC监听：`render-preview-init` / `render-preview-dataurl` / `render-preview-status` | 渲染进行中的帧预览显示                                       |
+| `src/audio-render.js`      | `bakeAudio(history, p, stateNames)` — 唯一对外接口`buildScaleNotes()` / `buildStateNoteMap()` — 音阶与状态映射`parseSfz()` / `getSampleNote()` — SFZ音源加载`synthPianoNote()` — 合成兜底`encodeWav()` — WAV编码 | 音频烘焙全流程；调性/音域/随机种子逻辑；SFZ格式支持；合成器兜底；输出WAV文件 |
+| `src/tm-editor.js`         | 图灵机代码文本框、高亮、自动补全、生成交互事件               | 图灵机代码编辑器                                             |
+| `src/colormap-editor.js`   | 纸带风格风格代码文本框、高亮、生成交互事件                   | 纸带风格代码编辑器                                           |
+| `src/vendor`               | 依赖库                                                       | 依赖库                                                       |
 
 出于性能和高亮光晕绘制方便的考虑，有向图可视化有两套代码，一套是`svg`绘图（矢量绘图），在`graph.js`中，用于实时可视化；一套是`canvas`绘图（位图绘图），在`render-anim.js`中，用于渲染输出。如果要修改绘图内容，应该两套代码一起动。
 
 ## TODO
 
-- 渲染图灵机运行动画
 - 纸带最大长度限制（用于避免机头一直移动造成界面卡顿）
 - 编辑代码时，在结果表格中高亮相应的行
 - 整理状态名称（将纯数格式的名称按在第一元出现的顺序重命名）
 - 样式编辑器中整行复制的功能
 - 在图中选中若干粒子然后构建群组
-- 保存图嵌入

@@ -14,86 +14,45 @@
             font-size: 13px;
             line-height: 1.6;
             user-select: none;
-            overflow: hidden;
+            overflow-y: auto;
+            overflow-x: hidden;
         }
-        h2 {
-            margin: 0 0 14px 0;
-            font-size: 15px;
-            font-weight: 600;
-            color: white;
-        }
+        h2 { margin: 0 0 14px 0; font-size: 15px; font-weight: 600; color: white; }
         .section-title {
-            font-size: 11px;
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
-            color: rgba(255,255,255,0.45);
-            margin: 14px 0 6px 0;
+            font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em;
+            color: rgba(255,255,255,0.45); margin: 14px 0 6px 0;
         }
-        .row {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            margin-bottom: 7px;
+        .row { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
+        .row label { width: 170px; flex-shrink: 0; color: rgba(255,255,255,0.75); }
+        input[type=number] {
+            background: hsl(224,17%,12%); border: 1px solid hsl(0,0%,38%);
+            border-radius: 4px; color: white; padding: 3px 7px; font-size: 13px; width: 80px;
         }
-        .row label {
-            width: 160px;
-            flex-shrink: 0;
-            color: rgba(255,255,255,0.75);
+        input[type=text] {
+            background: hsl(224,17%,12%); border: 1px solid hsl(0,0%,38%);
+            border-radius: 4px; color: white; padding: 3px 7px; font-size: 13px;
+            flex: 1; width: auto;
         }
-        input[type=number], input[type=text] {
-            background: hsl(224,17%,12%);
-            border: 1px solid hsl(0,0%,38%);
-            border-radius: 4px;
-            color: white;
-            padding: 3px 7px;
-            font-size: 13px;
-            width: 80px;
+        select {
+            background: hsl(224,17%,12%); border: 1px solid hsl(0,0%,38%);
+            border-radius: 4px; color: white; padding: 3px 7px; font-size: 13px;
         }
-        input[type=text] { flex: 1; width: auto; }
-        input:focus { outline: 1px solid hsl(210,60%,55%); border-color: hsl(210,60%,55%); }
+        .note-input { width: 52px; flex: none; }
+        input[type=checkbox] { width:14px; height:14px; cursor:pointer; accent-color:hsl(210,60%,55%); }
+        input:focus, select:focus { outline:1px solid hsl(210,60%,55%); border-color:hsl(210,60%,55%); }
         .btn {
-            padding: 5px 16px;
-            background: hsl(210,60%,40%);
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 13px;
+            padding: 5px 16px; background: hsl(210,60%,40%); color: white;
+            border: none; border-radius: 4px; cursor: pointer; font-size: 13px;
         }
         .btn:hover { background: hsl(210,60%,52%); }
         .btn:disabled { background: hsl(0,0%,35%); cursor: default; opacity: 0.6; }
-        #progress-row {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin-top: 14px;
-        }
-        #progress-bar-wrap {
-            flex: 1;
-            height: 8px;
-            background: hsl(0,0%,28%);
-            border-radius: 4px;
-            overflow: hidden;
-        }
-        #progress-bar {
-            height: 100%;
-            width: 0%;
-            background: hsl(210,60%,55%);
-            border-radius: 4px;
-            transition: width 0.1s;
-        }
-        #frame-counter {
-            font-size: 12px;
-            color: rgba(255,255,255,0.6);
-            white-space: nowrap;
-            min-width: 70px;
-            text-align: right;
-        }
-        #bottom-row {
-            display: flex;
-            justify-content: flex-end;
-            margin-top: 10px;
-        }
+        .btn-small { padding: 3px 10px; font-size: 12px; }
+        #progress-row { display:flex; align-items:center; gap:10px; margin-top:14px; }
+        #progress-bar-wrap { flex:1; height:8px; background:hsl(0,0%,28%); border-radius:4px; overflow:hidden; }
+        #progress-bar { height:100%; width:0%; background:hsl(210,60%,55%); border-radius:4px; transition:width 0.1s; }
+        #frame-counter { font-size:12px; color:rgba(255,255,255,0.6); white-space:nowrap; min-width:70px; text-align:right; }
+        #bottom-row { display:flex; justify-content:flex-end; margin-top:10px; }
+        .subsection-disabled { opacity:0.38; pointer-events:none; }
     </style>
 </head>
 <body>
@@ -103,11 +62,15 @@
     <div class="row">
         <label id="lbl-width">Width</label>
         <input id="width" type="number" value="1920" min="128" max="7680">
-        <label id="lbl-height" style="width:auto; padding-left:8px;">Height</label>
+        <label id="lbl-height" style="width:auto;padding-left:8px;">Height</label>
         <input id="height" type="number" value="1080" min="72" max="4320">
     </div>
 
     <div class="section-title" id="sec-timing">Timing</div>
+    <div class="row">
+        <label id="lbl-fps">Frame rate (fps)</label>
+        <input id="fps" type="number" value="30" min="1" max="120">
+    </div>
     <div class="row">
         <label id="lbl-move-frames">Move frames</label>
         <input id="move-frames" type="number" value="10" min="1" max="200">
@@ -120,14 +83,61 @@
         <label id="lbl-halflife">Highlight half-life (frames)</label>
         <input id="halflife" type="number" value="10" min="1" max="500">
     </div>
-    <div class="row" style="margin-top:4px; margin-bottom:0">
-        <label id="lbl-total-frames" style="color:rgba(255,255,255,0.45); font-size:12px; width:auto;"></label>
+    <div class="row" style="margin-top:4px;margin-bottom:0">
+        <label id="lbl-total-frames" style="color:rgba(255,255,255,0.45);font-size:12px;width:auto;"></label>
     </div>
 
     <div class="section-title" id="sec-style">Visual Style</div>
     <div class="row">
-        <label id="lbl-graphic-scale">Graphic scale</label>
-        <input id="graphic-scale" type="number" value="1.0" min="0.1" max="10" step="0.1">
+        <label id="lbl-render-image">Render image frames</label>
+        <input id="render-image" type="checkbox" checked>
+    </div>
+    <div id="image-options">
+        <div class="row">
+            <label id="lbl-graphic-scale">Graphic scale</label>
+            <input id="graphic-scale" type="number" value="1.0" min="0.1" max="10" step="0.1">
+        </div>
+    </div>
+
+    <div class="section-title" id="sec-music">Music</div>
+    <div class="row">
+        <label id="lbl-render-music">Export audio</label>
+        <input id="render-music" type="checkbox">
+    </div>
+    <div id="music-options" class="subsection-disabled">
+        <div class="row">
+            <label id="lbl-music-mode">Scale</label>
+            <select id="music-mode">
+                <option value="major">Major</option>
+                <option value="minor">Minor (natural)</option>
+            </select>
+        </div>
+        <div class="row">
+            <label id="lbl-music-root">Root note</label>
+            <input id="music-root" type="text" class="note-input" value="C4" placeholder="C4">
+        </div>
+        <div class="row">
+            <label id="lbl-music-lo">Low note (range)</label>
+            <input id="music-lo" type="text" class="note-input" value="C3" placeholder="C3">
+        </div>
+        <div class="row">
+            <label id="lbl-music-hi">High note (range)</label>
+            <input id="music-hi" type="text" class="note-input" value="C6" placeholder="C6">
+        </div>
+        <div class="row">
+            <label id="lbl-music-seed">Random seed</label>
+            <input id="music-seed" type="number" value="0" min="0" style="width:80px;">
+        </div>
+        <div class="row">
+            <label id="lbl-music-samples">Piano samples folder</label>
+            <input id="music-samples" type="text" placeholder="(leave blank to use synth)">
+            <button class="btn btn-small" id="music-browse-btn">…</button>
+        </div>
+        <div class="row" style="margin-top:2px;">
+            <label></label>
+            <button class="btn btn-small" id="music-preview-btn">▶ Preview</button>
+            <span id="music-preview-status" style="font-size:12px;color:rgba(255,255,255,0.45);margin-left:8px;"></span>
+        </div>
     </div>
 
     <div class="section-title" id="sec-output">Output path</div>
@@ -141,123 +151,169 @@
         <div id="progress-bar-wrap"><div id="progress-bar"></div></div>
         <span id="frame-counter">0 / 0</span>
     </div>
-
     <div id="bottom-row">
         <button class="btn" id="close-btn">Close</button>
     </div>
 
-    <script>
-        const { ipcRenderer } = require('electron');
+<script>
+const { ipcRenderer } = require('electron');
 
-        // ── Receive initial data from main window ─────────────────────
-        ipcRenderer.on('render-settings-init', (e, data) => {
-            // Apply localised strings
-            const s = data.strings;
-            if (s) {
-                document.getElementById('title').textContent           = s.title        || 'Render Animation';
-                document.getElementById('sec-size').textContent        = s.secSize      || 'Size';
-                document.getElementById('sec-timing').textContent      = s.secTiming    || 'Timing';
-                document.getElementById('sec-style').textContent       = s.secStyle     || 'Visual Style';
-                document.getElementById('sec-output').textContent      = s.secOutput    || 'Output path';
-                document.getElementById('lbl-width').textContent       = s.lblWidth     || 'Width';
-                document.getElementById('lbl-height').textContent      = s.lblHeight    || 'Height';
-                document.getElementById('lbl-move-frames').textContent = s.lblMoveFrames  || 'Move frames';
-                document.getElementById('lbl-pause-frames').textContent= s.lblPauseFrames || 'Pause frames';
-                document.getElementById('lbl-halflife').textContent    = s.lblHalflife  || 'Highlight half-life (frames)';
-                document.getElementById('lbl-graphic-scale').textContent = s.lblGraphicScale || 'Graphic scale';
-                document.getElementById('start-btn').textContent       = s.btnStart     || 'Render';
-                document.getElementById('close-btn').textContent       = s.btnClose     || 'Close';
-                document.getElementById('output-path').placeholder     = s.outputPlaceholder || '';
-                document.getElementById('browse-btn').textContent      = s.btnBrowse    || '…';
-            }
-            // Restore previous param values if provided
-            const params = data.params;
-            if (params) {
-                document.getElementById('width').value         = params.width;
-                document.getElementById('height').value        = params.height;
-                document.getElementById('move-frames').value   = params.moveFrames;
-                document.getElementById('pause-frames').value  = params.pauseFrames;
-                document.getElementById('halflife').value      = params.halflife;
-                document.getElementById('graphic-scale').value = params.graphicScale;
-                if (params.outputPath) document.getElementById('output-path').value = params.outputPath;
-            }
-            updateTotalFrames(data.totalFrames || 0);
-        });
+ipcRenderer.on('render-settings-init', (e, data) => {
+    const s = data.strings || {};
+    const setText = (id, key, fb) => { const el = document.getElementById(id); if (el) el.textContent = s[key] || fb; };
+    setText('title',             'title',           'Render Animation');
+    setText('sec-size',          'secSize',         'Size');
+    setText('sec-timing',        'secTiming',       'Timing');
+    setText('sec-style',         'secStyle',        'Visual Style');
+    setText('sec-music',         'secMusic',        'Music');
+    setText('sec-output',        'secOutput',       'Output path');
+    setText('lbl-fps',           'lblFps',          'Frame rate (fps)');
+    setText('lbl-width',         'lblWidth',        'Width');
+    setText('lbl-height',        'lblHeight',       'Height');
+    setText('lbl-move-frames',   'lblMoveFrames',   'Move frames');
+    setText('lbl-pause-frames',  'lblPauseFrames',  'Pause frames');
+    setText('lbl-halflife',      'lblHalflife',     'Highlight half-life (frames)');
+    setText('lbl-render-image',  'lblRenderImage',  'Render image frames');
+    setText('lbl-graphic-scale', 'lblGraphicScale', 'Graphic scale');
+    setText('lbl-render-music',  'lblRenderMusic',  'Export audio');
+    setText('lbl-music-mode',    'lblMusicMode',    'Scale');
+    setText('lbl-music-root',    'lblMusicRoot',    'Root note');
+    setText('lbl-music-lo',      'lblMusicLo',      'Low note (range)');
+    setText('lbl-music-hi',      'lblMusicHi',      'High note (range)');
+    setText('lbl-music-seed',    'lblMusicSeed',    'Random seed');
+    setText('lbl-music-samples', 'lblMusicSamples', 'Piano samples folder');
+    setText('start-btn',         'btnStart',        'Render');
+    setText('close-btn',         'btnClose',        'Close');
+    document.getElementById('output-path').placeholder = s.outputPlaceholder || '';
+    document.getElementById('browse-btn').textContent  = s.btnBrowse || '…';
 
-        // ── Receive progress updates during render ────────────────────
-        ipcRenderer.on('render-progress', (e, data) => {
-            document.getElementById('progress-bar').style.width = data.pct + '%';
-            document.getElementById('frame-counter').textContent = data.current + ' / ' + data.total;
-        });
+    const p = data.params || {};
+    const set = (id, val) => { if (val !== undefined && val !== null) document.getElementById(id).value = val; };
+    set('width',         p.width);
+    set('height',        p.height);
+    set('fps',           p.fps);
+    set('move-frames',   p.moveFrames);
+    set('pause-frames',  p.pauseFrames);
+    set('halflife',      p.halflife);
+    set('graphic-scale', p.graphicScale);
+    set('music-mode',    p.musicMode);
+    set('music-root',    p.musicRoot);
+    set('music-lo',      p.musicLoNote);
+    set('music-hi',      p.musicHiNote);
+    set('music-seed',    p.musicSeed);
+    set('music-samples', p.samplesDir);
+    if (p.outputPath) document.getElementById('output-path').value = p.outputPath;
+    if (p.renderImage !== undefined) document.getElementById('render-image').checked = !!p.renderImage;
+    if (p.renderMusic !== undefined) document.getElementById('render-music').checked = !!p.renderMusic;
+    updateSubsections();
+    updateTotalFrames(data.totalFrames || 0);
+});
 
-        // ── Receive total-frames updates when params change ───────────
-        ipcRenderer.on('render-total-frames', (e, n) => {
-            updateTotalFrames(n);
-        });
+ipcRenderer.on('render-progress', (e, data) => {
+    document.getElementById('progress-bar').style.width = data.pct + '%';
+    document.getElementById('frame-counter').textContent = data.current + ' / ' + data.total;
+});
+ipcRenderer.on('render-total-frames', (e, n) => updateTotalFrames(n));
 
-        function updateTotalFrames(n) {
-            const lbl = document.getElementById('lbl-total-frames');
-            lbl.textContent = (n > 0 ? n + ' frames total' : '');
-        }
+function updateTotalFrames(n) {
+    document.getElementById('lbl-total-frames').textContent = n > 0 ? n + ' frames total' : '';
+}
 
-        // ── Notify main window when params change ─────────────────────
-        function getParams() {
-            return {
-                width:        Math.max(1,   parseInt(document.getElementById('width').value)         || 1920),
-                height:       Math.max(1,   parseInt(document.getElementById('height').value)        || 1080),
-                moveFrames:   Math.max(1,   parseInt(document.getElementById('move-frames').value)   || 10),
-                pauseFrames:  Math.max(0,   parseInt(document.getElementById('pause-frames').value)  || 5),
-                halflife:     Math.max(1,   parseInt(document.getElementById('halflife').value)      || 10),
-                graphicScale: Math.max(0.1, parseFloat(document.getElementById('graphic-scale').value) || 1.0),
-                outputPath:   document.getElementById('output-path').value.trim(),
-            };
-        }
+function getParams() {
+    return {
+        width:        Math.max(1,   parseInt(document.getElementById('width').value)          || 1920),
+        height:       Math.max(1,   parseInt(document.getElementById('height').value)         || 1080),
+        fps:          Math.max(1,   parseInt(document.getElementById('fps').value)            || 30),
+        moveFrames:   Math.max(1,   parseInt(document.getElementById('move-frames').value)    || 10),
+        pauseFrames:  Math.max(0,   parseInt(document.getElementById('pause-frames').value)   || 5),
+        halflife:     Math.max(1,   parseInt(document.getElementById('halflife').value)       || 10),
+        graphicScale: Math.max(0.1, parseFloat(document.getElementById('graphic-scale').value) || 1.0),
+        renderImage:  document.getElementById('render-image').checked,
+        renderMusic:  document.getElementById('render-music').checked,
+        musicMode:    document.getElementById('music-mode').value,
+        musicRoot:    document.getElementById('music-root').value.trim()  || 'C4',
+        musicLoNote:  document.getElementById('music-lo').value.trim()    || 'C3',
+        musicHiNote:  document.getElementById('music-hi').value.trim()    || 'C6',
+        musicSeed:    parseInt(document.getElementById('music-seed').value) || 0,
+        samplesDir:   document.getElementById('music-samples').value.trim(),
+        outputPath:   document.getElementById('output-path').value.trim(),
+    };
+}
 
-        ['width','height','move-frames','pause-frames','halflife','graphic-scale'].forEach(id => {
-            document.getElementById(id).addEventListener('input', () => {
-                ipcRenderer.send('render-params-changed', getParams());
-            });
-        });
+['width','height','fps','move-frames','pause-frames','halflife','graphic-scale',
+ 'render-image','render-music','music-mode','music-root','music-lo','music-hi',
+ 'music-seed','music-samples'].forEach(id => {
+    const el = document.getElementById(id);
+    el.addEventListener('input',  () => ipcRenderer.send('render-params-changed', getParams()));
+    el.addEventListener('change', () => ipcRenderer.send('render-params-changed', getParams()));
+});
 
-        // ── Browse ────────────────────────────────────────────────────
-        document.getElementById('browse-btn').addEventListener('click', async () => {
-            const result = await ipcRenderer.invoke('show-open-dialog', {
-                title: 'Select Output Folder',
-                properties: ['openDirectory']
-            });
-            if (result && !result.canceled && result.filePaths.length > 0) {
-                document.getElementById('output-path').value = result.filePaths[0];
-                ipcRenderer.send('render-params-changed', getParams());
-            }
-        });
+function updateSubsections() {
+    document.getElementById('music-options').classList.toggle(
+        'subsection-disabled', !document.getElementById('render-music').checked);
+    document.getElementById('image-options').classList.toggle(
+        'subsection-disabled', !document.getElementById('render-image').checked);
+}
+document.getElementById('render-music').addEventListener('change', updateSubsections);
+document.getElementById('render-image').addEventListener('change', updateSubsections);
 
-        // ── Start render ──────────────────────────────────────────────
-        document.getElementById('start-btn').addEventListener('click', () => {
-            const params = getParams();
-            if (!params.outputPath) {
-                alert(document.getElementById('output-path').placeholder || 'Please choose an output folder.');
-                return;
-            }
-            ipcRenderer.send('render-start', params);
-        });
+document.getElementById('browse-btn').addEventListener('click', async () => {
+    const r = await ipcRenderer.invoke('show-open-dialog', { title: 'Select Output Folder', properties: ['openDirectory'] });
+    if (r && !r.canceled && r.filePaths.length > 0) {
+        document.getElementById('output-path').value = r.filePaths[0];
+        ipcRenderer.send('render-params-changed', getParams());
+    }
+});
 
-        // ── Close ─────────────────────────────────────────────────────
-        document.getElementById('close-btn').addEventListener('click', () => {
-            ipcRenderer.send('render-settings-close');
-        });
+document.getElementById('music-browse-btn').addEventListener('click', async () => {
+    const r = await ipcRenderer.invoke('show-open-dialog', { title: 'Select Piano Samples Folder', properties: ['openDirectory'] });
+    if (r && !r.canceled && r.filePaths.length > 0) {
+        document.getElementById('music-samples').value = r.filePaths[0];
+        ipcRenderer.send('render-params-changed', getParams());
+    }
+});
 
-        // ── Disable/enable UI during render ───────────────────────────
-        ipcRenderer.on('render-ui-lock', (e, locked) => {
-            const inputs = document.querySelectorAll('input, button');
-            inputs.forEach(el => {
-                if (el.id === 'close-btn' || el.id === 'start-btn') return; // controlled separately
-                el.disabled = locked;
-            });
-            document.getElementById('start-btn').disabled = locked;
-            document.getElementById('browse-btn').disabled = locked;
-            // close button stays disabled while rendering
-            document.getElementById('close-btn').disabled = locked;
-        });
-    </script>
+// ── Audio preview ─────────────────────────────────────────────────────────────
+document.getElementById('music-preview-btn').addEventListener('click', () => {
+    document.getElementById('music-preview-status').textContent = 'Baking…';
+    document.getElementById('music-preview-btn').disabled = true;
+    ipcRenderer.send('render-music-preview', getParams());
+});
+
+ipcRenderer.on('render-music-preview-ready', (e, data) => {
+    document.getElementById('music-preview-btn').disabled = false;
+    const statusEl = document.getElementById('music-preview-status');
+    if (data.error) { statusEl.textContent = 'Error: ' + data.error; return; }
+    statusEl.textContent = 'Playing…';
+    const arrayBuf = Buffer.from(data.wavBase64, 'base64').buffer;
+    const actx = new AudioContext();
+    actx.decodeAudioData(arrayBuf, decoded => {
+        const src = actx.createBufferSource();
+        src.buffer = decoded;
+        src.connect(actx.destination);
+        src.start();
+        src.onended = () => { statusEl.textContent = ''; actx.close(); };
+    }, () => { statusEl.textContent = 'Decode error'; });
+});
+
+document.getElementById('start-btn').addEventListener('click', () => {
+    const params = getParams();
+    if (!params.outputPath) { alert('Please choose an output folder.'); return; }
+    if (!params.renderImage && !params.renderMusic) {
+        alert('Please enable at least one of: Render image frames or Export audio.'); return;
+    }
+    ipcRenderer.send('render-start', params);
+});
+
+document.getElementById('close-btn').addEventListener('click', () => {
+    ipcRenderer.send('render-settings-close');
+});
+
+ipcRenderer.on('render-ui-lock', (e, locked) => {
+    document.querySelectorAll('input, button, select').forEach(el => el.disabled = locked);
+    document.getElementById('close-btn').disabled = locked;
+    document.getElementById('start-btn').disabled = locked;
+});
+</script>
 </body>
 </html>
