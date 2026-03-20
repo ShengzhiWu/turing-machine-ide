@@ -52,16 +52,17 @@ function getRenderParams() {
 
 function computeTotalFrames(history, p) {
     // Matches buildFrameSequence exactly.
-    const pause = Math.max(1, p.pauseFrames);
-    const move  = Math.max(1, p.moveFrames);
+    const pause    = Math.max(1, p.pauseFrames);
+    const move     = Math.max(1, p.moveFrames);
+    const cooldown = Math.ceil(9 * p.halflife);
     if (!history || history.length === 0) return 0;
-    if (history.length === 1) return pause + pause;
-    let total = pause;
+    // 1 dark frame + initial pause + transitions + final pause + cooldown
+    let total = 1 + pause;
     for (let i = 1; i < history.length; i++) {
         if (history[i][1] !== history[i-1][1]) total += move;
         total += pause;
     }
-    total += pause;
+    total += pause + cooldown;
     return total;
 }
 
@@ -185,8 +186,17 @@ function buildFrameSequence(history, p) {
         }
     };
 
-    // Initial pause: head at position of history[0], state = history[0][3]
+    // ── Frame 0: one dark frame before anything lights up ────────────
     const initial = history[0];
+    frames.push({
+        headPos:      initial[1],
+        historyIndex: 0,
+        currentState: initial[3],
+        activateNode: null,
+        activateEdge: null,
+    });
+
+    // Initial pause: head at position of history[0], start node lights up
     pushFrames(pause, initial[1], 0, initial[3],
         canonicalStateName(initial[3]), null);
 
@@ -229,6 +239,19 @@ function buildFrameSequence(history, p) {
     const last = history[history.length - 1];
     pushFrames(pause, last[1], history.length - 1, last[3],
         canonicalStateName(last[3]), null);
+
+    // Cooldown: continue rendering until glow fully fades.
+    // After 9 half-lives, brightness = 1/2^9 < 0.002, visually black.
+    const cooldown = Math.ceil(9 * p.halflife);
+    for (let i = 0; i < cooldown; i++) {
+        frames.push({
+            headPos:      last[1],
+            historyIndex: history.length - 1,
+            currentState: last[3],
+            activateNode: null,
+            activateEdge: null,
+        });
+    }
 
     return frames;
 }
