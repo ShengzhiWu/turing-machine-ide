@@ -276,26 +276,28 @@ function buildFrameSequence(history, p) {
         // Edge key for the transition prevState → currState
         const edgeKey = prevState + '||' + currState;
 
-        // Post-transition pause: tape and state have already changed to curr's values.
-        // Head is still at prevPos. Highlight the new state node and the taken edge.
-        pushFrames(pause, prevPos, i, currState,
-            canonicalStateName(currState), edgeKey);
-
-        // Head movement: eased interpolation from prevPos to currPos
-        // Skip if position didn't change (direction was N)
+        // Head movement: animate from prevPos to currPos.
+        // During movement the tape and state still show the PREVIOUS step's values,
+        // so the tape write and state change appear to happen once the head has landed.
+        // Skip movement frames if position didn't change (direction was N).
         if (currPos !== prevPos) {
             for (let mf = 0; mf < move; mf++) {
                 const t01   = (mf + 1) / move;
                 const tEase = cubicEase(t01);
                 frames.push({
                     headPos:      prevPos + (currPos - prevPos) * tEase,
-                    historyIndex: i,
-                    currentState: currState,
+                    historyIndex: i - 1,   // still show old tape while head is in flight
+                    currentState: prevState,
                     activateNode: null,
                     activateEdge: null,
                 });
             }
         }
+
+        // Post-arrival pause: head is at currPos, tape and state flip to curr's values.
+        // Highlight the new state node and the taken edge.
+        pushFrames(pause, currPos, i, currState,
+            canonicalStateName(currState), edgeKey);
     }
 
     // Final pause at the terminal position/state
@@ -624,30 +626,29 @@ function drawTapeOnCanvas(ctx, p, record, headPos, currentState, areaY, areaH, W
     ctx.textAlign    = 'left';
     ctx.textBaseline = 'alphabetic';
 
-    // ── Read-head: pentagon (rectangle top + downward point at bottom) ──
-    // The tip of the pentagon points down to the center of the current cell (always W/2).
-    const tipX = W / 2;  // screen center = center of current cell
-    const tipY = tapeTopY;
+    // ── Read-head: pentagon (rectangle body + downward spike at bottom) ──
+    // The rect body sits above the tape. The spike tip points DOWN into the tape strip,
+    // touching the vertical center of the tape cell (tapeCenterY).
+    const tipX      = W / 2;
+    const tipY      = tapeCenterY;                    // spike tip at tape cell center
+    const spikeTopY = headBoxY + headBoxH;            // where the rect bottom / spike base is
     const pentPointW = Math.max(8, Math.round(headBoxW * 0.30));
     const rectL = tipX - headBoxW / 2;
     const rectR = tipX + headBoxW / 2;
     const hr = Math.max(3, Math.round(headBoxH * 0.18));
     ctx.fillStyle = 'hsl(0,0%,22%)';
     ctx.beginPath();
-    // Top-left corner (rounded)
     ctx.moveTo(rectL + hr, headBoxY);
-    // Top-right corner (rounded)
     ctx.lineTo(rectR - hr, headBoxY);
     ctx.quadraticCurveTo(rectR, headBoxY, rectR, headBoxY + hr);
-    // Right side down to where the pentagon shoulder starts
-    ctx.lineTo(rectR, headBoxY + headBoxH);
-    // Right shoulder → tip
-    ctx.lineTo(tipX + pentPointW / 2, headBoxY + headBoxH);
+    ctx.lineTo(rectR, spikeTopY);
+    // Right shoulder of spike
+    ctx.lineTo(tipX + pentPointW / 2, spikeTopY);
+    // Spike tip
     ctx.lineTo(tipX, tipY);
-    // Left shoulder ← tip
-    ctx.lineTo(tipX - pentPointW / 2, headBoxY + headBoxH);
-    // Left side back up
-    ctx.lineTo(rectL, headBoxY + headBoxH);
+    // Left shoulder of spike
+    ctx.lineTo(tipX - pentPointW / 2, spikeTopY);
+    ctx.lineTo(rectL, spikeTopY);
     ctx.lineTo(rectL, headBoxY + hr);
     ctx.quadraticCurveTo(rectL, headBoxY, rectL + hr, headBoxY);
     ctx.closePath();
