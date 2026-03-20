@@ -430,6 +430,12 @@ function bakeAudio(history, p, stateNames) {
 
     const pcm = new Float32Array(totalSamples);
 
+    // Resolve samples directory once, outside the loop
+    const resolvedSamplesDir =
+        (p.samplesDir && fs.existsSync(p.samplesDir)) ? p.samplesDir :
+        fs.existsSync(DEFAULT_SAMPLES_DIR)            ? DEFAULT_SAMPLES_DIR :
+        null;
+
     // Walk through history and schedule notes
     // Frame counter mirrors buildFrameSequence logic
     let frameAt = 1 + pauseFrames;  // after dark frame + initial pause
@@ -453,11 +459,8 @@ function bakeAudio(history, p, stateNames) {
             : (scaleNotes[0] || 60);
         const freq = midiToFreq(midi);
 
-        // Resolve samples directory: user-specified → built-in → synth
-        const resolvedSamplesDir =
-            (p.samplesDir && fs.existsSync(p.samplesDir)) ? p.samplesDir :
-            fs.existsSync(DEFAULT_SAMPLES_DIR)            ? DEFAULT_SAMPLES_DIR :
-            null;
+        // State changed → loud (0.9); self-loop (same state) → soft (0.35)
+        const gain = (curr[3] !== prev[3]) ? 0.9 : 0.35;
 
         let noteSamples;
         if (resolvedSamplesDir) {
@@ -467,7 +470,7 @@ function bakeAudio(history, p, stateNames) {
             noteSamples = synthPianoNote(freq, noteDuration, SAMPLE_RATE);
         }
 
-        addNote(pcm, noteSamples, startSmp, 0.7);
+        addNote(pcm, noteSamples, startSmp, gain);
         frameAt += pauseFrames;
     }
 
