@@ -1,7 +1,9 @@
 const electron = require('electron');
 const app = electron.app;
 const BrowserWindow = electron.BrowserWindow;
-const { ipcMain, dialog } = electron;
+const { ipcMain, dialog, Menu } = electron;
+
+Menu.setApplicationMenu(null);  // 移除 Electron 默认菜单栏，使用应用内自定义菜单
 
 var mainWindow       = null;
 var settingsWindow   = null;  // Render settings child window
