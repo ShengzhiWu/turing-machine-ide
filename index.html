@@ -418,9 +418,11 @@
         update_graph_view();  // 启动物理模拟与渲染循环
 
         // ── 初始化纸带与运行结果 ────────────────────────────────────────
+        if (examples[example]["recommended-max-steps"])
+            max_steps_input.value = examples[example]["recommended-max-steps"];
         var tape = normalizeTape([...examples[example]['tapes'][0]]);
         var detailed_output = false;
-        var result = run_turing_machine(code, tape, 3000, detailed_output);
+        var result = run_turing_machine(code, tape, parseInt(max_steps_input.value), detailed_output);
     </script>
 
     <script src="src/app.js"></script>
