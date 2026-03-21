@@ -422,6 +422,10 @@ function menuLoadExample(key) {
     const ex = examples[key];
     example = key;  // 记录当前样例
 
+    // 载入推荐步数
+    if (ex["recommended-max-steps"])
+        max_steps_input.value = ex["recommended-max-steps"];
+
     // 载入图灵机代码
     const code = ex['code'][lang] || ex['code']['en'];
     code_editor_value = code;
