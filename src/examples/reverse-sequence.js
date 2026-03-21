@@ -133,3 +133,5 @@ examples["reverse-sequence"]["tapes"] = [  // 样例初始纸带
     ["", "0", ""],  // 长度为1
     ["", "1", ""]  // 长度为1
 ];
+
+examples["reverse-sequence"]["recommended-max-steps"] = 3000;  // 推荐的最大步数

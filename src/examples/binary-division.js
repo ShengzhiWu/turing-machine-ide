@@ -1156,3 +1156,5 @@ examples["binary-division"]["embedding"] = {
       -2.4895306091588614
     ]
   };
+
+examples["binary-division"]["recommended-max-steps"] = 3000;  // 推荐的最大步数

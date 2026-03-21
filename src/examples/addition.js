@@ -103,3 +103,5 @@ R, white, rgb(181,86,172)  // target position`;
 examples["addition"]["tapes"] = [  // 样例初始纸带
     ["", "P", "B", "B", "B", "B", "", "Q", "B", "B", "", "R"]
 ];
+
+examples["addition"]["recommended-max-steps"] = 3000;  // 推荐的最大步数

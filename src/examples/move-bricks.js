@@ -64,3 +64,5 @@ Q, white, blue  // Target position`;
 examples["move-bricks"]["tapes"] = [  // 样例初始纸带
     ["", "P", "B", "B", "B", "B", "", "", "Q", "", "", "", "", "", "", ""]
 ];
+
+examples["move-bricks"]["recommended-max-steps"] = 3000;  // 推荐的最大步数
