@@ -385,6 +385,7 @@ function menuLoadExample(key) {
 
     // 载入纸带初值
     tape = normalizeTape([...ex['tapes'][0]]);
+    start_position = 0;
 
     // 刷新有向图
     refresh_graph_embedding();
