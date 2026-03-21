@@ -43,10 +43,14 @@ npx electron .
 
 ## 链接
 
-[The Cup | Turing cup](https://mdt.di.unipi.it/cup.html#past-editions)是意大利的一个高中生图灵机编程竞赛，你可以从中获取一些有趣的题目
+[Wolfram Atlas: Turing Machines](https://atlas.wolfram.com/TOC/TOC_103.html)是Wolfram公司展示图灵机的页面，你可以从中发现一些一直的具有有趣行为的图灵机。它们多是在空白纸带上工作，能够自发实现有趣的图案演变。
+
+[The Cup | Turing cup](https://mdt.di.unipi.it/cup.html#past-editions)是意大利的一个高中生图灵机编程竞赛，你可以从中获取一些有趣的题目。
 
 ## TODO
 
+- 加一个复选框控制是每一步都展示还是只展示关键步
+- 渲染设置里试听停止播放
 - 保存快捷键
 - 纸带不动机头动的动画模式
 - 纸带最大长度限制（用于避免机头一直移动造成界面卡顿）

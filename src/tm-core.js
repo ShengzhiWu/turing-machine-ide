@@ -102,6 +102,9 @@ function run_turing_machine(code, tape, max_steps, detailed_output, start_positi
     var state = "start";
     const history = [[step, position, undefined, state, [...tape]]];  // 步数, 位置, 上一个状态, 当前状态, 纸带
 
+    while (tape[start_position] === undefined)  // 确保起始位置有格子
+        tape.push('');  // 在末尾加一个空格
+
     tape = [...tape];  // Clone the tape, to avoid changing the original tape.
     while(state != "end" && state != "error") {
         var need_record = detailed_output;
@@ -168,8 +171,12 @@ function run_turing_machine(code, tape, max_steps, detailed_output, start_positi
     return history;
 }
 
-// 保持纸带右侧有适当数量的空格，方便编辑
+// 保持纸带右侧有适当数量的空格，方便编辑。这个函数在机头初始位置左侧有很多空格的情况下也会修改机头初始位置
 function normalizeTape(t) {
+    while (start_position > 0 && t[0] === '') {
+        t.shift();  // 删除第一个元素
+        start_position--;
+    }
     while (t.length < 3 || t[t.length-1] !== '' || t[t.length-2] !== '' || t[t.length-3] !== '')
         t.push('');
     while (t[t.length-1] === '' && t[t.length-2] === '' && t[t.length-3] === '' && t[t.length-4] === '')

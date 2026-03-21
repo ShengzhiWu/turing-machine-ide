@@ -423,8 +423,8 @@
         // ── 初始化纸带与运行结果 ────────────────────────────────────────
         if (examples[example]["recommended-max-steps"])
             max_steps_input.value = examples[example]["recommended-max-steps"];
-        var tape = normalizeTape([...examples[example]['tapes'][0]]);
         var start_position = 0;
+        var tape = normalizeTape([...examples[example]['tapes'][0]]);
         var detailed_output = false;
         var result = run_turing_machine(code, tape, parseInt(max_steps_input.value), detailed_output, start_position);
         tape = result[0][4];  // 因为运行过程中使用的部分可能逐渐变长，为了用户正确地编辑纸带，把最终的纸带状态覆盖回 tape 变量

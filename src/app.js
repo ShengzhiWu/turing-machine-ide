@@ -32,12 +32,9 @@ function finishEditingTapeCallback(data) {
     if (data.value !== tape[data.cellIndex]) {  // 有变化
         tape[data.cellIndex] = data.value;  // 更新纸带数据
 
-        // 如果纸带最后三格有内容，往后延续。这是为了让用户总可以往后编辑
-        if (data.value != '')
-            while (tape.length - data.cellIndex <= 3)
-                tape.push('');
-        else
-            normalizeTape(tape);
+        // 如果纸带最后三格有内容，往后延续。也移除左侧的多余空格（但会保持机头和纸带的相对位置不变）。这是为了让用户总可以往后编辑
+        tape = normalizeTape(tape);
+        console.log(start_position, tape);
 
         run_program();  // 重新运行程序
     }
@@ -104,6 +101,7 @@ function refresh_graph_embedding() {  // 根据代码重建有向图（这个函
 
 function run_program() {
     code = parseProgramCode(code_editor_value);  // 解析代码文本
+    tape = normalizeTape(tape);  // 确保纸带右侧有适当数量的空格，方便编辑。也去除左侧多余的空格（但会保持机头和纸带的相对位置不变）
     result = run_turing_machine(code, tape, max_steps_input.value, detailed_output, start_position);
     tape = result[0][4];  // 因为运行过程中使用的部分可能逐渐变长，为了用户正确地编辑纸带，把最终的纸带状态覆盖回 tape 变量
     start_position = result[0][1];

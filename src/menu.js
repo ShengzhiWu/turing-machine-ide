@@ -361,6 +361,7 @@ function menuOpenProject() {
         if (obj.embedding) applyGraphEmbedding(obj.embedding);
 
         // 恢复纸带
+        start_position = 0;
         if (Array.isArray(obj.tape)) tape = normalizeTape([...obj.tape]);
 
         // 重新运行
@@ -384,8 +385,8 @@ function menuLoadExample(key) {
     result_table_style = parseStyleCode(styleCode);
 
     // 载入纸带初值
-    tape = normalizeTape([...ex['tapes'][0]]);
     start_position = 0;
+    tape = normalizeTape([...ex['tapes'][0]]);
 
     // 刷新有向图
     refresh_graph_embedding();
