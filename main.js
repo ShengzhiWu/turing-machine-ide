@@ -29,7 +29,7 @@ ipcMain.handle('open-render-settings', async (event, initData) => {
     }
     settingsWindow = new BrowserWindow({
         width: 540,
-        height: 760,
+        height: 840,
         resizable: false,
         minimizable: false,
         maximizable: false,
