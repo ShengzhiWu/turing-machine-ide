@@ -220,12 +220,15 @@ function updateTotalFrames(n) {
 }
 
 function getParams() {
+    let pauseFrames = parseInt(document.getElementById('pause-frames').value);
+    if (pauseFrames === undefined)
+        pauseFrames = 5;
     return {
         width:        Math.max(1,   parseInt(document.getElementById('width').value)          || 1920),
         height:       Math.max(1,   parseInt(document.getElementById('height').value)         || 1080),
         fps:          Math.max(1,   parseInt(document.getElementById('fps').value)            || 30),
         moveFrames:   Math.max(1,   parseInt(document.getElementById('move-frames').value)    || 10),
-        pauseFrames:  Math.max(0,   parseInt(document.getElementById('pause-frames').value)   || 5),
+        pauseFrames:  Math.max(0,   pauseFrames),  // pauseFrames 可以为 0
         halflife:     Math.max(1,   parseInt(document.getElementById('halflife').value)       || 10),
         graphicScale: Math.max(0.1, parseFloat(document.getElementById('graphic-scale').value) || 1.0),
         renderImage:  document.getElementById('render-image').checked,

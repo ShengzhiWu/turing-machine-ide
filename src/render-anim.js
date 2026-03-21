@@ -56,7 +56,7 @@ function getRenderParams() {
 
 function computeTotalFrames(history, p) {
     // Matches buildFrameSequence exactly.
-    const pause    = Math.max(1, p.pauseFrames);
+    const pause    = Math.max(0, p.pauseFrames);
     const move     = Math.max(1, p.moveFrames);
     const cooldown = Math.ceil(9 * p.halflife);
     if (!history || history.length === 0) return 0;
@@ -211,7 +211,7 @@ function buildFrameSequence(history, p) {
 
     if (history.length === 0) return frames;
 
-    const pause = Math.max(1, p.pauseFrames);
+    const pause = Math.max(0, p.pauseFrames);
     const move  = Math.max(1, p.moveFrames);
 
     const pushFrames = (count, headPos, histIdx, currentState, activateNode, activateEdge) => {
