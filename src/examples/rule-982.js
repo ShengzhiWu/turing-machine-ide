@@ -8,7 +8,12 @@ examples["rule-982"] = {};
 examples["rule-982"]["name"] = {
     "zh": "规则 982",
     "en": "Rule 982"
-}
+};
+
+examples["rule-982"]["category"] = {
+    "zh": "复杂行为/",
+    "en": "Complex Behavior/"
+};
 
 examples["rule-982"]["description"] = {
     "zh": "能发生周期性的变化并向右行进。路上遇到的1会稍微拖慢前进速度但不会破坏结构，最终被擦掉。",

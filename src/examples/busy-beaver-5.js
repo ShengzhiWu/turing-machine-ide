@@ -8,7 +8,12 @@ examples["busy-beaver-5"] = {};
 examples["busy-beaver-5"]["name"] = {
     "zh": "忙碌的海狸 5",
     "en": "Busy beaver 5"
-}
+};
+
+examples["busy-beaver-5"]["category"] = {
+    "zh": "复杂行为/",
+    "en": "Complex Behavior/"
+};
 
 examples["busy-beaver-5"]["description"] = {
     "zh": "已知的能在空纸带上留下最多1且会停机的5状态图灵机 BB(5)。它一开始进入状态A后需要运行47176870步才停机，留下4098个1。",

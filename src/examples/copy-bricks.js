@@ -8,7 +8,12 @@ examples["copy-bricks"] = {};
 examples["copy-bricks"]["name"] = {
     "zh": "复制砖块",
     "en": "Copy bricks"
-}
+};
+
+examples["copy-bricks"]["category"] = {
+    "zh": "简单操作/",
+    "en": "Simple Operations/"
+};
 
 examples["copy-bricks"]["description"] = {
     "zh": "将砖块从P后面复制到Q后面。",

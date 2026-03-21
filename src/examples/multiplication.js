@@ -8,7 +8,12 @@ examples["multiplication"] = {};
 examples["multiplication"]["name"] = {
     "zh": "乘法",
     "en": "Multiplication"
-}
+};
+
+examples["multiplication"]["category"] = {
+    "zh": "简单操作/",
+    "en": "Simple Operations/"
+};
 
 examples["multiplication"]["description"] = {
     "zh": "在R后面添加P和Q后面的砖块数量之乘积的砖块。",

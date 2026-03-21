@@ -15,6 +15,11 @@ examples["binary-division"]["description"] = {
     "en": "This Turing machine implements binary division. The initial tape format is as follows: blank, dividend, blank, divisor. The first digit of both the dividend and divisor must be 1."
 };
 
+examples["binary-division"]["category"] = {
+    "zh": "二进制运算/",
+    "en": "Binary Operations/"
+};
+
 examples["binary-division"]["code"] = {};
 
 examples["binary-division"]["code"]["zh"] = `// 二进制除法

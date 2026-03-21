@@ -8,7 +8,12 @@ examples["move-bricks"] = {};
 examples["move-bricks"]["name"] = {
     "zh": "移动砖块",
     "en": "Move bricks"
-}
+};
+
+examples["move-bricks"]["category"] = {
+    "zh": "简单操作/",
+    "en": "Simple Operations/"
+};
 
 examples["move-bricks"]["description"] = {
     "zh": "将砖块从P后面移动到Q后面。",

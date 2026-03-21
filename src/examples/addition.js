@@ -8,7 +8,12 @@ examples["addition"] = {};
 examples["addition"]["name"] = {
     "zh": "加法",
     "en": "Addition"
-}
+};
+
+examples["addition"]["category"] = {
+    "zh": "简单操作/",
+    "en": "Simple Operations/"
+};
 
 examples["addition"]["description"] = {
     "zh": "将P和Q后面的砖块合起来复制到R后面。",

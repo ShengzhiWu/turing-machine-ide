@@ -8,7 +8,12 @@ examples["rule-1953"] = {};
 examples["rule-1953"]["name"] = {
     "zh": "规则 1953",
     "en": "Rule 1953"
-}
+};
+
+examples["rule-1953"]["category"] = {
+    "zh": "复杂行为/",
+    "en": "Complex Behavior/"
+};
 
 examples["rule-1953"]["description"] = {
     "zh": "能产生复杂的图案并向右无限扩张。",

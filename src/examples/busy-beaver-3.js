@@ -10,6 +10,11 @@ examples["busy-beaver-3"]["name"] = {
     "en": "Busy beaver 3"
 }
 
+examples["busy-beaver-3"]["category"] = {
+    "zh": "复杂行为/",
+    "en": "Complex Behavior/"
+};
+
 examples["busy-beaver-3"]["description"] = {
     "zh": "已知的能在空纸带上留下最多1且会停机的3状态图灵机 BB(3)。",
     "en": "The known 3-state Turing machine BB(3) that leaves the maximum number of 1s on an empty tape and halts."

@@ -8,7 +8,12 @@ examples["busy-beaver-4"] = {};
 examples["busy-beaver-4"]["name"] = {
     "zh": "忙碌的海狸 4",
     "en": "Busy beaver 4"
-}
+};
+
+examples["busy-beaver-4"]["category"] = {
+    "zh": "复杂行为/",
+    "en": "Complex Behavior/"
+};
 
 examples["busy-beaver-4"]["description"] = {
     "zh": "已知的能在空纸带上留下最多1且会停机的4状态图灵机 BB(4)。",

@@ -8,7 +8,12 @@ examples["reverse-sequence"] = {};
 examples["reverse-sequence"]["name"] = {
     "zh": "逆转序列",
     "en": "Reverse sequence"
-}
+};
+
+examples["reverse-sequence"]["category"] = {
+    "zh": "简单操作/",
+    "en": "Simple Operations/"
+};
 
 examples["reverse-sequence"]["description"] = {
     "zh": "原位逆转一个二进制序列。",

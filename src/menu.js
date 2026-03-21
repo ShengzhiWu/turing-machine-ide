@@ -115,10 +115,58 @@ function buildMenuBar() {
                 'separator',
                 {
                     label: t('examples'),
-                    submenu: Object.keys(examples).map(key => ({
-                        label: (examples[key]['name'][language] || examples[key]['name']['en']),
-                        action: () => menuLoadExample(key)
-                    }))
+                    submenu: (() => {
+                        // 将 examples 按 category 组织成嵌套树
+                        // category 形如 "A/B/"，以 "/" 分割，忽略末尾空段
+                        // category 缺失或为空字符串则放在顶层
+                        function insertIntoTree(node, pathSegments, leafItem) {
+                            if (pathSegments.length === 0) {
+                                node.items.push(leafItem);
+                                return;
+                            }
+                            const seg = pathSegments[0];
+                            let child = node.children[seg];
+                            if (!child) {
+                                child = { items: [], children: {}, childOrder: [] };
+                                node.children[seg] = child;
+                                node.childOrder.push(seg);
+                            }
+                            insertIntoTree(child, pathSegments.slice(1), leafItem);
+                        }
+
+                        function treeToSubmenu(node) {
+                            const result = [];
+                            // 先输出分类子菜单（保持插入顺序）
+                            for (const seg of node.childOrder) {
+                                result.push({
+                                    label: seg,
+                                    submenu: treeToSubmenu(node.children[seg])
+                                });
+                            }
+                            // 再输出本层的叶子项
+                            for (const item of node.items) {
+                                result.push(item);
+                            }
+                            return result;
+                        }
+
+                        const root = { items: [], children: {}, childOrder: [] };
+                        for (const key of Object.keys(examples)) {
+                            const ex = examples[key];
+                            const leafItem = {
+                                label: (ex['name'][language] || ex['name']['en']),
+                                action: () => menuLoadExample(key)
+                            };
+                            const rawCategory = ex['category']
+                                ? (ex['category'][language] || ex['category']['en'] || '')
+                                : '';
+                            // 按 "/" 分割，过滤空段
+                            const segments = rawCategory.split('/').filter(s => s !== '');
+                            insertIntoTree(root, segments, leafItem);
+                        }
+
+                        return treeToSubmenu(root);
+                    })()
                 },
                 'separator',
                 {

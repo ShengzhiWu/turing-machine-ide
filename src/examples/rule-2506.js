@@ -8,7 +8,12 @@ examples["rule-2506"] = {};
 examples["rule-2506"]["name"] = {
     "zh": "规则 2506",
     "en": "Rule 2506"
-}
+};
+
+examples["rule-2506"]["category"] = {
+    "zh": "复杂行为/",
+    "en": "Complex Behavior/"
+};
 
 examples["rule-2506"]["description"] = {
     "zh": "能产生交替的图案且向两侧无限扩散。",

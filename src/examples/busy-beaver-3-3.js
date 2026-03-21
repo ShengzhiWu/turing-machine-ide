@@ -8,7 +8,12 @@ examples["busy-beaver-3-3"] = {};
 examples["busy-beaver-3-3"]["name"] = {
     "zh": "忙碌的海狸 3,3",
     "en": "Busy beaver 3,3"
-}
+};
+
+examples["busy-beaver-3-3"]["category"] = {
+    "zh": "复杂行为/",
+    "en": "Complex Behavior/"
+};
 
 examples["busy-beaver-3-3"]["description"] = {
     "zh": "已知的能在空纸带上留下最多1且会停机的3状态3符号图灵机 BB(3,3)。在最初进入A状态运行大约1.19×10¹⁷步后停机。",
