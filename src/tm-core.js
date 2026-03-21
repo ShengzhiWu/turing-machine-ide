@@ -96,9 +96,9 @@ function parseStyleCode(code) {  // 解析风格代码
     return result;
 }
 
-function run_turing_machine(code, tape, max_steps, detailed_output) {  // 运行图灵机
+function run_turing_machine(code, tape, max_steps, detailed_output, start_position) {  // 运行图灵机
     var step = 0;
-    var position = 0;
+    var position = start_position || 0;
     var state = "start";
     const history = [[step, position, undefined, state, [...tape]]];  // 步数, 位置, 上一个状态, 当前状态, 纸带
 
@@ -147,8 +147,14 @@ function run_turing_machine(code, tape, max_steps, detailed_output) {  // 运行
             position ++;
         else if (action[1]=="L") {
             position --;
-            if (position < 0)
-                state = "error";  // 不允许移出纸带左边缘
+            if (position < 0) {  // 向左移出了纸带，在左边加一格
+                position++;
+                tape.unshift('');
+                history.forEach(record => {
+                    record[1]++;
+                    record[4].unshift('');  // 在历史记录的每个纸带前面加一个空格
+                });
+            }
         }
     }
 

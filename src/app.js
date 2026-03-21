@@ -104,7 +104,9 @@ function refresh_graph_embedding() {  // 根据代码重建有向图（这个函
 
 function run_program() {
     code = parseProgramCode(code_editor_value);  // 解析代码文本
-    result = run_turing_machine(code, tape, max_steps_input.value, detailed_output);
+    result = run_turing_machine(code, tape, max_steps_input.value, detailed_output, start_position);
+    tape = result[0][4];  // 因为运行过程中使用的部分可能逐渐变长，为了用户正确地编辑纸带，把最终的纸带状态覆盖回 tape 变量
+    start_position = result[0][1];
     refresh_history_table(history_table, result);
 }
 
