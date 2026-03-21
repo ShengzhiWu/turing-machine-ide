@@ -136,15 +136,15 @@ function buildMenuBar() {
 
                         function treeToSubmenu(node) {
                             const result = [];
-                            // 先输出分类子菜单（保持插入顺序）
-                            for (const seg of node.childOrder) {
+                            // 先输出分类子菜单（字典序）
+                            for (const seg of [...node.childOrder].sort((a, b) => a.localeCompare(b))) {
                                 result.push({
                                     label: seg,
                                     submenu: treeToSubmenu(node.children[seg])
                                 });
                             }
-                            // 再输出本层的叶子项
-                            for (const item of node.items) {
+                            // 再输出本层的叶子项（字典序）
+                            for (const item of [...node.items].sort((a, b) => a.label.localeCompare(b.label))) {
                                 result.push(item);
                             }
                             return result;
