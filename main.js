@@ -150,6 +150,7 @@ app.on('ready', () => {
         title: 'Turing Machine IDE',
         webPreferences: { nodeIntegration: true, contextIsolation: false }
     });
+    // mainWindow.webContents.openDevTools();  // 打开开发人员工具
     mainWindow.loadFile('index.html');
     mainWindow.on('closed', () => { mainWindow = null; });
 });
