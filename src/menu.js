@@ -68,6 +68,13 @@ const MENU_I18N = {
         renderMusicModeMinor:    '小调（自然）',
         renderRendering:         '渲染中…',
         renderDone:              '渲染完成',
+        // ── 新增 ──
+        detailedOutput:          '仅记录纸带有变化的步',
+        minimalMode:             '极简模式',
+        pixelScaleX:             '横向缩放',
+        pixelScaleY:             '纵向缩放',
+        saveTableData:           '保存表格数据',
+        saveAsImage:             '保存为图片',
     },
     en: {
         file:           'File',
@@ -136,6 +143,13 @@ const MENU_I18N = {
         renderMusicModeMinor:    'Minor (natural)',
         renderRendering:         'Rendering…',
         renderDone:              'Done',
+        // ── 新增 ──
+        detailedOutput:          'Record only steps where tape changes',
+        minimalMode:             'Minimal mode',
+        pixelScaleX:             'H scale',
+        pixelScaleY:             'V scale',
+        saveTableData:           'Save table data',
+        saveAsImage:             'Save as image',
     }
 };
 
@@ -512,6 +526,25 @@ function applyLanguageToUI() {
 
     const maxStepsLabel = document.getElementById('max-steps-label');
     if (maxStepsLabel) maxStepsLabel.textContent = t('maxSteps');
+
+    // ── 新增控件的文案 ──
+    const detailedOutputLabel = document.getElementById('detailed-output-label');
+    if (detailedOutputLabel) detailedOutputLabel.textContent = t('detailedOutput');
+
+    const minimalModeLabel = document.getElementById('minimal-mode-label');
+    if (minimalModeLabel) minimalModeLabel.textContent = t('minimalMode');
+
+    const pixelScaleXLabel = document.getElementById('pixel-scale-x-label');
+    if (pixelScaleXLabel) pixelScaleXLabel.textContent = t('pixelScaleX');
+
+    const pixelScaleYLabel = document.getElementById('pixel-scale-y-label');
+    if (pixelScaleYLabel) pixelScaleYLabel.textContent = t('pixelScaleY');
+
+    const saveTableLabel = document.getElementById('save-table-label');
+    if (saveTableLabel) saveTableLabel.textContent = t('saveTableData');
+
+    const saveImageLabel = document.getElementById('save-image-label');
+    if (saveImageLabel) saveImageLabel.textContent = t('saveAsImage');
 
     if (typeof code_editor !== 'undefined') code_editor.lang = language;
     if (typeof style_editor !== 'undefined') style_editor.lang = language;
