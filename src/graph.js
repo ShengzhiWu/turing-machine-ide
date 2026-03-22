@@ -166,6 +166,8 @@ function build_graph_dom(graph) {
     // 清空 graph_view，但保留已有的非图内容（无）
     while (graph_view.firstChild) graph_view.removeChild(graph_view.lastChild);
 
+    graph_view.style.userSelect = 'none';  // 文本不可选中
+
     // 连线层
     const conn_group = svgEl("g", {});
     graph_view.appendChild(conn_group);
