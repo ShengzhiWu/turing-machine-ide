@@ -393,12 +393,13 @@ function encodeWav(pcmFloat32, sampleRate) {
 function bakeAudio(history, p, stateNames) {
     const SAMPLE_RATE = 44100;
     const fps         = Math.max(1, p.fps || 30);
-    const pauseFrames = Math.max(1, p.pauseFrames);
+    const pauseFrames = Math.max(0, p.pauseFrames);   // allow 0 pause
     const moveFrames  = Math.max(1, p.moveFrames);
     const halflife    = Math.max(1, p.halflife);
 
-    // Duration of one step's pause in seconds
-    const stepDuration = (pauseFrames / fps) * 2;   // movement + pause ≈ one "beat"
+    // Duration of one "beat" in seconds: movement + pause, minimum 1 frame worth.
+    const beatFrames   = moveFrames + pauseFrames;
+    const stepDuration = Math.max(beatFrames, 1) / fps;
     // Note-on duration: let it ring for a bit longer than one step but fade naturally
     const noteDuration = Math.max(stepDuration * 3, 1.5);
 
@@ -417,12 +418,18 @@ function bakeAudio(history, p, stateNames) {
 
     const noteMap = buildStateNoteMap(stateNames, scaleNotes, seed);
 
-    // Total audio duration mirrors total frame count
-    const cooldown    = Math.ceil(9 * halflife);
-    let totalFrames   = 1 + pauseFrames;   // dark frame + initial pause
+    // Total audio duration mirrors buildFrameSequence / computeTotalFrames logic exactly.
+    // (Must stay in sync with the frame-counting fix for pauseFrames=0.)
+    const cooldown  = Math.ceil(9 * halflife);
+    let totalFrames = 1 + pauseFrames;   // dark frame + initial pause
     for (let i = 1; i < history.length; i++) {
-        if (history[i][1] !== history[i-1][1]) totalFrames += moveFrames;
-        totalFrames += pauseFrames;
+        const posChanged = history[i][1] !== history[i-1][1];
+        if (posChanged) {
+            totalFrames += moveFrames + pauseFrames;
+        } else {
+            // No movement: pause frames (or 1 explicit landing frame when pause=0)
+            totalFrames += pauseFrames > 0 ? pauseFrames : 1;
+        }
     }
     totalFrames += pauseFrames + cooldown;  // final pause + cooldown
     const totalDuration = totalFrames / fps;
@@ -436,8 +443,8 @@ function bakeAudio(history, p, stateNames) {
         fs.existsSync(DEFAULT_SAMPLES_DIR)            ? DEFAULT_SAMPLES_DIR :
         null;
 
-    // Walk through history and schedule notes
-    // Frame counter mirrors buildFrameSequence logic
+    // Walk through history and schedule notes.
+    // Frame counter mirrors buildFrameSequence logic exactly.
     let frameAt = 1 + pauseFrames;  // after dark frame + initial pause
 
     for (let i = 1; i < history.length; i++) {
@@ -445,11 +452,15 @@ function bakeAudio(history, p, stateNames) {
         const curr    = history[i];
         const prevPos = prev[1];
         const currPos = curr[1];
+        const posChanged = currPos !== prevPos;
 
-        // Movement frames
-        if (currPos !== prevPos) frameAt += moveFrames;
+        if (posChanged) {
+            // When pause=0, note fires on the last movement frame (same as buildFrameSequence).
+            // When pause>0, note fires at the start of the pause block after movement.
+            frameAt += moveFrames;
+        }
+        // frameAt now points to the moment the highlight (and note) fires.
 
-        // Now at the arrival pause for step i — this is where the note fires
         const timeAt   = frameAt / fps;
         const startSmp = Math.floor(timeAt * SAMPLE_RATE);
 
@@ -471,7 +482,14 @@ function bakeAudio(history, p, stateNames) {
         }
 
         addNote(pcm, noteSamples, startSmp, gain);
-        frameAt += pauseFrames;
+
+        // Advance past the pause block (or the 1 landing frame when pause=0 and no movement)
+        if (pauseFrames > 0) {
+            frameAt += pauseFrames;
+        } else if (!posChanged) {
+            frameAt += 1;   // the explicit landing frame inserted by buildFrameSequence
+        }
+        // (pause=0 with movement: no extra frames after the last move frame)
     }
 
     return encodeWav(pcm, SAMPLE_RATE);
