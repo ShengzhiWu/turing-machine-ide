@@ -61,6 +61,15 @@ ipcMain.on('render-params-changed', (event, params) => {
 
 // ── Start render → relay to main window ──────────────────────────────
 ipcMain.on('render-start', (event, params) => {
+    // Ensure output directory exists before starting render
+    if (params.outputPath) {
+        try {
+            require('fs').mkdirSync(params.outputPath, { recursive: true });
+        } catch (err) {
+            sendTo(settingsWindow, 'render-output-path-error', err.message);
+            return;
+        }
+    }
     sendTo(mainWindow, 'render-start', params);
 });
 
