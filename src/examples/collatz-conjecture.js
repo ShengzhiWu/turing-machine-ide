@@ -20,7 +20,6 @@ examples["collatz-conjecture"]["description"] = {
     "en": "For a positive integer, if it is even, divide it by 2; if it is odd, multiply it by 3 and add 1. The Collatz conjecture posits that no matter which positive integer you start with, repeatedly applying the above operations will eventually lead to 1. This program simulates the evolution of a binary number and halts when it reaches 1."
 };
 
-
 examples["collatz-conjecture"]["code"] = {};
 
 examples["collatz-conjecture"]["code"]["zh"] = `// 考拉兹猜想
