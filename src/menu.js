@@ -50,7 +50,7 @@ const MENU_I18N = {
         renderLabelMusicHi:      '最高音（范围）',
         renderLabelMusicSeed:    '随机种子',
         renderLabelMusicSamples: '钢琴采样文件夹',
-        renderBtnMusicPreview:   '▶ 预听',
+        renderBtnMusicPreview:   '▶ 试听',
         renderBrowse:            '…',
         renderStart:             '渲染',
         renderClose:             '关闭',
