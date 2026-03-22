@@ -60,11 +60,23 @@ function computeTotalFrames(history, p) {
     const move     = Math.max(1, p.moveFrames);
     const cooldown = Math.ceil(9 * p.halflife);
     if (!history || history.length === 0) return 0;
-    // 1 dark frame + initial pause + transitions + final pause + cooldown
+    // 1 dark frame + initial pause (>=0) + transitions + final pause + cooldown
     let total = 1 + pause;
     for (let i = 1; i < history.length; i++) {
-        if (history[i][1] !== history[i-1][1]) total += move;
-        total += pause;
+        const posChanged = history[i][1] !== history[i-1][1];
+        if (posChanged) {
+            total += move;
+            // When pause=0, the last movement frame carries the highlight; no extra frame.
+            total += pause;
+        } else {
+            // No movement frames.
+            if (pause > 0) {
+                total += pause;
+            } else {
+                // pause=0 and no movement: one explicit landing frame is inserted.
+                total += 1;
+            }
+        }
     }
     total += pause + cooldown;
     return total;
@@ -259,20 +271,39 @@ function buildFrameSequence(history, p) {
             for (let mf = 0; mf < move; mf++) {
                 const t01   = (mf + 1) / move;
                 const tEase = cubicEase(t01);
+                // On the last movement frame, fire activateNode/activateEdge so the
+                // highlight is always triggered even when pauseFrames = 0.
+                const isLastMoveFrame = (mf === move - 1);
                 frames.push({
                     headPos:      prevPos + (currPos - prevPos) * tEase,
-                    historyIndex: i - 1,   // still show old tape while head is in flight
-                    currentState: prevState,
-                    activateNode: null,
-                    activateEdge: null,
+                    historyIndex: isLastMoveFrame ? i : i - 1,
+                    currentState: isLastMoveFrame ? currState : prevState,
+                    activateNode: isLastMoveFrame ? canonicalStateName(currState) : null,
+                    activateEdge: isLastMoveFrame ? edgeKey : null,
                 });
             }
         }
 
         // Post-arrival pause: head is at currPos, tape and state flip to curr's values.
         // Highlight the new state node and the taken edge.
-        pushFrames(pause, currPos, i, currState,
-            canonicalStateName(currState), edgeKey);
+        // When pauseFrames = 0, skip pushFrames (count = 0, no frames added).
+        // But if there were also no movement frames (position unchanged), we still need
+        // at least one landing frame to fire the highlight — insert it explicitly.
+        if (pause > 0) {
+            pushFrames(pause, currPos, i, currState,
+                canonicalStateName(currState), edgeKey);
+        } else if (currPos === prevPos) {
+            // No movement frames AND no pause frames: fire highlight in a single frame.
+            frames.push({
+                headPos:      currPos,
+                historyIndex: i,
+                currentState: currState,
+                activateNode: canonicalStateName(currState),
+                activateEdge: edgeKey,
+            });
+        }
+        // (If pause=0 but movement frames existed, the last movement frame already
+        //  carried the highlight above — nothing more needed here.)
     }
 
     // Final pause at the terminal position/state
