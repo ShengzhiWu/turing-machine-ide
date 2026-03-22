@@ -33,7 +33,7 @@ ipcMain.handle('open-render-settings', async (event, initData) => {
         resizable: false,
         minimizable: false,
         maximizable: false,
-        title: 'Render Animation',
+        title: (initData && initData.strings && initData.strings.renderSettingsTitle) || 'Render Settings',
         parent: mainWindow,
         modal: true,  // disables main window while open
         webPreferences: { nodeIntegration: true, contextIsolation: false }
@@ -105,7 +105,7 @@ ipcMain.handle('open-render-preview', async (event, initData) => {
         height: maxH,
         minWidth: 320,
         minHeight: 200,
-        title: 'Rendering…',
+        title: (initData && initData.strings && initData.strings.renderRendering) || 'Rendering…',
         parent: mainWindow,
         webPreferences: { nodeIntegration: true, contextIsolation: false }
     });

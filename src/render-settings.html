@@ -2,7 +2,7 @@
 <html lang="">
 <head>
     <meta charset="UTF-8">
-    <title>Render Animation</title>
+    <title></title>
     <style>
         * { box-sizing: border-box; }
         body {
@@ -158,8 +158,11 @@
 <script>
 const { ipcRenderer } = require('electron');
 
+let _s = {};  // 当前语言字符串，render-settings-init 时填充
+
 ipcRenderer.on('render-settings-init', (e, data) => {
-    const s = data.strings || {};
+    _s = data.strings || {};
+    const s = _s;
     const setText = (id, key, fb) => { const el = document.getElementById(id); if (el) el.textContent = s[key] || fb; };
     setText('title',             'title',           'Render Animation');
     setText('sec-size',          'secSize',         'Size');
@@ -182,10 +185,18 @@ ipcRenderer.on('render-settings-init', (e, data) => {
     setText('lbl-music-hi',      'lblMusicHi',      'High note (range)');
     setText('lbl-music-seed',    'lblMusicSeed',    'Random seed');
     setText('lbl-music-samples', 'lblMusicSamples', 'Piano samples folder');
+    setText('music-preview-btn', 'btnMusicPreview', '▶ Preview');
     setText('start-btn',         'btnStart',        'Render');
     setText('close-btn',         'btnClose',        'Close');
-    document.getElementById('output-path').placeholder = s.outputPlaceholder || '';
-    document.getElementById('browse-btn').textContent  = s.btnBrowse || '…';
+    document.getElementById('output-path').placeholder   = s.outputPlaceholder       || '';
+    document.getElementById('music-samples').placeholder = s.musicSamplesPlaceholder || '(leave blank to use synth)';
+    document.getElementById('browse-btn').textContent    = s.btnBrowse || '…';
+    // 音阶选项文字
+    const modeEl = document.getElementById('music-mode');
+    modeEl.options[0].textContent = s.renderMusicModeMajor || 'Major';
+    modeEl.options[1].textContent = s.renderMusicModeMinor || 'Minor (natural)';
+    // 窗口 OS 标题
+    document.title = s.renderSettingsTitle || s.title || 'Render Settings';
 
     const p = data.params || {};
     const set = (id, val) => { if (val !== undefined && val !== null) document.getElementById(id).value = val; };
@@ -216,7 +227,8 @@ ipcRenderer.on('render-progress', (e, data) => {
 ipcRenderer.on('render-total-frames', (e, n) => updateTotalFrames(n));
 
 function updateTotalFrames(n) {
-    document.getElementById('lbl-total-frames').textContent = n > 0 ? n + ' frames total' : '';
+    const prefix = _s.lblTotalFrames || 'Total frames: ';
+    document.getElementById('lbl-total-frames').textContent = n > 0 ? prefix + n : '';
 }
 
 function getParams() {
@@ -261,7 +273,7 @@ document.getElementById('render-music').addEventListener('change', updateSubsect
 document.getElementById('render-image').addEventListener('change', updateSubsections);
 
 document.getElementById('browse-btn').addEventListener('click', async () => {
-    const r = await ipcRenderer.invoke('show-open-dialog', { title: 'Select Output Folder', properties: ['openDirectory'] });
+    const r = await ipcRenderer.invoke('show-open-dialog', { title: _s.browseTitle || 'Select Output Folder', properties: ['openDirectory'] });
     if (r && !r.canceled && r.filePaths.length > 0) {
         document.getElementById('output-path').value = r.filePaths[0];
         ipcRenderer.send('render-params-changed', getParams());
@@ -269,7 +281,7 @@ document.getElementById('browse-btn').addEventListener('click', async () => {
 });
 
 document.getElementById('music-browse-btn').addEventListener('click', async () => {
-    const r = await ipcRenderer.invoke('show-open-dialog', { title: 'Select Piano Samples Folder', properties: ['openDirectory'] });
+    const r = await ipcRenderer.invoke('show-open-dialog', { title: _s.musicBrowseTitle || 'Select Piano Samples Folder', properties: ['openDirectory'] });
     if (r && !r.canceled && r.filePaths.length > 0) {
         document.getElementById('music-samples').value = r.filePaths[0];
         ipcRenderer.send('render-params-changed', getParams());
@@ -278,7 +290,7 @@ document.getElementById('music-browse-btn').addEventListener('click', async () =
 
 // ── Audio preview ─────────────────────────────────────────────────────────────
 document.getElementById('music-preview-btn').addEventListener('click', () => {
-    document.getElementById('music-preview-status').textContent = 'Baking…';
+    document.getElementById('music-preview-status').textContent = _s.musicBaking || 'Baking…';
     document.getElementById('music-preview-btn').disabled = true;
     ipcRenderer.send('render-music-preview', getParams());
 });
@@ -287,7 +299,7 @@ ipcRenderer.on('render-music-preview-ready', (e, data) => {
     document.getElementById('music-preview-btn').disabled = false;
     const statusEl = document.getElementById('music-preview-status');
     if (data.error) { statusEl.textContent = 'Error: ' + data.error; return; }
-    statusEl.textContent = 'Playing…';
+    statusEl.textContent = _s.musicPlaying || 'Playing…';
     const arrayBuf = Buffer.from(data.wavBase64, 'base64').buffer;
     const actx = new AudioContext();
     actx.decodeAudioData(arrayBuf, decoded => {
@@ -296,14 +308,14 @@ ipcRenderer.on('render-music-preview-ready', (e, data) => {
         src.connect(actx.destination);
         src.start();
         src.onended = () => { statusEl.textContent = ''; actx.close(); };
-    }, () => { statusEl.textContent = 'Decode error'; });
+    }, () => { statusEl.textContent = _s.musicDecodeError || 'Decode error'; });
 });
 
 document.getElementById('start-btn').addEventListener('click', () => {
     const params = getParams();
-    if (!params.outputPath) { alert('Please choose an output folder.'); return; }
+    if (!params.outputPath) { alert(_s.alertNoOutput || 'Please choose an output folder.'); return; }
     if (!params.renderImage && !params.renderMusic) {
-        alert('Please enable at least one of: Render image frames or Export audio.'); return;
+        alert(_s.alertNothingEnabled || 'Please enable at least one of: Render image frames or Export audio.'); return;
     }
     ipcRenderer.send('render-start', params);
 });

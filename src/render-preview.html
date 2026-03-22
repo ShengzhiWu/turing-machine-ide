@@ -28,7 +28,7 @@
     </style>
 </head>
 <body>
-    <span id="status">Rendering…</span>
+    <span id="status"></span>
     <canvas id="preview-canvas"></canvas>
 
     <script>
@@ -39,6 +39,8 @@
         const status = document.getElementById('status');
 
         ipcRenderer.on('render-preview-init', (e, data) => {
+            const s = data.strings || {};
+            status.textContent = s.renderRendering || 'Rendering…';
             canvas.width  = data.width;
             canvas.height = data.height;
             const maxW = window.innerWidth  - 24;

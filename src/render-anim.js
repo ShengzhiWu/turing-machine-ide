@@ -33,18 +33,43 @@ function menuRenderAnimation() {
             title:            t('renderDialogTitle'),
             secSize:          t('renderSecSize'),
             secTiming:        t('renderSecTiming'),
-            secStyle:         t('renderSecStyle') || 'Visual Style',
+            secStyle:         t('renderSecStyle'),
+            secMusic:         t('renderSecMusic'),
             secOutput:        t('renderSecOutput'),
             lblWidth:         t('renderLabelWidth'),
             lblHeight:        t('renderLabelHeight'),
+            lblFps:           t('renderLabelFps'),
             lblMoveFrames:    t('renderLabelMoveFrames'),
             lblPauseFrames:   t('renderLabelPauseFrames'),
             lblHalflife:      t('renderLabelHalflife'),
-            lblGraphicScale:  t('renderLabelGraphicScale') || 'Graphic scale',
+            lblTotalFrames:   t('renderLabelTotalFrames'),
+            lblRenderImage:   t('renderLabelRenderImage'),
+            lblGraphicScale:  t('renderLabelGraphicScale'),
+            lblRenderMusic:   t('renderLabelRenderMusic'),
+            lblMusicMode:     t('renderLabelMusicMode'),
+            lblMusicRoot:     t('renderLabelMusicRoot'),
+            lblMusicLo:       t('renderLabelMusicLo'),
+            lblMusicHi:       t('renderLabelMusicHi'),
+            lblMusicSeed:     t('renderLabelMusicSeed'),
+            lblMusicSamples:  t('renderLabelMusicSamples'),
+            btnMusicPreview:  t('renderBtnMusicPreview'),
             btnStart:         t('renderStart'),
             btnClose:         t('renderClose'),
             btnBrowse:        t('renderBrowse'),
-            outputPlaceholder: t('renderOutputPlaceholder'),
+            outputPlaceholder:       t('renderOutputPlaceholder'),
+            browseTitle:             t('renderBrowseTitle'),
+            musicBrowseTitle:        t('renderMusicBrowseTitle'),
+            musicSamplesPlaceholder: t('renderMusicSamplesPlaceholder'),
+            musicBaking:      t('renderMusicBaking'),
+            musicPlaying:     t('renderMusicPlaying'),
+            musicDecodeError: t('renderMusicDecodeError'),
+            alertNoOutput:    t('renderAlertNoOutput'),
+            alertNothingEnabled: t('renderAlertNothingEnabled'),
+            renderSettingsTitle:     t('renderSettingsTitle'),
+            renderMusicModeMajor:    t('renderMusicModeMajor'),
+            renderMusicModeMinor:    t('renderMusicModeMinor'),
+            renderRendering:  t('renderRendering'),
+            renderDone:       t('renderDone'),
         },
     });
 }
@@ -136,7 +161,7 @@ async function startRender(p) {
 
     // ── Open preview window only when rendering images ────────────────
     if (p.renderImage) {
-        await ipcRenderer.invoke('open-render-preview', { width: p.width, height: p.height });
+        await ipcRenderer.invoke('open-render-preview', { width: p.width, height: p.height, strings: { renderRendering: t('renderRendering'), renderDone: t('renderDone') } });
     }
 
     const offCanvas = p.renderImage ? document.createElement('canvas') : null;
