@@ -1,0 +1,24 @@
+{
+  "appId": "com.mycompany.turingmachineide",
+  "productName": "Turing Machine IDE",
+  "directories": {
+    "output": "dist"
+  },
+  "files": [
+    "src/**/*",
+    "node_modules/**/*",
+    "resources/**/*",
+    "main.js",
+    "index.html",
+    "package.json"
+  ],
+  "extraResources": [],
+  "win": {
+    "target": "nsis",
+    "executableName": "TuringMachineIDE"
+  },
+  "nsis": {
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true
+  }
+}

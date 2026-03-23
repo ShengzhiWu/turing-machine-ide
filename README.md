@@ -22,6 +22,22 @@ npm i
 npx electron .
 ```
 
+## 打包
+
+如下两条指令二选一即可
+
+打包出文件夹版可执行文件
+
+```bash
+npm run pack
+```
+
+打包出安装包
+
+```bash
+npm run build
+```
+
 ## 项目结构
 
 | 文件                       | 具体内容                                                     | 相关功能                                                     |
