@@ -121,7 +121,7 @@ function run_program() {
 // 复选框：仅记录纸带有变化的步
 // checked=true  → detailed_output=false（只记录有变化的步）
 // checked=false → detailed_output=true （记录每一步）
-document.getElementById('detailed-output-checkbox').addEventListener('change', function() {
+document.getElementById('only-changes-checkbox').addEventListener('change', function() {
     detailed_output = !this.checked;
     run_program();
 });

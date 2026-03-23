@@ -381,6 +381,12 @@ function buildProjectJSON() {
         style:     (typeof style_editor      !== 'undefined') ? style_editor.value : '',
         embedding: getGraphEmbedding(),
         tape:      getTapeInitial(),
+        "start-position": start_position,  // 机头起始位置
+        "max-steps": parseInt(max_steps_input.value),  // 最大步数
+        "output-filter": document.getElementById('only-changes-checkbox').checked ? 'only-changes' : 'all',  // 结果记录过滤器
+        "minimal-mode": document.getElementById('minimal-mode-checkbox').checked,  // 极简模式
+        "pixel-scale-x": parseInt(document.getElementById('pixel-scale-x-input').value), // 横向缩放
+        "pixel-scale-y": parseInt(document.getElementById('pixel-scale-y-input').value) // 纵向缩放
     };
 }
 
@@ -472,8 +478,19 @@ function menuOpenProject() {
         start_position = 0;
         if (Array.isArray(obj.tape)) tape = normalizeTape([...obj.tape]);
 
+        if (typeof obj["start-position"] === 'number') start_position = obj["start-position"];
+        if (typeof obj["max-steps"] === 'number') max_steps_input.value = obj["max-steps"];
+        if (obj["output-filter"] !== undefined) {
+            detailed_output = obj["output-filter"] !== 'only-changes';
+            document.getElementById('only-changes-checkbox').checked = !detailed_output;
+        }
+        if (typeof obj["minimal-mode"] === 'boolean') document.getElementById('minimal-mode-checkbox').checked = obj["minimal-mode"];
+        if (typeof obj["pixel-scale-x"] === 'number') document.getElementById('pixel-scale-x-input').value = obj["pixel-scale-x"];
+        if (typeof obj["pixel-scale-y"] === 'number') document.getElementById('pixel-scale-y-input').value = obj["pixel-scale-y"];
+
+
         // 重新运行
-        if (typeof run_program === 'function') run_program();
+        run_program();
     });
 }
 
