@@ -66,9 +66,9 @@ start, other, N, R
 9, "P", N, L, 11
 9, other, N, L
 
-// 把一位标上'
 10, "0", "0'", R, 13
 10, "1", "1'", R, 13
+10, "", "0'", R, 13
 10, other, N, L
 
 11, "0", "1", R, 12
@@ -152,9 +152,9 @@ start, other, N, R
 9, "P", N, L, 11
 9, other, N, L
 
-// Mark one digit with '
 10, "0", "0'", R, 13
 10, "1", "1'", R, 13
+10, "", "0'", R, 13
 10, other, N, L
 
 11, "0", "1", R, 12
@@ -196,16 +196,29 @@ start, other, N, R
 
 examples["binary-addition"]["style"] = {};
 
-examples["binary-addition"]["style"]["zh"] = undefined;
+examples["binary-addition"]["style"]["zh"] = `P, white, rgb(220,61,61)
+Q, white, rgb(100,204,54)
+R, white, rgb(230,208,35)
+
+// '在第1个加数区表示这一位已经复制过
+// '在第2个加数区表示这一位已经参与过运算
+// '在结果区表示这一位已经固定
+0', brown
+1', brown`;
 
 examples["binary-addition"]["style"]["en"] = `P, white, rgb(220,61,61)
 Q, white, rgb(100,204,54)
 R, white, rgb(230,208,35)
+
+// ' means this bit has been copied in the first addend area
+// ' means this bit has been processed in the second addend area
+// ' means this bit has been fixed in the result area
 0', brown
 1', brown`;
 
 examples["binary-addition"]["tapes"] = [  // 样例初始纸带
-    ["", "1", "1", "0", "1", "", "1", "1"]  // 13 + 3 = 16
+    ["", "1", "1", "0", "1", "", "1", "1"],  // 13 + 3 = 16
+    ["", "1", "1", "", "1", "0", "0", "0"]  // 3 + 8 = 11
 ];
 
 examples["binary-addition"]["embedding"] = {
