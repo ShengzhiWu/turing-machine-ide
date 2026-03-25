@@ -263,6 +263,11 @@ function buildMenuBar() {
         }
     ];
 
+    // Recursively remove submenu-open from all descendants
+    function closeSubmenusIn(container) {
+        container.querySelectorAll('.submenu-open').forEach(el => el.classList.remove('submenu-open'));
+    }
+
     function buildMenuItems(items, container, isSubmenu = false) {
         items.forEach(entry => {
             if (entry === 'separator') {
@@ -279,6 +284,17 @@ function buildMenuBar() {
                 sub.className = 'menu-submenu';
                 buildMenuItems(entry.submenu, sub, true);
                 di.appendChild(sub);
+
+                // Hover: close sibling submenus, open this one
+                di.addEventListener('mouseenter', () => {
+                    Array.from(container.children).forEach(sibling => {
+                        if (sibling !== di && sibling.classList.contains('submenu-open')) {
+                            closeSubmenusIn(sibling);
+                            sibling.classList.remove('submenu-open');
+                        }
+                    });
+                    di.classList.add('submenu-open');
+                });
             } else {
                 di.className = isSubmenu ? 'menu-submenu-item' : 'menu-dropdown-item';
                 if (isSubmenu) {
@@ -289,6 +305,17 @@ function buildMenuBar() {
                     di.appendChild(check);
                 }
                 di.appendChild(Object.assign(document.createElement('span'), { textContent: entry.label }));
+
+                // Hover: close any open sibling submenus
+                di.addEventListener('mouseenter', () => {
+                    Array.from(container.children).forEach(sibling => {
+                        if (sibling.classList.contains('submenu-open')) {
+                            closeSubmenusIn(sibling);
+                            sibling.classList.remove('submenu-open');
+                        }
+                    });
+                });
+
                 di.addEventListener('mousedown', e => {
                     e.preventDefault(); e.stopPropagation();
                     closeAllMenus();
@@ -331,6 +358,7 @@ function buildMenuBar() {
 
 function closeAllMenus() {
     document.querySelectorAll('.menu-item.active').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.submenu-open').forEach(el => el.classList.remove('submenu-open'));
 }
 
 // ── About dialog ─────────────────────────────────────────────────────
@@ -586,5 +614,3 @@ function switchLanguage(lang) {
     buildMenuBar();       // 重建菜单栏（含新语言的标签和勾选状态）
     applyLanguageToUI();  // 更新其他界面元素
 }
-
-// ── Render Animation ──────────────────────────────────────────────────
