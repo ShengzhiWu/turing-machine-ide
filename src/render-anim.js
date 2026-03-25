@@ -7,6 +7,7 @@ const _renderDefaultParams = {
     moveFrames: 10, pauseFrames: 5, halflife: 10,
     graphicScale: 1.0,
     renderImage: true, renderMusic: false,
+    movementMode: 'tape',  // 'tape' = 纸带动机头固定；'head' = 机头动纸带固定
     musicMode: 'major', musicRoot: 'C4', musicLoNote: 'C3', musicHiNote: 'C6',
     musicSeed: 0, samplesDir: '',
     outputPath: '',
@@ -70,6 +71,9 @@ function menuRenderAnimation() {
             renderMusicModeMinor:    t('renderMusicModeMinor'),
             renderRendering:  t('renderRendering'),
             renderDone:       t('renderDone'),
+            renderSecMovementMode:   t('renderSecMovementMode'),
+            renderMovementModeTape:  t('renderMovementModeTape'),
+            renderMovementModeHead:  t('renderMovementModeHead'),
         },
     });
 }
@@ -601,6 +605,10 @@ function drawTapeOnCanvas(ctx, p, record, headPos, currentState, areaY, areaH, W
     const tape = record[4];
     if (!tape) return;
 
+    // movementMode: 'tape' (default) = head fixed at screen center, tape scrolls
+    //               'head'           = tape origin fixed at screen center, head moves
+    const headMoving = (p.movementMode === 'head');
+
     // ── Measure widest state name to size the read-head box ──────────
     const headFontSize = Math.max(12, Math.round(areaH * 0.11));
     ctx.font = `bold ${headFontSize}px system-ui, sans-serif`;
@@ -620,34 +628,36 @@ function drawTapeOnCanvas(ctx, p, record, headPos, currentState, areaY, areaH, W
     const headBoxH = Math.round(areaH * 0.24);
 
     // ── Vertical layout ───────────────────────────────────────────────
-    // Tape strip: cellH tall, centred at 78% down the tape area
     const cellH        = Math.round(areaH * 0.28);
     const cellFontSize = Math.max(10, Math.round(cellH * 0.52));
     const cellW        = Math.max(Math.round(cellFontSize * 1.9), Math.round(W / 30));
     const tapeCenterY  = areaY + Math.round(areaH * 0.78);
     const tapeTopY     = tapeCenterY - Math.round(cellH / 2);
+    const headBoxY     = tapeTopY - headBoxH;
 
-    // Head box sits above the tape; pentagon tip points down to cell center
-    const headBoxY = tapeTopY - headBoxH;   // head box top
+    // ── Compute screen X positions depending on movement mode ─────────
+    // In 'tape' mode: cell at headPos is centred at W/2 (head box stays centred)
+    // In 'head' mode: tape content (indices 0..tape.length-1) is centred on screen,
+    //                 head box moves left/right with headPos
+    const tapeCenterOffset = headMoving ? W / 2 - (tape.length / 2) * cellW : W / 2 - headPos * cellW;
+    const cellScreenX  = ci => tapeCenterOffset - cellW / 2 + ci * cellW;
+    const headScreenX  = headMoving ? (tapeCenterOffset - cellW / 2 + headPos * cellW + cellW / 2) : W / 2;
 
     // ── Tape background strip ─────────────────────────────────────────
     ctx.fillStyle = 'hsl(0,0%,98%)';
     ctx.fillRect(0, tapeTopY, W, cellH);
 
     // ── Tape cells ────────────────────────────────────────────────────
-    // Cell at index headPos is horizontally centred at W/2
-    // cx is the LEFT edge of cell ci; the center of cell headPos is at W/2
-    const cellScreenX  = ci => W / 2 - cellW / 2 + (ci - headPos) * cellW;
     const visibleCells = Math.ceil(W / cellW) + 4;
-    const startCell    = Math.round(headPos) - Math.floor(visibleCells / 2);
-    const endCell      = startCell + visibleCells;
+    const startCell    = headMoving ? 0 : Math.round(headPos) - Math.floor(visibleCells / 2);
+    const endCell      = headMoving ? tape.length : startCell + visibleCells;
 
     ctx.font = `${cellFontSize}px 'Courier New', monospace`;
     for (let ci = startCell; ci < endCell; ci++) {
         const cx      = cellScreenX(ci);
+        if (cx + cellW < 0 || cx > W) continue;
         const cellVal = (ci >= 0 && ci < tape.length) ? tape[ci] : '';
 
-        // Per-symbol styling from result_table_style
         let bgColor = null, fgColor = '#111';
         if (typeof result_table_style !== 'undefined' && result_table_style) {
             const sty = result_table_style[cellVal];
@@ -671,12 +681,10 @@ function drawTapeOnCanvas(ctx, p, record, headPos, currentState, areaY, areaH, W
     ctx.textAlign    = 'left';
     ctx.textBaseline = 'alphabetic';
 
-    // ── Read-head: pentagon (rectangle body + downward spike at bottom) ──
-    // The rect body sits above the tape. The spike tip points DOWN into the tape strip,
-    // touching the vertical center of the tape cell (tapeCenterY).
-    const tipX      = W / 2;
-    const tipY      = tapeCenterY;                    // spike tip at tape cell center
-    const spikeTopY = headBoxY + headBoxH;            // where the rect bottom / spike base is
+    // ── Read-head: pentagon ───────────────────────────────────────────
+    const tipX      = headScreenX;
+    const tipY      = tapeCenterY;
+    const spikeTopY = headBoxY + headBoxH;
     const pentPointW = Math.max(8, Math.round(headBoxW * 0.30));
     const rectL = tipX - headBoxW / 2;
     const rectR = tipX + headBoxW / 2;
@@ -687,11 +695,8 @@ function drawTapeOnCanvas(ctx, p, record, headPos, currentState, areaY, areaH, W
     ctx.lineTo(rectR - hr, headBoxY);
     ctx.quadraticCurveTo(rectR, headBoxY, rectR, headBoxY + hr);
     ctx.lineTo(rectR, spikeTopY);
-    // Right shoulder of spike
     ctx.lineTo(tipX + pentPointW / 2, spikeTopY);
-    // Spike tip
     ctx.lineTo(tipX, tipY);
-    // Left shoulder of spike
     ctx.lineTo(tipX - pentPointW / 2, spikeTopY);
     ctx.lineTo(rectL, spikeTopY);
     ctx.lineTo(rectL, headBoxY + hr);
@@ -699,7 +704,7 @@ function drawTapeOnCanvas(ctx, p, record, headPos, currentState, areaY, areaH, W
     ctx.closePath();
     ctx.fill();
 
-    // ── State name (white bold text inside head box) ──────────────────
+    // ── State name inside head box ────────────────────────────────────
     const displayState = canonicalStateName(currentState) || '';
     ctx.fillStyle    = 'white';
     ctx.font         = `bold ${headFontSize}px system-ui, sans-serif`;

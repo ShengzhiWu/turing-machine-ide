@@ -68,6 +68,8 @@ const MENU_I18N = {
         renderMusicModeMinor:    '小调（自然）',
         renderRendering:         '渲染中…',
         renderDone:              '渲染完成',
+        renderMovementModeTape:  '机头固定，纸带移动',
+        renderMovementModeHead:  '纸带固定，机头移动',
         // ── 新增 ──
         detailedOutput:          '仅记录纸带有变化的步',
         minimalMode:             '极简模式',
@@ -143,6 +145,8 @@ const MENU_I18N = {
         renderMusicModeMinor:    'Minor (natural)',
         renderRendering:         'Rendering…',
         renderDone:              'Done',
+        renderMovementModeTape:  'Head fixed, tape moves',
+        renderMovementModeHead:  'Tape fixed, head moves',
         // ── 新增 ──
         detailedOutput:          'Record only steps where tape changes',
         minimalMode:             'Minimal mode',

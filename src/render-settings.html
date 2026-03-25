@@ -97,6 +97,18 @@
             <label id="lbl-graphic-scale">Graphic scale</label>
             <input id="graphic-scale" type="number" value="1.0" min="0.1" max="10" step="0.1">
         </div>
+        <div class="row" style="margin-top:6px;gap:40px;">
+            <label style="display:flex;align-items:center;gap:6px;width:auto;cursor:pointer;">
+                <input type="radio" name="movement-mode" id="movement-mode-tape" value="tape" checked
+                       style="width:14px;height:14px;cursor:pointer;accent-color:hsl(210,60%,55%);">
+                <span id="lbl-movement-mode-tape">Tape moves, head fixed</span>
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;width:auto;cursor:pointer;">
+                <input type="radio" name="movement-mode" id="movement-mode-head" value="head"
+                       style="width:14px;height:14px;cursor:pointer;accent-color:hsl(210,60%,55%);">
+                <span id="lbl-movement-mode-head">Head moves, tape fixed</span>
+            </label>
+        </div>
     </div>
 
     <div class="section-title" id="sec-music">Music</div>
@@ -178,6 +190,8 @@ ipcRenderer.on('render-settings-init', (e, data) => {
     setText('lbl-halflife',      'lblHalflife',     'Highlight half-life (frames)');
     setText('lbl-render-image',  'lblRenderImage',  'Render image frames');
     setText('lbl-graphic-scale', 'lblGraphicScale', 'Graphic scale');
+    setText('lbl-movement-mode-tape',  'renderMovementModeTape',  'Tape moves, head fixed');
+    setText('lbl-movement-mode-head',  'renderMovementModeHead',  'Head moves, tape fixed');
     setText('lbl-render-music',  'lblRenderMusic',  'Export audio');
     setText('lbl-music-mode',    'lblMusicMode',    'Scale');
     setText('lbl-music-root',    'lblMusicRoot',    'Root note');
@@ -207,6 +221,10 @@ ipcRenderer.on('render-settings-init', (e, data) => {
     set('pause-frames',  p.pauseFrames);
     set('halflife',      p.halflife);
     set('graphic-scale', p.graphicScale);
+    if (p.movementMode) {
+        const modeEl = document.querySelector(`input[name="movement-mode"][value="${p.movementMode}"]`);
+        if (modeEl) modeEl.checked = true;
+    }
     set('music-mode',    p.musicMode);
     set('music-root',    p.musicRoot);
     set('music-lo',      p.musicLoNote);
@@ -243,6 +261,7 @@ function getParams() {
         pauseFrames:  Math.max(0,   pauseFrames),  // pauseFrames 可以为 0
         halflife:     Math.max(1,   parseInt(document.getElementById('halflife').value)       || 10),
         graphicScale: Math.max(0.1, parseFloat(document.getElementById('graphic-scale').value) || 1.0),
+        movementMode: document.querySelector('input[name="movement-mode"]:checked')?.value || 'tape',
         renderImage:  document.getElementById('render-image').checked,
         renderMusic:  document.getElementById('render-music').checked,
         musicMode:    document.getElementById('music-mode').value,
@@ -257,7 +276,7 @@ function getParams() {
 
 ['width','height','fps','move-frames','pause-frames','halflife','graphic-scale',
  'render-image','render-music','music-mode','music-root','music-lo','music-hi',
- 'music-seed','music-samples'].forEach(id => {
+ 'music-seed','music-samples','movement-mode-tape','movement-mode-head'].forEach(id => {
     const el = document.getElementById(id);
     el.addEventListener('input',  () => ipcRenderer.send('render-params-changed', getParams()));
     el.addEventListener('change', () => ipcRenderer.send('render-params-changed', getParams()));
