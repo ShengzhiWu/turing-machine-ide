@@ -31,7 +31,6 @@ function menuRenderAnimation() {
         params: _lastRenderParams,
         totalFrames,
         strings: {
-            title:            t('renderDialogTitle'),
             secSize:          t('renderSecSize'),
             secTiming:        t('renderSecTiming'),
             secStyle:         t('renderSecStyle'),
