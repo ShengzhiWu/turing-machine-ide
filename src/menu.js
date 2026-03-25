@@ -285,6 +285,9 @@ function buildMenuBar() {
                 buildMenuItems(entry.submenu, sub, true);
                 di.appendChild(sub);
 
+                // Clicking a submenu trigger should not bubble up to .menu-item
+                di.addEventListener('mousedown', e => { e.preventDefault(); e.stopPropagation(); });
+
                 // Hover: close sibling submenus, open this one
                 di.addEventListener('mouseenter', () => {
                     Array.from(container.children).forEach(sibling => {
