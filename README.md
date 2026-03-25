@@ -65,7 +65,6 @@ npm run build
 
 ## TODO
 
-- debug: 子菜单显示纵向位置不正确
 - debug: 缩小时标签会掉
 - debug: 如果把一个符号改成了相同的符号，视为没有修改纸带
 - debug: 保存工程时动画参数
