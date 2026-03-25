@@ -607,6 +607,21 @@ function drawTapeOnCanvas(ctx, p, record, headPos, currentState, areaY, areaH, W
     //               'head'           = tape origin fixed at screen center, head moves
     const headMoving = (p.movementMode === 'head');
 
+    // ── Vertical layout & shrink factor ──────────────────────────────
+    const cellH0        = Math.round(areaH * 0.28);
+    const cellFontSize0 = Math.max(10, Math.round(cellH0 * 0.52));
+    const cellW0        = Math.max(Math.round(cellFontSize0 * 1.9), Math.round(W / 30));
+
+    // In head-moving mode, shrink everything uniformly if the tape's meaningful
+    // content is wider than the canvas. Never upscale (shrink ≤ 1).
+    const shrink = (headMoving && tape.length > 0)
+        ? Math.min(1, W / (tape.length * cellW0))
+        : 1;
+
+    const cellW        = cellW0        * shrink;
+    const cellH        = cellH0        * shrink;
+    const cellFontSize = Math.max(6, cellFontSize0 * shrink);
+
     // ── Measure widest state name to size the read-head box ──────────
     const headFontSize = Math.max(12, Math.round(areaH * 0.11));
     ctx.font = `bold ${headFontSize}px system-ui, sans-serif`;
@@ -622,33 +637,37 @@ function drawTapeOnCanvas(ctx, p, record, headPos, currentState, areaY, areaH, W
         if (w > maxStateNameW) maxStateNameW = w;
     }
     const headPadX = headFontSize * 0.7;
-    const headBoxW = Math.max(headFontSize * 2.2, maxStateNameW + headPadX * 2);
-    const headBoxH = Math.round(areaH * 0.24);
-
-    // ── Vertical layout ───────────────────────────────────────────────
-    const cellH        = Math.round(areaH * 0.28);
-    const cellFontSize = Math.max(10, Math.round(cellH * 0.52));
-    const cellW        = Math.max(Math.round(cellFontSize * 1.9), Math.round(W / 30));
+    const headBoxW = Math.max(headFontSize * 2.2, maxStateNameW + headPadX * 2) * shrink;
+    const headBoxH = Math.round(areaH * 0.24) * shrink;
+    const headFontSizeScaled = headFontSize * shrink;
     const tapeCenterY  = areaY + Math.round(areaH * 0.78);
     const tapeTopY     = tapeCenterY - Math.round(cellH / 2);
     const headBoxY     = tapeTopY - headBoxH;
 
     // ── Compute screen X positions depending on movement mode ─────────
     // In 'tape' mode: cell at headPos is centred at W/2 (head box stays centred)
-    // In 'head' mode: tape content (indices 0..tape.length-1) is centred on screen,
-    //                 head box moves left/right with headPos
-    const tapeCenterOffset = headMoving ? W / 2 - (tape.length / 2) * cellW : W / 2 - headPos * cellW;
-    const cellScreenX  = ci => tapeCenterOffset - cellW / 2 + ci * cellW;
-    const headScreenX  = headMoving ? (tapeCenterOffset - cellW / 2 + headPos * cellW + cellW / 2) : W / 2;
+    //   cellScreenX(ci) = W/2 - headPos*cellW - cellW/2 + ci*cellW
+    //   → cellScreenX(headPos) = W/2 - cellW/2  (left edge), centre = W/2 ✓
+    // In 'head' mode: tape[0..length-1] centred on screen, head moves
+    //   left edge of ci=0: W/2 - tape.length/2*cellW
+    //   → total tape width = tape.length*cellW, centred at W/2 ✓
+    const tapeCenterOffset = headMoving
+        ? W / 2 - (tape.length / 2) * cellW      // left edge of cell 0
+        : W / 2 - headPos * cellW - cellW / 2;   // left edge of cell headPos → centre W/2
+    const cellScreenX = ci => tapeCenterOffset + ci * cellW;
+    const headScreenX = headMoving
+        ? tapeCenterOffset + headPos * cellW + cellW / 2
+        : W / 2;
 
     // ── Tape background strip ─────────────────────────────────────────
     ctx.fillStyle = 'hsl(0,0%,98%)';
     ctx.fillRect(0, tapeTopY, W, cellH);
 
     // ── Tape cells ────────────────────────────────────────────────────
-    const visibleCells = Math.ceil(W / cellW) + 4;
-    const startCell    = headMoving ? 0 : Math.round(headPos) - Math.floor(visibleCells / 2);
-    const endCell      = headMoving ? tape.length : startCell + visibleCells;
+    // Always render the full visible range so cells outside the meaningful
+    // content still show grid lines instead of a blank strip.
+    const startCell = Math.floor(-tapeCenterOffset / cellW) - 1;
+    const endCell   = Math.ceil((W - tapeCenterOffset) / cellW) + 1;
 
     ctx.font = `${cellFontSize}px 'Courier New', monospace`;
     for (let ci = startCell; ci < endCell; ci++) {
@@ -671,10 +690,12 @@ function drawTapeOnCanvas(ctx, p, record, headPos, currentState, areaY, areaH, W
         ctx.strokeStyle = 'hsl(0,0%,60%)';
         ctx.lineWidth   = 1;
         ctx.strokeRect(cx + 0.5, tapeTopY + 0.5, cellW - 1, cellH - 1);
-        ctx.fillStyle    = fgColor;
-        ctx.textAlign    = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(cellVal, cx + cellW / 2, tapeCenterY);
+        if (cellVal !== '') {
+            ctx.fillStyle    = fgColor;
+            ctx.textAlign    = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(cellVal, cx + cellW / 2, tapeCenterY);
+        }
     }
     ctx.textAlign    = 'left';
     ctx.textBaseline = 'alphabetic';
@@ -683,10 +704,10 @@ function drawTapeOnCanvas(ctx, p, record, headPos, currentState, areaY, areaH, W
     const tipX      = headScreenX;
     const tipY      = tapeCenterY;
     const spikeTopY = headBoxY + headBoxH;
-    const pentPointW = Math.max(8, Math.round(headBoxW * 0.30));
+    const pentPointW = Math.max(8 * shrink, Math.round(headBoxW * 0.30));
     const rectL = tipX - headBoxW / 2;
     const rectR = tipX + headBoxW / 2;
-    const hr = Math.max(3, Math.round(headBoxH * 0.18));
+    const hr = Math.max(3 * shrink, Math.round(headBoxH * 0.18));
     ctx.fillStyle = 'hsl(0,0%,22%)';
     ctx.beginPath();
     ctx.moveTo(rectL + hr, headBoxY);
@@ -705,7 +726,7 @@ function drawTapeOnCanvas(ctx, p, record, headPos, currentState, areaY, areaH, W
     // ── State name inside head box ────────────────────────────────────
     const displayState = canonicalStateName(currentState) || '';
     ctx.fillStyle    = 'white';
-    ctx.font         = `bold ${headFontSize}px system-ui, sans-serif`;
+    ctx.font         = `bold ${headFontSizeScaled}px system-ui, sans-serif`;
     ctx.textAlign    = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(displayState, tipX, headBoxY + headBoxH / 2);
