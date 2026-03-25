@@ -51,7 +51,6 @@
         #progress-bar-wrap { flex:1; height:8px; background:hsl(0,0%,28%); border-radius:4px; overflow:hidden; }
         #progress-bar { height:100%; width:0%; background:hsl(210,60%,55%); border-radius:4px; transition:width 0.1s; }
         #frame-counter { font-size:12px; color:rgba(255,255,255,0.6); white-space:nowrap; min-width:70px; text-align:right; }
-        #bottom-row { display:flex; justify-content:flex-end; margin-top:10px; }
         .subsection-disabled { opacity:0.38; pointer-events:none; }
         .section-sep { border: none; border-top: 1px solid hsl(0,0%,28%); margin: 12px 0 0 0; }
     </style>
@@ -166,9 +165,6 @@
         <div id="progress-bar-wrap"><div id="progress-bar"></div></div>
         <span id="frame-counter">0 / 0</span>
     </div>
-    <div id="bottom-row">
-        <button class="btn" id="close-btn">Close</button>
-    </div>
 
 <script>
 const { ipcRenderer } = require('electron');
@@ -203,7 +199,6 @@ ipcRenderer.on('render-settings-init', (e, data) => {
     setText('lbl-music-samples', 'lblMusicSamples', 'Piano samples folder');
     setText('music-preview-btn', 'btnMusicPreview', '▶ Preview');
     setText('start-btn',         'btnStart',        'Render');
-    setText('close-btn',         'btnClose',        'Close');
     document.getElementById('output-path').placeholder   = s.outputPlaceholder       || '';
     document.getElementById('music-samples').placeholder = s.musicSamplesPlaceholder || '(leave blank to use synth)';
     document.getElementById('browse-btn').textContent    = s.btnBrowse || '…';
@@ -341,13 +336,8 @@ document.getElementById('start-btn').addEventListener('click', () => {
     ipcRenderer.send('render-start', params);
 });
 
-document.getElementById('close-btn').addEventListener('click', () => {
-    ipcRenderer.send('render-settings-close');
-});
-
 ipcRenderer.on('render-ui-lock', (e, locked) => {
     document.querySelectorAll('input, button, select').forEach(el => el.disabled = locked);
-    document.getElementById('close-btn').disabled = locked;
     document.getElementById('start-btn').disabled = locked;
 });
 </script>

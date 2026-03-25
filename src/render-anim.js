@@ -54,7 +54,6 @@ function menuRenderAnimation() {
             lblMusicSamples:  t('renderLabelMusicSamples'),
             btnMusicPreview:  t('renderBtnMusicPreview'),
             btnStart:         t('renderStart'),
-            btnClose:         t('renderClose'),
             btnBrowse:        t('renderBrowse'),
             outputPlaceholder:       t('renderOutputPlaceholder'),
             browseTitle:             t('renderBrowseTitle'),
