@@ -243,7 +243,17 @@ ipcRenderer.on('render-total-frames', (e, n) => updateTotalFrames(n));
 
 function updateTotalFrames(n) {
     const prefix = _s.lblTotalFrames || 'Total frames: ';
-    document.getElementById('lbl-total-frames').textContent = n > 0 ? prefix + n : '';
+    if (n <= 0) { document.getElementById('lbl-total-frames').textContent = ''; return; }
+    const fps = Math.max(1, parseInt(document.getElementById('fps').value) || 30);
+    const totalSec = Math.round(n / fps);
+    const h = Math.floor(totalSec / 3600);
+    const m = Math.floor((totalSec % 3600) / 60);
+    const s = totalSec % 60;
+    let dur = '';
+    if (h > 0) dur += h + (_s.durationHour   || 'h') + ' ';
+    if (h > 0 || m > 0) dur += m + (_s.durationMinute || 'm') + ' ';
+    dur += s + (_s.durationSecond || 's');
+    document.getElementById('lbl-total-frames').textContent = prefix + n + '\u2003\u2003' + (_s.lblTotalDuration || 'Duration: ') + dur.trim();
 }
 
 function getParams() {

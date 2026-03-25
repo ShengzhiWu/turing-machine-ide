@@ -43,6 +43,7 @@ function menuRenderAnimation() {
             lblPauseFrames:   t('renderLabelPauseFrames'),
             lblHalflife:      t('renderLabelHalflife'),
             lblTotalFrames:   t('renderLabelTotalFrames'),
+            lblTotalDuration: t('renderLabelTotalDuration'),
             lblRenderImage:   t('renderLabelRenderImage'),
             lblGraphicScale:  t('renderLabelGraphicScale'),
             lblRenderMusic:   t('renderLabelRenderMusic'),
@@ -69,9 +70,11 @@ function menuRenderAnimation() {
             renderMusicModeMinor:    t('renderMusicModeMinor'),
             renderRendering:  t('renderRendering'),
             renderDone:       t('renderDone'),
-            renderSecMovementMode:   t('renderSecMovementMode'),
             renderMovementModeTape:  t('renderMovementModeTape'),
             renderMovementModeHead:  t('renderMovementModeHead'),
+            durationHour:     t('renderDurationHour'),
+            durationMinute:   t('renderDurationMinute'),
+            durationSecond:   t('renderDurationSecond'),
         },
     });
 }
