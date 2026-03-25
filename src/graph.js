@@ -223,6 +223,7 @@ function build_graph_dom(graph) {
             el.style.cursor = 'pointer';
             el.addEventListener('mousedown', e => {
                 if (e.button !== 0) return;  // 只响应左键
+                if (typeof closeAllMenus === 'function') closeAllMenus();  // 隐藏菜单
                 e.stopPropagation();
                 e.preventDefault();
 
