@@ -5,9 +5,10 @@ const { ipcMain, dialog, Menu } = electron;
 
 Menu.setApplicationMenu(null);  // 移除 Electron 默认菜单栏，使用应用内自定义菜单
 
-var mainWindow       = null;
-var settingsWindow   = null;  // Render settings child window
-var previewWindow    = null;  // Render preview child window
+var mainWindow          = null;
+var settingsWindow      = null;  // Render settings child window
+var previewWindow       = null;  // Render preview child window
+var currentRenderParams = null;  // Last known render settings (persisted in project file)
 
 // ── Helper: safely send to a window if it still exists ───────────────
 function sendTo(win, channel, ...args) {
@@ -26,6 +27,12 @@ ipcMain.handle('open-render-settings', async (event, initData) => {
     if (settingsWindow && !settingsWindow.isDestroyed()) {
         settingsWindow.focus();
         return;
+    }
+    // Merge any cached render params so the window reflects the last saved state
+    if (currentRenderParams) {
+        initData = Object.assign({}, initData, {
+            params: Object.assign({}, initData && initData.params, currentRenderParams)
+        });
     }
     settingsWindow = new BrowserWindow({
         width: 540,
@@ -54,9 +61,23 @@ ipcMain.on('render-settings-close', () => {
     if (settingsWindow && !settingsWindow.isDestroyed()) settingsWindow.close();
 });
 
-// ── Params changed → relay to main window ────────────────────────────
+// ── Params changed → relay to main window & update cache ─────────────
 ipcMain.on('render-params-changed', (event, params) => {
+    currentRenderParams = params;
     sendTo(mainWindow, 'render-params-changed', params);
+});
+
+// ── Get render params (called by file.js when saving a project) ───────
+ipcMain.handle('get-render-params', () => currentRenderParams);
+
+// ── Set render params (called by file.js when opening a project) ──────
+ipcMain.handle('set-render-params', (event, params) => {
+    currentRenderParams = params;
+    // If the settings window is already open, push the new values into it
+    // by re-sending render-settings-init with the updated params merged in.
+    if (settingsWindow && !settingsWindow.isDestroyed()) {
+        sendTo(settingsWindow, 'render-settings-init', { params });
+    }
 });
 
 // ── Start render → relay to main window ──────────────────────────────
@@ -150,7 +171,7 @@ app.on('ready', () => {
         title: 'Turing Machine IDE',
         webPreferences: { nodeIntegration: true, contextIsolation: false }
     });
-    // mainWindow.webContents.openDevTools();  // 打开开发人员工具
+    mainWindow.webContents.openDevTools();  // 打开开发人员工具
     mainWindow.loadFile('index.html');
     mainWindow.on('closed', () => { mainWindow = null; });
 });

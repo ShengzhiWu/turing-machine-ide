@@ -33,8 +33,14 @@ function getTapeInitial() {
 
 // ── JSON builders ────────────────────────────────────────────────────
 
-function buildProjectJSON() {
-    return {
+/**
+ * 构建工程 JSON 对象。
+ * 若 electronAPI.getRenderParams 可用，会异步读取渲染设置并合并进去；
+ * 否则仍正常返回（不含渲染设置字段）。
+ * 返回值：Promise<object>
+ */
+async function buildProjectJSON() {
+    const obj = {
         version: '1.0',
         code:      (typeof code_editor_value !== 'undefined') ? code_editor_value : '',
         style:     (typeof style_editor      !== 'undefined') ? style_editor.value : '',
@@ -48,6 +54,20 @@ function buildProjectJSON() {
         "pixel-scale-x": parseInt(document.getElementById('pixel-scale-x-input').value),
         "pixel-scale-y": parseInt(document.getElementById('pixel-scale-y-input').value)
     };
+
+    // ── 读取渲染设置（Electron 环境）────────────────────────────────
+    try {
+        const { ipcRenderer } = require('electron');
+        const renderParams = await ipcRenderer.invoke('get-render-params');
+        if (renderParams && typeof renderParams === 'object') {
+            obj["render-settings"] = renderParams;
+        }
+    } catch (e) {
+        // 非 Electron 环境或读取失败时静默跳过
+        console.warn('[file.js] get-render-params failed, skipping render settings:', e);
+    }
+
+    return obj;
 }
 
 function buildEmbeddingJSON() {
@@ -109,8 +129,9 @@ function openJSONFile(callback) {
 
 // ── Menu actions: save / open / load example ─────────────────────────
 
-function saveProject() {
-    saveJSONFile(buildProjectJSON(), 'project.json');
+async function saveProject() {
+    const obj = await buildProjectJSON();
+    saveJSONFile(obj, 'project.json');
 }
 
 function menuSaveEmbedding() {
@@ -118,7 +139,7 @@ function menuSaveEmbedding() {
 }
 
 function openProject() {
-    openJSONFile(obj => {
+    openJSONFile(async obj => {
         if (!obj || !obj.version) { alert('Invalid project file.'); return; }
 
         // 恢复代码
@@ -157,6 +178,18 @@ function openProject() {
         if (typeof obj["minimal-mode"] === 'boolean') document.getElementById('minimal-mode-checkbox').checked = obj["minimal-mode"];
         if (typeof obj["pixel-scale-x"] === 'number') document.getElementById('pixel-scale-x-input').value = obj["pixel-scale-x"];
         if (typeof obj["pixel-scale-y"] === 'number') document.getElementById('pixel-scale-y-input').value = obj["pixel-scale-y"];
+
+        // ── 恢复渲染设置（旧文件中无此字段时静默跳过）──────────────────
+        if (obj["render-settings"] !== undefined &&
+            obj["render-settings"] !== null &&
+            typeof obj["render-settings"] === 'object') {
+            try {
+                const { ipcRenderer } = require('electron');
+                await ipcRenderer.invoke('set-render-params', obj["render-settings"]);
+            } catch (e) {
+                console.warn('[file.js] set-render-params failed, skipping render settings restore:', e);
+            }
+        }
 
         // 重新运行
         run_program();
