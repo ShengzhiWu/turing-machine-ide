@@ -124,6 +124,11 @@ document.getElementById('result-filter-select').addEventListener('change', funct
     run_program();
 });
 
+// 最大步数输入框：失去焦点或按回车时重新运行
+max_steps_input.addEventListener('change', function() {
+    run_program();
+});
+
 // 复选框：极简模式
 document.getElementById('minimal-mode-checkbox').addEventListener('change', function() {
     refreshDisplayMode();
