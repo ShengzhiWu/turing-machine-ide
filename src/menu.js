@@ -670,6 +670,7 @@ function applyLanguageToUI() {
         const el = document.getElementById(id);
         if (el) el.textContent = t(key);
     }
+    const minimalModeLabel = document.getElementById('minimal-mode-label');
     if (minimalModeLabel) minimalModeLabel.textContent = t('minimalMode');
 
     const pixelScaleXLabel = document.getElementById('pixel-scale-x-label');
