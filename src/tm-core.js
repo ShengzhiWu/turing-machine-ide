@@ -133,7 +133,7 @@ function run_turing_machine(code, tape, max_steps, detailed_output, start_positi
             state = "error";
             break;
         }
-        if (action[0] != N) {
+        if (action[0] != N && action[0] != tape[position]) {
             tape[position] = action[0];
             need_record = true;
         }
