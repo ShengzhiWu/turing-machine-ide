@@ -1,7 +1,7 @@
 // ── Graph: vector utils, graph construction, DOM rendering, physics ─────────
 
 var global_size_factor = 0.5;
-var global_force_factor = 4.;
+var global_force_factor = 4;
 var connection_default_length = 0.6 * global_size_factor;  // 0.15
 var self_connection_default_length = 0.4 * global_size_factor;  // 0.15
 var vertex_prefered_distance = 1.4 * global_size_factor;  //0.8
@@ -79,25 +79,33 @@ function construct_directed_graph_with_code(code, seed=0) {  // 根据图灵机�
 
                 // Calaulate offset for displaying multiple edges.
                 var offset = 0.5;
+                var has_same_direction_edge = false;
                 vertex[3].forEach(connection => {
                     if(connection[0] == j)  // Found multiple edge of same direction
                     {
                         offset = Math.min(offset, connection[3]);
                         connection[3] += 0.5;
+                        has_same_direction_edge = true;
                     }
                 });
                 const nextStateVertex = graph[j];
                 if(nextStateVertex[0].startsWith('self-connection'))
                     return;
+                var has_opposite_direction_edge = false;
                 nextStateVertex[3].forEach(connection => {
                     if(connection[0] == i) {  // Found multiple edge of opposite direction
                         offset = Math.min(offset, -connection[3]);
                         connection[3] -= 0.5;
+                        has_opposite_direction_edge = true;
                     }
                 });
                 offset -= 0.5;
 
-                vertex[3].push([j, edge_name, connection_default_length, offset]);
+                // 重边中只有第一条参与力布局，避免多弹簧叠加导致抖动
+                const is_first_edge = !has_same_direction_edge && !has_opposite_direction_edge;
+                const new_connection = [j, edge_name, connection_default_length, offset];
+                new_connection._physics = is_first_edge;
+                vertex[3].push(new_connection);
             }
             
         }
@@ -479,6 +487,7 @@ function graph_evolve() {
         if(node1[0].startsWith('self-connection'))
             return;
         node1[3].forEach(connection => {
+            if(connection._physics === false) return;  // 重边只让第一条参与力布局
             const idx2 = connection[0];
             const node2 = graph[idx2];
             const prefered_length = connection[2];
