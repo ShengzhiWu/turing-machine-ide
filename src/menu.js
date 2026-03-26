@@ -294,6 +294,12 @@ function applyLanguageToUI() {
     const saveImageLabel = document.getElementById('save-image-label');
     if (saveImageLabel) saveImageLabel.textContent = t('saveAsImage');
 
+    const graphHintPan = document.getElementById('graph-hint-pan');
+    if (graphHintPan) graphHintPan.textContent = t('mouseHintPan');
+
+    const graphHintRotate = document.getElementById('graph-hint-rotate');
+    if (graphHintRotate) graphHintRotate.textContent = t('mouseHintRotate');
+
     if (typeof code_editor !== 'undefined') code_editor.lang = language;
     if (typeof style_editor !== 'undefined') style_editor.lang = language;
 }

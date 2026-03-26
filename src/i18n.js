@@ -95,6 +95,8 @@ const MENU_I18N = {
         pixelScaleY:             '纵向缩放',
         saveTableData:           '保存表格数据',
         saveAsImage:             '保存为图片',
+        mouseHintPan:            '中键拖动：平移画布',
+        mouseHintRotate:         'Alt + 左键拖动：旋转画布',
     },
     en: {
         file:           'File',
@@ -190,6 +192,8 @@ const MENU_I18N = {
         pixelScaleY:             'V scale',
         saveTableData:           'Save table data',
         saveAsImage:             'Save as image',
+        mouseHintPan:            'Middle-click drag: move',
+        mouseHintRotate:         'Alt + left drag: rotate',
     }
 };
 
