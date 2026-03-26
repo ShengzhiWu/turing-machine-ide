@@ -73,7 +73,18 @@ const MENU_I18N = {
         renderMovementModeTape:  '机头固定，纸带移动',
         renderMovementModeHead:  '纸带固定，机头移动',
         // ── 新增 ──
-        detailedOutput:          '仅记录纸带有变化的步',
+        resultFilterLabel:       '结果过滤器',
+        resultFilterAll:         '所有',
+        resultFilterOnlyChanges: '仅纸带变化的步',
+        resultFilterEvery100:    '每 10² 步',
+        resultFilterEvery1000:   '每 10³ 步',
+        resultFilterEvery10000:  '每 10⁴ 步',
+        resultFilterEvery100000: '每 10⁵ 步',
+        resultFilterEvery1000000:'每 10⁶ 步',
+        resultFilterEvery10000000:'每 10⁷ 步',
+        resultFilterEvery100000000:'每 10⁸ 步',
+        resultFilterEvery1000000000:'每 10⁹ 步',
+        resultFilterHeadTail:    '仅开头和结尾',
         minimalMode:             '极简模式',
         pixelScaleX:             '横向缩放',
         pixelScaleY:             '纵向缩放',
@@ -152,7 +163,18 @@ const MENU_I18N = {
         renderMovementModeTape:  'Head fixed, tape moves',
         renderMovementModeHead:  'Tape fixed, head moves',
         // ── 新增 ──
-        detailedOutput:          'Record only steps where tape changes',
+        resultFilterLabel:       'Result filter',
+        resultFilterAll:         'All',
+        resultFilterOnlyChanges: 'Tape-change steps only',
+        resultFilterEvery100:    'Every 10² steps',
+        resultFilterEvery1000:   'Every 10³ steps',
+        resultFilterEvery10000:  'Every 10⁴ steps',
+        resultFilterEvery100000: 'Every 10⁵ steps',
+        resultFilterEvery1000000:'Every 10⁶ steps',
+        resultFilterEvery10000000:'Every 10⁷ steps',
+        resultFilterEvery100000000:'Every 10⁸ steps',
+        resultFilterEvery1000000000:'Every 10⁹ steps',
+        resultFilterHeadTail:    'First and last only',
         minimalMode:             'Minimal mode',
         pixelScaleX:             'H scale',
         pixelScaleY:             'V scale',
@@ -422,7 +444,7 @@ function buildProjectJSON() {
         tape:      getTapeInitial(),
         "start-position": start_position,  // 机头起始位置
         "max-steps": parseInt(max_steps_input.value),  // 最大步数
-        "output-filter": document.getElementById('only-changes-checkbox').checked ? 'only-changes' : 'all',  // 结果记录过滤器
+        "output-filter": document.getElementById('result-filter-select').value,  // 结果记录过滤器
         "minimal-mode": document.getElementById('minimal-mode-checkbox').checked,  // 极简模式
         "pixel-scale-x": parseInt(document.getElementById('pixel-scale-x-input').value), // 横向缩放
         "pixel-scale-y": parseInt(document.getElementById('pixel-scale-y-input').value) // 纵向缩放
@@ -521,7 +543,8 @@ function menuOpenProject() {
         if (typeof obj["max-steps"] === 'number') max_steps_input.value = obj["max-steps"];
         if (obj["output-filter"] !== undefined) {  // 文件中包含过滤器信息
             output_filter = obj["output-filter"];
-            document.getElementById('only-changes-checkbox').checked = output_filter === 'only-changes';  // 根据过滤器更新界面复选框状态
+            const sel = document.getElementById('result-filter-select');
+            if (sel) sel.value = output_filter;  // 根据过滤器更新下拉列表选中项
         }
         if (typeof obj["minimal-mode"] === 'boolean') document.getElementById('minimal-mode-checkbox').checked = obj["minimal-mode"];
         if (typeof obj["pixel-scale-x"] === 'number') document.getElementById('pixel-scale-x-input').value = obj["pixel-scale-x"];
@@ -584,8 +607,27 @@ function applyLanguageToUI() {
     if (maxStepsLabel) maxStepsLabel.textContent = t('maxSteps');
 
     // ── 新增控件的文案 ──
-    const detailedOutputLabel = document.getElementById('detailed-output-label');
-    if (detailedOutputLabel) detailedOutputLabel.textContent = t('detailedOutput');
+    const resultFilterLabel = document.getElementById('result-filter-label');
+    if (resultFilterLabel) resultFilterLabel.textContent = t('resultFilterLabel');
+
+    // 更新下拉列表各选项文案
+    const filterOptMap = {
+        'result-filter-opt-all':          'resultFilterAll',
+        'result-filter-opt-only-changes': 'resultFilterOnlyChanges',
+        'result-filter-opt-every-100':    'resultFilterEvery100',
+        'result-filter-opt-every-1000':   'resultFilterEvery1000',
+        'result-filter-opt-every-10000':  'resultFilterEvery10000',
+        'result-filter-opt-every-100000': 'resultFilterEvery100000',
+        'result-filter-opt-every-1000000':'resultFilterEvery1000000',
+        'result-filter-opt-every-10000000':'resultFilterEvery10000000',
+        'result-filter-opt-every-100000000':'resultFilterEvery100000000',
+        'result-filter-opt-every-1000000000':'resultFilterEvery1000000000',
+        'result-filter-opt-head-tail':    'resultFilterHeadTail',
+    };
+    for (const [id, key] of Object.entries(filterOptMap)) {
+        const el = document.getElementById(id);
+        if (el) el.textContent = t(key);
+    }
 
     const minimalModeLabel = document.getElementById('minimal-mode-label');
     if (minimalModeLabel) minimalModeLabel.textContent = t('minimalMode');

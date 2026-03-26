@@ -96,6 +96,18 @@ function parseStyleCode(code) {  // 解析风格代码
     return result;
 }
 
+// history_filter 取值：
+//   "all"              — 记录每一步
+//   "only-changes"     — 仅记录纸带有变化的步（默认）
+//   "every-100"        — 每 10² 步记录一次
+//   "every-1000"       — 每 10³ 步记录一次
+//   "every-10000"      — 每 10⁴ 步记录一次
+//   "every-100000"     — 每 10⁵ 步记录一次
+//   "every-1000000"    — 每 10⁶ 步记录一次
+//   "every-10000000"   — 每 10⁷ 步记录一次
+//   "every-100000000"  — 每 10⁸ 步记录一次
+//   "every-1000000000" — 每 10⁹ 步记录一次
+//   "head-tail"        — 仅记录开头和结尾
 function run_turing_machine(code, tape, max_steps, history_filter, start_position) {  // 运行图灵机
     var step = 0;
     var position = start_position || 0;
@@ -106,8 +118,19 @@ function run_turing_machine(code, tape, max_steps, history_filter, start_positio
         tape.push('');  // 在末尾加一个空格
 
     tape = [...tape];  // Clone the tape, to avoid changing the original tape.
+
+    // 预计算过滤器参数，避免在热循环中重复判断字符串
+    const filterAll         = history_filter === "all";
+    const filterOnlyChanges = history_filter === "only-changes" || !history_filter;
+    const filterHeadTail    = history_filter === "head-tail";
+    // 周期过滤器：提取步长，0 表示非周期过滤器
+    let filterInterval = 0;
+    if (!filterAll && !filterOnlyChanges && !filterHeadTail) {
+        const m = (history_filter || '').match(/^every-(\d+)$/);
+        if (m) filterInterval = parseInt(m[1]);
+    }
+
     while(state != "end" && state != "error") {
-        var need_record = history_filter === "all";
         step ++;
         if(step > max_steps)
             break;
@@ -133,12 +156,28 @@ function run_turing_machine(code, tape, max_steps, history_filter, start_positio
             state = "error";
             break;
         }
+
+        // 判断纸带是否有变化（供 only-changes 和 all 模式使用）
+        var tapeChanged = false;
         if (action[0] != N && action[0] != tape[position]) {
             tape[position] = action[0];
-            need_record = true;
+            tapeChanged = true;
         }
 
-        if(need_record) {
+        // 根据过滤器决定是否记录本步
+        var need_record;
+        if (filterAll) {
+            need_record = true;
+        } else if (filterOnlyChanges) {
+            need_record = tapeChanged;
+        } else if (filterInterval > 0) {
+            need_record = (step % filterInterval === 0);
+        } else {
+            // head-tail：不在循环中记录中间步，结束后补充
+            need_record = false;
+        }
+
+        if (need_record) {
             history.push([step, position, state_0, state, [...tape]]);
         }
 
@@ -159,6 +198,11 @@ function run_turing_machine(code, tape, max_steps, history_filter, start_positio
                 });
             }
         }
+    }
+
+    // head-tail 模式：补充最终状态（若与开头不同）
+    if (filterHeadTail && step > 0) {
+        history.push([step, position, history[history.length - 1][3], state, [...tape]]);
     }
 
     // 将纸带补到每次记录一样长

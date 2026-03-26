@@ -420,11 +420,23 @@
                 <input id="max-steps-input" type="text" value="3000"/>
             </div>
 
-            <!-- 仅记录纸带有变化的步 -->
-            <label>
-                <input type="checkbox" id="only-changes-checkbox" checked>
-                <span id="detailed-output-label">仅记录纸带有变化的步</span>
-            </label>
+            <!-- 结果过滤器 -->
+            <div>
+                <span id="result-filter-label">结果过滤器</span>
+                <select id="result-filter-select">
+                    <option value="all"          id="result-filter-opt-all">所有</option>
+                    <option value="only-changes" id="result-filter-opt-only-changes" selected>仅纸带变化的步</option>
+                    <option value="every-100"       id="result-filter-opt-every-100">每 10² 步</option>
+                    <option value="every-1000"      id="result-filter-opt-every-1000">每 10³ 步</option>
+                    <option value="every-10000"     id="result-filter-opt-every-10000">每 10⁴ 步</option>
+                    <option value="every-100000"    id="result-filter-opt-every-100000">每 10⁵ 步</option>
+                    <option value="every-1000000"   id="result-filter-opt-every-1000000">每 10⁶ 步</option>
+                    <option value="every-10000000"  id="result-filter-opt-every-10000000">每 10⁷ 步</option>
+                    <option value="every-100000000" id="result-filter-opt-every-100000000">每 10⁸ 步</option>
+                    <option value="every-1000000000" id="result-filter-opt-every-1000000000">每 10⁹ 步</option>
+                    <option value="head-tail"    id="result-filter-opt-head-tail">仅开头和结尾</option>
+                </select>
+            </div>
 
             <!-- 极简模式 -->
             <label>
@@ -560,7 +572,7 @@
             max_steps_input.value = examples[example]["recommended-max-steps"];
         var start_position = 0;
         var tape = normalizeTape([...examples[example]['tapes'][0]]);
-        var output_filter = "only-changes";  // 可以是"all", "only-changes"
+        var output_filter = "only-changes";  // 可以是 "all", "only-changes", "every-100", "every-1000", "every-10000", "every-100000", "every-1000000", "head-tail"
         var result = run_turing_machine(code, tape, parseInt(max_steps_input.value), output_filter, start_position);
         tape = result[0][4];
         start_position = result[0][1];

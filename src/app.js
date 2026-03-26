@@ -118,9 +118,9 @@ function run_program() {
 
 // ── 事件监听 ─────────────────────────────────────────────────────────────────
 
-// 复选框：仅记录纸带有变化的步
-document.getElementById('only-changes-checkbox').addEventListener('change', function() {
-    output_filter = this.checked ? "only-changes" : "all";
+// 下拉列表：结果过滤器
+document.getElementById('result-filter-select').addEventListener('change', function() {
+    output_filter = this.value;
     run_program();
 });
 
