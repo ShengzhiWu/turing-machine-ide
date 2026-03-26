@@ -107,7 +107,7 @@ function refresh_graph_embedding() {  // 根据代码重建有向图（这个函
 function run_program() {
     code = parseProgramCode(code_editor_value);  // 解析代码文本
     tape = normalizeTape(tape);  // 确保纸带右侧有适当数量的空格，方便编辑。也去除左侧多余的空格（但会保持机头和纸带的相对位置不变）
-    result = run_turing_machine(code, tape, max_steps_input.value, detailed_output, start_position);
+    result = run_turing_machine(code, tape, max_steps_input.value, output_filter, start_position);
     tape = result[0][4];  // 因为运行过程中使用的部分可能逐渐变长，为了用户正确地编辑纸带，把最终的纸带状态覆盖回 tape 变量
     start_position = result[0][1];
     refresh_history_table(history_table, result);
@@ -119,10 +119,8 @@ function run_program() {
 // ── 事件监听 ─────────────────────────────────────────────────────────────────
 
 // 复选框：仅记录纸带有变化的步
-// checked=true  → detailed_output=false（只记录有变化的步）
-// checked=false → detailed_output=true （记录每一步）
 document.getElementById('only-changes-checkbox').addEventListener('change', function() {
-    detailed_output = !this.checked;
+    output_filter = this.checked ? "only-changes" : "all";
     run_program();
 });
 

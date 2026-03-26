@@ -96,7 +96,7 @@ function parseStyleCode(code) {  // 解析风格代码
     return result;
 }
 
-function run_turing_machine(code, tape, max_steps, detailed_output, start_position) {  // 运行图灵机
+function run_turing_machine(code, tape, max_steps, history_filter, start_position) {  // 运行图灵机
     var step = 0;
     var position = start_position || 0;
     var state = "start";
@@ -107,7 +107,7 @@ function run_turing_machine(code, tape, max_steps, detailed_output, start_positi
 
     tape = [...tape];  // Clone the tape, to avoid changing the original tape.
     while(state != "end" && state != "error") {
-        var need_record = detailed_output;
+        var need_record = history_filter === "all";
         step ++;
         if(step > max_steps)
             break;

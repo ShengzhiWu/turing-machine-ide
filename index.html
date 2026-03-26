@@ -408,27 +408,25 @@
 
     <div id="tape-panel" style="padding-top: 0.5em; flex: 1; overflow: hidden; display: flex; flex-direction: column; gap: 0.5em; background-color: hsl(0, 0%, 90%);">
 
-        <!-- 1. 运行按钮 -->
+        <!-- 运行按钮 -->
         <button id="run-btn" title=" Run Program (F5)" onclick="run_program();" style="color: white;">▶</button>
 
-        <!-- 2 – 4. 参数控件 -->
+        <!-- 参数控件 -->
         <div id="tape-panel-controls">
 
-            <!-- 2. 最大步数 -->
+            <!-- 最大步数 -->
             <div>
                 <span id="max-steps-label">Max steps</span>
                 <input id="max-steps-input" type="text" value="3000"/>
             </div>
 
-            <!-- 3. 仅记录纸带有变化的步
-                 checked = 勾选 → detailed_output = false（只记录有变化的步）
-                 未勾选  →        detailed_output = true （记录每一步）      -->
+            <!-- 仅记录纸带有变化的步 -->
             <label>
                 <input type="checkbox" id="only-changes-checkbox" checked>
                 <span id="detailed-output-label">仅记录纸带有变化的步</span>
             </label>
 
-            <!-- 4. 极简模式 -->
+            <!-- 极简模式 -->
             <label>
                 <input type="checkbox" id="minimal-mode-checkbox">
                 <span id="minimal-mode-label">极简模式</span>
@@ -446,7 +444,7 @@
 
         </div>
 
-        <!-- 5a. 普通表格容器 -->
+        <!-- 普通表格容器 -->
         <div id="table-container" style="flex: 1; overflow: hidden; min-height: 0;">
             <div style="overflow: scroll; height: 100%;">
                 <div style="width: max-content; padding-bottom: 1em; background-color: white;">
@@ -455,7 +453,7 @@
             </div>
         </div>
 
-        <!-- 5b. 极简位图容器
+        <!-- 极简位图容器
              初始 display:none 写在 inline style 里，CSS 里不写，
              JS 显示时设 display='flex'，隐藏时设 display='none'。 -->
         <div id="bitmap-container" style="display: none;">
@@ -558,13 +556,12 @@
         update_graph_view();
 
         // ── 初始化纸带与运行结果 ────────────────────────────────────────
-        // detailed_output=false → 仅记录纸带有变化的步，对应 checkbox 默认勾选
         if (examples[example]["recommended-max-steps"])
             max_steps_input.value = examples[example]["recommended-max-steps"];
         var start_position = 0;
         var tape = normalizeTape([...examples[example]['tapes'][0]]);
-        var detailed_output = false;
-        var result = run_turing_machine(code, tape, parseInt(max_steps_input.value), detailed_output, start_position);
+        var output_filter = "only-changes";  // 可以是"all", "only-changes"
+        var result = run_turing_machine(code, tape, parseInt(max_steps_input.value), output_filter, start_position);
         tape = result[0][4];
         start_position = result[0][1];
     </script>
