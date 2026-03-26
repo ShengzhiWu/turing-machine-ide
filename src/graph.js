@@ -1,12 +1,12 @@
 // ── Graph: vector utils, graph construction, DOM rendering, physics ─────────
 
 var global_size_factor = 0.5;
-var global_force_factor = 2.;
-var connection_default_length = 0.6*global_size_factor;  // 0.15
-var self_connection_default_length = 0.4*global_size_factor;  // 0.15
-var vertex_prefered_distance = 1.4*global_size_factor;  //0.8
-var vertex_repel_strength = 0.01*global_force_factor;  // 0.02
-var connection_length_preserve_strength = 0.01*global_force_factor;  // 0.02
+var global_force_factor = 4.;
+var connection_default_length = 0.6 * global_size_factor;  // 0.15
+var self_connection_default_length = 0.4 * global_size_factor;  // 0.15
+var vertex_prefered_distance = 1.4 * global_size_factor;  //0.8
+var vertex_repel_strength = 0.01 * global_force_factor;  // 0.02
+var connection_length_preserve_strength = 0.01 * global_force_factor;  // 0.02
 
 
 function makeRng(seed) {
@@ -456,6 +456,9 @@ function update_graph_dom(graph) {
 }
 
 function graph_evolve() {
+    // 先将所有力累积到 delta 数组，帧末统一应用，避免帧内即时更新破坏角动量守恒
+    const delta = graph.map(() => [0, 0]);
+
     // Vertices repeling
     for(var i = 0; i < graph.length; i++)
         for(var j = 0; j < i; j++) {
@@ -463,24 +466,30 @@ function graph_evolve() {
             const d = vector_length(v);
             if(d<vertex_prefered_distance) {
                 const force = vector_scale((1-d/vertex_prefered_distance)*vertex_repel_strength/d, v);
-                if(graph[j] !== dragging_node) graph[j][1] = vector_plus(graph[j][1], force);
-                if(graph[i] !== dragging_node) graph[i][1] = vector_subtract(graph[i][1], force);
+                if(graph[j] !== dragging_node) delta[j] = vector_plus(delta[j], force);
+                if(graph[i] !== dragging_node) delta[i] = vector_subtract(delta[i], force);
             }
         }
 
     // Connections length preserving
-    graph.forEach(node1 => {
+    graph.forEach((node1, idx1) => {
         if(node1[0].startsWith('self-connection'))
             return;
         node1[3].forEach(connection => {
-            const node2 = graph[connection[0]];
+            const idx2 = connection[0];
+            const node2 = graph[idx2];
             const prefered_length = connection[2];
             const v = vector_subtract(node2[1], node1[1]);
             const d = vector_length(v);
             const force = vector_scale((1-d/prefered_length)*connection_length_preserve_strength/d, v);
-            if(node2 !== dragging_node) node2[1] = vector_plus(node2[1], force);
-            if(node1 !== dragging_node) node1[1] = vector_subtract(node1[1], force);
+            if(node2 !== dragging_node) delta[idx2] = vector_plus(delta[idx2], force);
+            if(node1 !== dragging_node) delta[idx1] = vector_subtract(delta[idx1], force);
         });
+    });
+
+    // 统一应用位移
+    graph.forEach((node, idx) => {
+        node[1] = vector_plus(node[1], delta[idx]);
     });
 }
 
