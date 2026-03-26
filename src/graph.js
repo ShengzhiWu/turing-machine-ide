@@ -1,7 +1,7 @@
 // ── Graph: vector utils, graph construction, DOM rendering, physics ─────────
 
 var global_size_factor = 0.5;
-var global_force_factor = 4;
+var global_force_factor = 2.5;
 var connection_default_length = 0.6 * global_size_factor;  // 0.15
 var self_connection_default_length = 0.4 * global_size_factor;  // 0.15
 var vertex_prefered_distance = 1.4 * global_size_factor;  //0.8
@@ -124,9 +124,9 @@ var self_connection_angle = 1.;
 var connection_text_offset = 10.;  // (px)
 var self_connection_text_distance_factor = 0.85;
 var vertex_name_text_offset = [8, 15];
-var multiple_edges_gap_angle = 1.2;
-var multiple_edges_shape_param1 = 0.3;
-var multiple_edges_shape_param2 = 50;  // (px)
+var multiple_edges_gap_angle = 1.2;      // 起止点旋转角（控制曲线从节点边缘的散开角度）
+var multiple_edges_shape_param1 = 0.3;   // 控制点切线延伸量 = l * param1
+var multiple_edges_gap = 15;             // (px) 控制点法向偏移量，控制重边显示间距
 
 function vector_plus(u, v) {
     return [u[0] + v[0], u[1] + v[1]]
@@ -425,16 +425,22 @@ function update_graph_dom(graph) {
             } else {
                 if (l > vertex_r*2) {
                     const offset = connection[3];
-                    const l_cramp = Math.min(multiple_edges_shape_param2, l);
-                    const c1 = vector_rotate(c,  multiple_edges_gap_angle*offset*0.5);
-                    const c2 = vector_rotate(c, -multiple_edges_gap_angle*offset*0.5);
+                    // 起止点：旋转角度决定从节点边缘的出发方向（曲线自然散开）
+                    const c1 = vector_rotate(c,  multiple_edges_gap_angle * offset * 0.5);
+                    const c2 = vector_rotate(c, -multiple_edges_gap_angle * offset * 0.5);
                     const p1 = vector_plus(a, c1);
                     const p2 = vector_subtract(b, c2);
-                    const p3 = vector_plus(p1,  vector_scale(multiple_edges_shape_param1*l_cramp/vertex_r, c1));
-                    const p4 = vector_subtract(p2, vector_scale(multiple_edges_shape_param1*l_cramp/vertex_r, c2));
-                    const tl = vector_plus(vector_scale(0.5, vector_plus(p3, p4)), vector_scale(connection_text_offset*Math.sign(offset+0.1), normal));
+                    // 控制点：切线分量（l*param1）保证曲线流畅，叠加法线固定偏移保证间距均匀
+                    const normalOffset = vector_scale(multiple_edges_gap * offset, normal);
+                    const p3 = vector_plus(vector_plus(p1, vector_scale(multiple_edges_shape_param1 * l, v_normalized)), normalOffset);
+                    const p4 = vector_plus(vector_subtract(p2, vector_scale(multiple_edges_shape_param1 * l, v_normalized)), normalOffset);
+                    // 标签：曲线中点沿法线偏移
+                    const mid = vector_scale(0.5, vector_plus(p3, p4));
+                    const tl = vector_plus(mid, vector_scale(connection_text_offset * Math.sign(offset + 0.1), normal));
+                    // 箭头方向用 p4→p2 的实际切线
+                    const arrowDir = (() => { const d = vector_subtract(p2, p4); const dl = vector_length(d); return dl > 0 ? vector_scale(1/dl, d) : v_normalized; })();
                     dom.path.setAttribute("d", `M ${p1[0]} ${p1[1]} C ${p3[0]} ${p3[1]} ${p4[0]} ${p4[1]} ${p2[0]} ${p2[1]}`);
-                    update_arrow_head_el(dom.arrow, p2, vector_scale(1./vertex_r, c2));
+                    update_arrow_head_el(dom.arrow, p2, arrowDir);
                     dom.text.setAttribute("x", tl[0]-3);
                     dom.text.setAttribute("y", tl[1]+4);
                     dom.path.setAttribute("visibility", "visible");

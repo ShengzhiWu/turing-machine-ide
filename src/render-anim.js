@@ -530,20 +530,26 @@ function drawGraphOnCanvas(ctx, snapGraph, W, H, animFrame, nodeBrightness, edge
             } else {
                 if (l > vr*2) {
                     const offset = conn.offset !== undefined ? conn.offset : 0;
-                    const lc = Math.min(multiple_edges_shape_param2, l);
-                    const c1 = vector_rotate(c,  multiple_edges_gap_angle*offset*0.5);
-                    const c2 = vector_rotate(c, -multiple_edges_gap_angle*offset*0.5);
+                    // 起止点：旋转角度决定从节点边缘的出发方向（曲线自然散开）
+                    const c1 = vector_rotate(c,  multiple_edges_gap_angle * offset * 0.5);
+                    const c2 = vector_rotate(c, -multiple_edges_gap_angle * offset * 0.5);
                     const p1 = vector_plus(a, c1);
                     const p2 = vector_subtract(b, c2);
-                    const p3 = vector_plus(p1,  vector_scale(multiple_edges_shape_param1*lc/vr, c1));
-                    const p4 = vector_subtract(p2, vector_scale(multiple_edges_shape_param1*lc/vr, c2));
-                    const tl = vector_plus(vector_scale(0.5, vector_plus(p3, p4)),
-                                            vector_scale(connection_text_offset*Math.sign(offset+0.1), normal));
+                    // 控制点：切线分量（l*param1）保证曲线流畅，叠加法线固定偏移保证间距均匀
+                    const normalOffset = vector_scale(multiple_edges_gap * gs * offset, normal);
+                    const p3 = vector_plus(vector_plus(p1, vector_scale(multiple_edges_shape_param1 * l, vn)), normalOffset);
+                    const p4 = vector_plus(vector_subtract(p2, vector_scale(multiple_edges_shape_param1 * l, vn)), normalOffset);
+                    // 标签：曲线中点沿法线偏移
+                    const mid = vector_scale(0.5, vector_plus(p3, p4));
+                    const tl = vector_plus(mid,
+                        vector_scale(connection_text_offset * gs * Math.sign(offset + 0.1), normal));
+                    // 箭头方向用 p4→p2 的实际切线
+                    const arrowDir = (() => { const d = vector_subtract(p2, p4); const dl = vector_length(d); return dl > 0 ? vector_scale(1/dl, d) : vn; })();
                     ctx.beginPath();
                     ctx.moveTo(p1[0], p1[1]);
                     ctx.bezierCurveTo(p3[0], p3[1], p4[0], p4[1], p2[0], p2[1]);
                     ctx.stroke();
-                    drawArrowHead(ctx, p2, vector_scale(1/vr, c2), ahL, ahW);
+                    drawArrowHead(ctx, p2, arrowDir, ahL, ahW);
                     ctx.fillStyle = edgeColor;
                     ctx.font = `${fontSize}px system-ui,sans-serif`;
                     ctx.fillText(conn.edgeName, tl[0]-3, tl[1]+4);
