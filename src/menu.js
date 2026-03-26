@@ -542,8 +542,9 @@ function menuOpenProject() {
         if (typeof obj["start-position"] === 'number') start_position = obj["start-position"];
         if (typeof obj["max-steps"] === 'number') max_steps_input.value = obj["max-steps"];
         if (obj["output-filter"] !== undefined) {  // 文件中包含过滤器信息
-            output_filter = obj["output-filter"];
             const sel = document.getElementById('result-filter-select');
+            const known = sel ? Array.from(sel.options).map(o => o.value) : [];
+            output_filter = known.includes(obj["output-filter"]) ? obj["output-filter"] : "only-changes";
             if (sel) sel.value = output_filter;  // 根据过滤器更新下拉列表选中项
         }
         if (typeof obj["minimal-mode"] === 'boolean') document.getElementById('minimal-mode-checkbox').checked = obj["minimal-mode"];
