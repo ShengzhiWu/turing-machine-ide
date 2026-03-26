@@ -223,6 +223,7 @@ function build_graph_dom(graph) {
             el.style.cursor = 'pointer';
             el.addEventListener('mousedown', e => {
                 if (e.button !== 0) return;  // 只响应左键
+                if (e.altKey) return;  // Alt 键时让事件冒泡，由图旋转逻辑处理
                 if (typeof closeAllMenus === 'function') closeAllMenus();  // 隐藏菜单
                 e.stopPropagation();
                 e.preventDefault();
@@ -270,6 +271,61 @@ function build_graph_dom(graph) {
                 window.addEventListener('mouseup', onMouseUp);
             });
         });
+    });
+
+    // ── Alt + 左键拖动：整图绕可视区域中心旋转 ──────────────────────
+    graph_view.addEventListener('mousedown', e => {
+        if (e.button !== 0 || !e.altKey) return;
+        e.preventDefault();
+
+        const rect = graph_view.getBoundingClientRect();
+
+        // 快照：记录每个节点的起始图坐标
+        const startPositions = graph.map(node => node[1].slice());
+
+        // 旋转轴：所有节点位置的平均值（图坐标）
+        const pivotX = startPositions.reduce((s, p) => s + p[0], 0) / startPositions.length;
+        const pivotY = startPositions.reduce((s, p) => s + p[1], 0) / startPositions.length;
+
+        // 旋转轴对应的屏幕坐标，作为角度计算的参考中心
+        const cx = frame.x + pivotX * frame.factor;
+        const cy = frame.y + pivotY * frame.factor;
+
+        // 起始角度：鼠标相对旋转轴的方位角
+        const startAngle = Math.atan2(
+            e.clientY - rect.top  - cy,
+            e.clientX - rect.left - cx
+        );
+
+        graph_view.style.cursor = 'grabbing';
+
+        const onMouseMove = e => {
+            const angle = Math.atan2(
+                e.clientY - rect.top  - cy,
+                e.clientX - rect.left - cx
+            );
+            const delta = angle - startAngle;
+            const cos = Math.cos(delta);
+            const sin = Math.sin(delta);
+
+            graph.forEach((node, idx) => {
+                const dx = startPositions[idx][0] - pivotX;
+                const dy = startPositions[idx][1] - pivotY;
+                node[1] = [
+                    pivotX + dx * cos - dy * sin,
+                    pivotY + dx * sin + dy * cos
+                ];
+            });
+        };
+
+        const onMouseUp = () => {
+            window.removeEventListener('mousemove', onMouseMove);
+            window.removeEventListener('mouseup',   onMouseUp);
+            graph_view.style.cursor = '';
+        };
+
+        window.addEventListener('mousemove', onMouseMove);
+        window.addEventListener('mouseup',   onMouseUp);
     });
 }
 
