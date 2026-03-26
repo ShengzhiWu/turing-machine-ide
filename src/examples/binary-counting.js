@@ -42,6 +42,7 @@ start, other, N, N, 0
 3, other, N, L
 
 4, "", N, R, 0
+4, "B'", N, R, 0
 4, other, N, L
 
 5, "B'", "B", L
@@ -109,6 +110,7 @@ start, other, N, N, 0
 3, other, N, L
 
 4, "", N, R, 0
+4, "B'", N, R, 0
 4, other, N, L
 
 5, "B'", "B", L
