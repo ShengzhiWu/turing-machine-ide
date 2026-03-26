@@ -438,7 +438,17 @@
                 </select>
             </div>
 
-            <!-- 极简模式 -->
+            <!-- 末尾保留步数 -->
+            <div>
+                <span id="tail-steps-label">末尾保留步数</span>
+                <select id="tail-steps-select">
+                    <option value="0"    id="tail-steps-opt-0">0 步</option>
+                    <option value="1"    id="tail-steps-opt-1" selected>1 步</option>
+                    <option value="10"   id="tail-steps-opt-10">10 步</option>
+                    <option value="100"  id="tail-steps-opt-100">100 步</option>
+                    <option value="1000" id="tail-steps-opt-1000">1000 步</option>
+                </select>
+            </div>
             <label>
                 <input type="checkbox" id="minimal-mode-checkbox">
                 <span id="minimal-mode-label">极简模式</span>
@@ -572,8 +582,9 @@
             max_steps_input.value = examples[example]["recommended-max-steps"];
         var start_position = 0;
         var tape = normalizeTape([...examples[example]['tapes'][0]]);
-        var output_filter = "only-changes";  // 可以是 "all", "only-changes", "every-100", "every-1000", "every-10000", "every-100000", "every-1000000", "head-tail"
-        var result = run_turing_machine(code, tape, parseInt(max_steps_input.value), output_filter, start_position);
+        var output_filter = "only-changes";  // 可以是 "all", "only-changes", "every-100", "every-1000", "every-10000", "every-100000", "every-1000000", "every-10000000", "every-100000000", "every-1000000000", "head-tail"
+        var tail_steps = 1;  // 末尾保留步数
+        var result = run_turing_machine(code, tape, parseInt(max_steps_input.value), output_filter, start_position, tail_steps);
         tape = result[0][4];
         start_position = result[0][1];
     </script>

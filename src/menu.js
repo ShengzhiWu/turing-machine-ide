@@ -85,6 +85,12 @@ const MENU_I18N = {
         resultFilterEvery100000000:'每 10⁸ 步',
         resultFilterEvery1000000000:'每 10⁹ 步',
         resultFilterHeadTail:    '仅开头和结尾',
+        tailStepsLabel:          '末尾保留步数',
+        tailSteps0:              '0 步',
+        tailSteps1:              '1 步',
+        tailSteps10:             '10 步',
+        tailSteps100:            '100 步',
+        tailSteps1000:           '1000 步',
         minimalMode:             '极简模式',
         pixelScaleX:             '横向缩放',
         pixelScaleY:             '纵向缩放',
@@ -175,6 +181,12 @@ const MENU_I18N = {
         resultFilterEvery100000000:'Every 10⁸ steps',
         resultFilterEvery1000000000:'Every 10⁹ steps',
         resultFilterHeadTail:    'First and last only',
+        tailStepsLabel:          'Tail steps retained',
+        tailSteps0:              '0 steps',
+        tailSteps1:              '1 step',
+        tailSteps10:             '10 steps',
+        tailSteps100:            '100 steps',
+        tailSteps1000:           '1000 steps',
         minimalMode:             'Minimal mode',
         pixelScaleX:             'H scale',
         pixelScaleY:             'V scale',
@@ -445,6 +457,7 @@ function buildProjectJSON() {
         "start-position": start_position,  // 机头起始位置
         "max-steps": parseInt(max_steps_input.value),  // 最大步数
         "output-filter": document.getElementById('result-filter-select').value,  // 结果记录过滤器
+        "tail-steps": parseInt(document.getElementById('tail-steps-select').value),  // 末尾保留步数
         "minimal-mode": document.getElementById('minimal-mode-checkbox').checked,  // 极简模式
         "pixel-scale-x": parseInt(document.getElementById('pixel-scale-x-input').value), // 横向缩放
         "pixel-scale-y": parseInt(document.getElementById('pixel-scale-y-input').value) // 纵向缩放
@@ -547,6 +560,12 @@ function menuOpenProject() {
             output_filter = known.includes(obj["output-filter"]) ? obj["output-filter"] : "only-changes";
             if (sel) sel.value = output_filter;  // 根据过滤器更新下拉列表选中项
         }
+        if (typeof obj["tail-steps"] === 'number') {
+            const sel = document.getElementById('tail-steps-select');
+            const known = sel ? Array.from(sel.options).map(o => parseInt(o.value)) : [];
+            tail_steps = known.includes(obj["tail-steps"]) ? obj["tail-steps"] : 1;
+            if (sel) sel.value = tail_steps;
+        }
         if (typeof obj["minimal-mode"] === 'boolean') document.getElementById('minimal-mode-checkbox').checked = obj["minimal-mode"];
         if (typeof obj["pixel-scale-x"] === 'number') document.getElementById('pixel-scale-x-input').value = obj["pixel-scale-x"];
         if (typeof obj["pixel-scale-y"] === 'number') document.getElementById('pixel-scale-y-input').value = obj["pixel-scale-y"];
@@ -637,7 +656,20 @@ function applyLanguageToUI() {
         if (el) el.textContent = t(key);
     }
 
-    const minimalModeLabel = document.getElementById('minimal-mode-label');
+    const tailStepsLabel = document.getElementById('tail-steps-label');
+    if (tailStepsLabel) tailStepsLabel.textContent = t('tailStepsLabel');
+
+    const tailStepsOptMap = {
+        'tail-steps-opt-0':    'tailSteps0',
+        'tail-steps-opt-1':    'tailSteps1',
+        'tail-steps-opt-10':   'tailSteps10',
+        'tail-steps-opt-100':  'tailSteps100',
+        'tail-steps-opt-1000': 'tailSteps1000',
+    };
+    for (const [id, key] of Object.entries(tailStepsOptMap)) {
+        const el = document.getElementById(id);
+        if (el) el.textContent = t(key);
+    }
     if (minimalModeLabel) minimalModeLabel.textContent = t('minimalMode');
 
     const pixelScaleXLabel = document.getElementById('pixel-scale-x-label');

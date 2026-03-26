@@ -108,7 +108,10 @@ function parseStyleCode(code) {  // 解析风格代码
 //   "every-100000000"  — 每 10⁸ 步记录一次
 //   "every-1000000000" — 每 10⁹ 步记录一次
 //   "head-tail"        — 仅记录开头和结尾
-function run_turing_machine(code, tape, max_steps, history_filter, start_position) {  // 运行图灵机
+//
+// tail_steps: 末尾保留步数。无论过滤器如何，最后 tail_steps 步始终保留在历史中。
+//   用环形缓冲区实现，主循环里开销为 O(1)，对大步数运行没有性能影响。
+function run_turing_machine(code, tape, max_steps, history_filter, start_position, tail_steps) {  // 运行图灵机
     var step = 0;
     var position = start_position || 0;
     var state = "start";
@@ -118,6 +121,14 @@ function run_turing_machine(code, tape, max_steps, history_filter, start_positio
         tape.push('');  // 在末尾加一个空格
 
     tape = [...tape];  // Clone the tape, to avoid changing the original tape.
+
+    // 末尾保留步数：用环形缓冲区滚动记录最近 tail_steps 步
+    // 每步写入开销 O(1)，不影响大步数运行的性能
+    const tailSize = (tail_steps > 0) ? tail_steps : 0;
+    // ring[i] 存储一条历史记录，ringHead 指向最旧的槽位（满时被覆盖）
+    const ring = tailSize > 0 ? new Array(tailSize) : null;
+    let ringHead = 0;   // 环形缓冲区头指针
+    let ringCount = 0;  // 缓冲区中已有的记录数
 
     // 预计算过滤器参数，避免在热循环中重复判断字符串
     const filterAll         = history_filter === "all";
@@ -181,6 +192,14 @@ function run_turing_machine(code, tape, max_steps, history_filter, start_positio
             history.push([step, position, state_0, state, [...tape]]);
         }
 
+        // 环形缓冲区：无论过滤器如何，始终滚动保存最近 tail_steps 步
+        // need_record 为 true 时本步已进 history，仍写入 ring 以便后续去重
+        if (ring) {
+            ring[ringHead] = [step, position, state_0, state, [...tape]];
+            ringHead = (ringHead + 1) % tailSize;
+            if (ringCount < tailSize) ringCount++;
+        }
+
         if (action[1] == NOT_VALID) {
             state = "error";
             break;
@@ -196,6 +215,14 @@ function run_turing_machine(code, tape, max_steps, history_filter, start_positio
                     record[1]++;
                     record[4].unshift('');  // 在历史记录的每个纸带前面加一个空格
                 });
+                // 环形缓冲区里的记录也要同步修正
+                if (ring) {
+                    for (let i = 0; i < ringCount; i++) {
+                        const rec = ring[(ringHead - ringCount + i + tailSize) % tailSize];
+                        rec[1]++;
+                        rec[4].unshift('');
+                    }
+                }
             }
         }
     }
@@ -203,6 +230,30 @@ function run_turing_machine(code, tape, max_steps, history_filter, start_positio
     // head-tail 模式：补充最终状态（若与开头不同）
     if (filterHeadTail && step > 0) {
         history.push([step, position, history[history.length - 1][3], state, [...tape]]);
+    }
+
+    // 将环形缓冲区中的条目合并进 history（按步号升序，跳过已在 history 中的步）
+    if (ring && ringCount > 0) {
+        // 按时间顺序（从旧到新）排列缓冲区内容
+        const tailRecords = [];
+        for (let i = 0; i < ringCount; i++) {
+            tailRecords.push(ring[(ringHead - ringCount + i + tailSize) % tailSize]);
+        }
+        // 建立 history 中已有步号的快速查找集合
+        const inHistory = new Set(history.map(r => r[0]));
+        // 将缓冲区中不在 history 的条目插入到正确位置
+        for (const rec of tailRecords) {
+            if (!inHistory.has(rec[0])) {
+                // 找到第一个步号大于 rec[0] 的位置，插入其前
+                let idx = history.length;
+                for (let i = history.length - 1; i >= 0; i--) {
+                    if (history[i][0] < rec[0]) { idx = i + 1; break; }
+                    if (i === 0) idx = 0;
+                }
+                history.splice(idx, 0, rec);
+                inHistory.add(rec[0]);
+            }
+        }
     }
 
     // 将纸带补到每次记录一样长
