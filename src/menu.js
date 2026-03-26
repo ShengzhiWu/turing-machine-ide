@@ -15,7 +15,7 @@ const MENU_I18N = {
         saveEmbedding:  '保存图嵌入',
         about:          '关于',
         aboutTitle:     'Turing Machine IDE',
-        aboutVersion:   '版本 1.0',
+        aboutVersion:   '版本 1.1',
         aboutBody:      `<p>这是一款基于 Electron 的图灵机程序编写与调试工具。</p>
                             <p>您可以在左侧代码面板中编写图灵机程序，在中间面板中查看状态转移图，在右侧面板中观察纸带的运行历史。</p>
                             <p><b>开发者：</b>武圣智<br>
@@ -111,7 +111,7 @@ const MENU_I18N = {
         saveEmbedding:  'Save Graph Embedding',
         about:          'About',
         aboutTitle:     'Turing Machine IDE',
-        aboutVersion:   'Version 1.0',
+        aboutVersion:   'Version 1.1',
         aboutBody:      `<p>A Turing machine programming and debugging tool built with Electron.</p>
                             <p>Write your Turing machine program in the code panel on the left, inspect the state-transition graph in the centre, and trace the tape history on the right.</p>
                             <p><b>Developer:</b>Shengzhi Wu<br>
