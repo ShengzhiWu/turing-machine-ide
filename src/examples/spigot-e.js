@@ -16,8 +16,8 @@ examples["spigot-e"]["category"] = {
 };
 
 examples["spigot-e"]["description"] = {
-    "zh": "基于 Spigot 算法计算自然常数 e 的任意位数 10 进制小数。时间复杂度是 O(n³) 以上。",
-    "en": "Calculates the natural constant e to any number of decimal places using the Spigot algorithm. Time complexity is O(n³) or higher."
+    "zh": "基于 Spigot 算法计算自然常数 e 的任意位数 10 进制小数\n我们不确定此实现的时间复杂度是多少，经过拟合发现它近似是 O(n⁴log(n)²) 。",
+    "en": "Calculates the natural constant e to any number of decimal places using the Spigot algorithm.\nWe are not sure about the time complexity of this implementation, but fitting suggests it is O(n⁴log(n)²)."
 };
 
 
@@ -1090,9 +1090,9 @@ examples["spigot-e"]["embedding"] = {
 };
 
 examples["spigot-e"]["tapes"] = [  // 样例初始纸带
-    ["", "2", ".", "?", "?", "?"]
+    ["", "2", ".", "?", "?", "?", "?", "?", "?", "?", "?", "?", "?"],  // 小数点后10位，大约1500万步
+    ["", "2", ".", "?", "?", "?"]  // 小数点后3位，大约7万步
 ];
-
 examples["spigot-e"]["start-position"] = 0;
-
-examples["spigot-e"]["recommended-max-steps"] = 100000;  // 推荐的最大步数
+examples["spigot-e"]["recommended-max-steps"] = 20000000;  // 推荐的最大步数
+examples["spigot-e"]["output-filter"] = "head-tail";  // 结果过滤器

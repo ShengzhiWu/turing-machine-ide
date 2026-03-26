@@ -561,9 +561,16 @@ function menuLoadExample(key) {
     const ex = examples[key];
     example = key;  // 记录当前样例
 
-    // 载入推荐步数
+    // 载入推荐最大步数
     if (ex["recommended-max-steps"])
         max_steps_input.value = ex["recommended-max-steps"];
+
+    // 载入过滤器模式
+    if (ex["output-filter"] !== undefined) {
+        output_filter = ex["output-filter"];
+        const sel = document.getElementById('result-filter-select');
+        if (sel) sel.value = output_filter;  // 根据过滤器更新下拉列表选中项
+    }
 
     // 载入图灵机代码
     const code = ex['code'][lang] || ex['code']['en'];
