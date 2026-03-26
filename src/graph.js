@@ -264,6 +264,9 @@ function build_graph_dom(graph) {
                     if (!dragged) {
                         // 没有拖动 → 触发跳转
                         jumpEditorToState(node[0], node_name, node._jumpInfo);
+                    } else {
+                        // 手动拖动了节点 → 标记未保存
+                        if (typeof markDirty === 'function') markDirty();
                     }
                 };
 

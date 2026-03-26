@@ -163,6 +163,45 @@ ipcMain.on('render-preview-status', (event, text) => {
     if (previewWindow && !previewWindow.isDestroyed()) previewWindow.setTitle(text);
 });
 
+// ── Window title ─────────────────────────────────────────────────────
+ipcMain.on('set-title', (event, title) => {
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.setTitle(title);
+});
+
+// ── Save project file (returns chosen path, or null if cancelled) ─────
+ipcMain.handle('save-file', async (event, { defaultName, content }) => {
+    const result = await dialog.showSaveDialog(mainWindow, {
+        defaultPath: defaultName,
+        filters: [{ name: 'JSON', extensions: ['json'] }]
+    });
+    if (result.canceled || !result.filePath) return null;
+    require('fs').writeFileSync(result.filePath, content, 'utf8');
+    return result.filePath;
+});
+
+// ── Overwrite an existing file directly (no dialog) ───────────────────
+ipcMain.handle('save-file-to-path', async (event, { filePath, content }) => {
+    try {
+        require('fs').writeFileSync(filePath, content, 'utf8');
+        return true;
+    } catch (err) {
+        console.error('[main] save-file-to-path failed:', err);
+        return false;
+    }
+});
+
+// ── Open project file (returns { content, path }, or null if cancelled)
+ipcMain.handle('open-file', async () => {
+    const result = await dialog.showOpenDialog(mainWindow, {
+        filters: [{ name: 'JSON', extensions: ['json'] }],
+        properties: ['openFile']
+    });
+    if (result.canceled || !result.filePaths.length) return null;
+    const filePath = result.filePaths[0];
+    const content = require('fs').readFileSync(filePath, 'utf8');
+    return { content, path: filePath };
+});
+
 // ── Application startup ───────────────────────────────────────────────
 app.on('ready', () => {
     mainWindow = new BrowserWindow({
@@ -171,7 +210,7 @@ app.on('ready', () => {
         title: 'Turing Machine IDE',
         webPreferences: { nodeIntegration: true, contextIsolation: false }
     });
-    mainWindow.webContents.openDevTools();  // 打开开发人员工具
+    // mainWindow.webContents.openDevTools();  // 打开开发人员工具
     mainWindow.loadFile('index.html');
     mainWindow.on('closed', () => { mainWindow = null; });
 });

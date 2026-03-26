@@ -14,8 +14,9 @@ function buildMenuBar() {
         {
             label: t('file'),
             items: [
-                { label: t('openProject'),   action: openProject },
-                { label: t('saveProject'),   action: saveProject },
+                { label: t('openProject'),   action: openProject,   shortcut: 'Ctrl+O' },
+                { label: t('saveProject'),   action: saveProject,   shortcut: 'Ctrl+S' },
+                { label: t('saveProjectAs'), action: saveProjectAs, shortcut: 'Ctrl+Shift+S' },
                 { label: t('saveEmbedding'), action: menuSaveEmbedding },
                 'separator',
                 { label: t('renderAnim'),    action: menuRenderAnimation },
@@ -155,6 +156,12 @@ function buildMenuBar() {
                     di.appendChild(check);
                 }
                 di.appendChild(Object.assign(document.createElement('span'), { textContent: entry.label }));
+                if (entry.shortcut) {
+                    di.appendChild(Object.assign(document.createElement('span'), {
+                        textContent: entry.shortcut,
+                        style: 'margin-left: auto; padding-left: 24px; opacity: 0.5; font-size: 11px; pointer-events: none;'
+                    }));
+                }
 
                 // Hover: close any open sibling submenus
                 di.addEventListener('mouseenter', () => {

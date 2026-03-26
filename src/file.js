@@ -6,6 +6,57 @@
 //   examples, language
 // 依赖函数：normalizeTape(), parseStyleCode(), refresh_graph_embedding(), run_program()
 
+// ── Title / dirty-state management ──────────────────────────────────
+
+var _currentFilePath = null;   // 当前文件完整路径（用于 Ctrl+S 直接覆写），null 表示新建/未命名
+var _currentFileName = null;   // 仅文件名部分（用于标题显示）
+var _isDirty = false;          // 是否有未保存的修改
+
+const APP_NAME = 'Turing Machine IDE';
+
+function _sendTitle() {
+    const { ipcRenderer } = require('electron');
+    let title = APP_NAME;
+    if (_currentFileName) {
+        title += ' — ' + _currentFileName;
+        if (_isDirty) title += ' ●';
+    }
+    ipcRenderer.send('set-title', title);
+}
+
+/** 标记有未保存修改（供外部调用） */
+function markDirty() {
+    if (_isDirty) return;
+    _isDirty = true;
+    _sendTitle();
+}
+
+/**
+ * 保存/载入后清除修改标记。
+ * @param {string|null} filePath  完整路径；传 null 表示清除路径（切换样例等场景）；
+ *                                传 undefined 表示不更新路径（仅清除 dirty 标记）。
+ */
+function markClean(filePath) {
+    if (filePath !== undefined) {
+        _currentFilePath = filePath;
+        _currentFileName = filePath ? filePath.split(/[\\/]/).pop() : null;
+    }
+    _isDirty = false;
+    _sendTitle();
+}
+
+// ── 键盘快捷键 ───────────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+    if ((e.key === 's' || e.key === 'S') && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        if (e.shiftKey) {
+            saveProjectAs();   // Ctrl+Shift+S → 另存为
+        } else {
+            saveProject();     // Ctrl+S → 保存（有路径则直接覆写）
+        }
+    }
+});
+
 // ── Graph embedding helpers ──────────────────────────────────────────
 
 function getGraphEmbedding() {
@@ -79,16 +130,23 @@ function buildEmbeddingJSON() {
 
 // ── Low-level file save / open (Electron IPC + browser fallback) ─────
 
-function saveJSONFile(obj, defaultName) {
+/**
+ * 弹出另存为对话框，保存成功后调用 markClean(完整路径)。
+ * @param {object} obj        要序列化的 JSON 对象
+ * @param {string} defaultName  对话框默认文件名
+ */
+function saveJSONFileAs(obj, defaultName) {
     const json = JSON.stringify(obj, null, 2);
 
-    // Electron IPC path
-    if (typeof window !== 'undefined' && window.electronAPI && window.electronAPI.saveFile) {
-        window.electronAPI.saveFile({ defaultName, content: json });
+    try {
+        const { ipcRenderer } = require('electron');
+        ipcRenderer.invoke('save-file', { defaultName, content: json }).then(savedPath => {
+            if (savedPath) markClean(savedPath);
+        });
         return;
-    }
+    } catch (_) {}
 
-    // Browser fallback: <a download>
+    // Browser fallback: <a download>（无法拿到真实路径，仅清 dirty）
     const blob = new Blob([json], { type: 'application/json' });
     const url  = URL.createObjectURL(blob);
     const a    = document.createElement('a');
@@ -96,13 +154,42 @@ function saveJSONFile(obj, defaultName) {
     a.download = defaultName;
     a.click();
     URL.revokeObjectURL(url);
+    markClean(undefined);  // 路径未知，仅清 dirty
+}
+
+/**
+ * 直接覆写到指定路径，保存成功后调用 markClean。
+ * @param {object} obj
+ * @param {string} filePath  完整文件路径
+ */
+function saveJSONFileToPath(obj, filePath) {
+    const json = JSON.stringify(obj, null, 2);
+
+    try {
+        const { ipcRenderer } = require('electron');
+        ipcRenderer.invoke('save-file-to-path', { filePath, content: json }).then(ok => {
+            if (ok) markClean(filePath);
+        });
+    } catch (_) {
+        // 回退到另存为
+        saveJSONFileAs(obj, filePath.split(/[\\/]/).pop());
+    }
 }
 
 function openJSONFile(callback) {
-    // Electron IPC path
+    // Electron nodeIntegration path
+    try {
+        const { ipcRenderer } = require('electron');
+        ipcRenderer.invoke('open-file').then(result => {
+            if (result) callback(JSON.parse(result.content), result.path);
+        });
+        return;
+    } catch (_) {}
+
+    // Electron legacy electronAPI path
     if (typeof window !== 'undefined' && window.electronAPI && window.electronAPI.openFile) {
         window.electronAPI.openFile().then(result => {
-            if (result) callback(JSON.parse(result));
+            if (result) callback(JSON.parse(result), null);
         });
         return;
     }
@@ -117,7 +204,7 @@ function openJSONFile(callback) {
         const reader = new FileReader();
         reader.onload = e => {
             try {
-                callback(JSON.parse(e.target.result));
+                callback(JSON.parse(e.target.result), null);  // 浏览器拿不到真实路径
             } catch(err) {
                 alert('Failed to parse JSON: ' + err.message);
             }
@@ -129,17 +216,28 @@ function openJSONFile(callback) {
 
 // ── Menu actions: save / open / load example ─────────────────────────
 
+/** 保存：有已知路径则直接覆写，否则弹另存为对话框 */
 async function saveProject() {
     const obj = await buildProjectJSON();
-    saveJSONFile(obj, 'project.json');
+    if (_currentFilePath) {
+        saveJSONFileToPath(obj, _currentFilePath);
+    } else {
+        saveJSONFileAs(obj, 'project.json');
+    }
+}
+
+/** 另存为：始终弹对话框，保存后更新当前路径 */
+async function saveProjectAs() {
+    const obj = await buildProjectJSON();
+    saveJSONFileAs(obj, _currentFileName || 'project.json');
 }
 
 function menuSaveEmbedding() {
-    saveJSONFile(buildEmbeddingJSON(), 'embedding.json');
+    saveJSONFileAs(buildEmbeddingJSON(), 'embedding.json');
 }
 
 function openProject() {
-    openJSONFile(async obj => {
+    openJSONFile(async (obj, fileName) => {
         if (!obj || !obj.version) { alert('Invalid project file.'); return; }
 
         // 恢复代码
@@ -191,6 +289,9 @@ function openProject() {
             }
         }
 
+        // 标记已保存，记录完整路径（供后续 Ctrl+S 直接覆写）
+        markClean(fileName);  // fileName 此处实为完整路径，由 open-file invoke 返回
+
         // 重新运行
         run_program();
     });
@@ -240,4 +341,54 @@ function loadExample(key) {
     // 重置修改标记
     codeModified = false;
     styleModified = false;
+
+    // 切换样例视为新的未命名状态，清除已知文件路径
+    markClean(null);
 }
+
+// ── Dirty 事件绑定（DOM 加载完成后执行）─────────────────────────────
+// 监听所有会产生"未保存修改"的控件，触发时调用 markDirty()。
+// file.js 在 index.html 里被 <script src> 引入，此时 DOM 已就绪，可直接绑定。
+
+(function bindDirtyListeners() {
+    // 1. 代码编辑器（CodeMirror 自定义元素，监听其 change 事件）
+    //    index.html 里 code_editor 是 <colormap-editor> 同类自定义元素，
+    //    用 'input' 兼容各种编辑器组件。
+    const codeEl = document.getElementById('code-editor');
+    if (codeEl) {
+        codeEl.addEventListener('input',  markDirty);
+        codeEl.addEventListener('change', markDirty);
+    }
+
+    // 2. 样式编辑器
+    const styleEl = document.getElementById('style-textarea');
+    if (styleEl) {
+        styleEl.addEventListener('input',  markDirty);
+        styleEl.addEventListener('change', markDirty);
+    }
+
+    // 3. 运行参数：最大步数、过滤模式、末尾步数、极简模式、缩放
+    ['max-steps-input',
+     'result-filter-select',
+     'tail-steps-select',
+     'minimal-mode-checkbox',
+     'pixel-scale-x-input',
+     'pixel-scale-y-input'
+    ].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('change', markDirty);
+    });
+
+    // 4. 纸带编辑：纸带单元格是动态生成的，用事件委托监听整个 tape-panel
+    const tapePanel = document.getElementById('tape-panel');
+    if (tapePanel) {
+        tapePanel.addEventListener('input',  markDirty);
+        tapePanel.addEventListener('change', markDirty);
+    }
+
+    // 5. 渲染设置变化（主进程通过 render-params-changed 转发到主窗口）
+    try {
+        const { ipcRenderer } = require('electron');
+        ipcRenderer.on('render-params-changed', markDirty);
+    } catch (_) {}
+})();
