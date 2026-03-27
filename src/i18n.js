@@ -141,7 +141,7 @@ const MENU_I18N = {
         about:          'About',
         aboutTitle:     'Turing Machine IDE',
         aboutVersion:   'Version 1.2',
-        aboutBody:      `<p><b>Developer:</b>Shengzhi Wu<br>
+        aboutBody:      `<p><b>Developer:</b> Shengzhi Wu<br>
                             <b>License:</b> GPL-3.0</p>`,
         closeBtn:       'Close',
         saveDialogTitle:'Save Project',
