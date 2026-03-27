@@ -241,10 +241,18 @@
 
         const noise = createPerlin2D();
         const movedVertices = new Array(vertices.length);
-        const start = performance.now();
+        let rafId = 0;
+        let running = false;
+        let simElapsedMs = 0;
+        let lastNow = 0;
 
         function render(now) {
-            const t = (now - start) * 0.001;
+            if (!running) return;
+
+            if (lastNow === 0) lastNow = now;
+            simElapsedMs += now - lastNow;
+            lastNow = now;
+            const t = simElapsedMs * 0.001;
 
             for (let i = 0; i < vertices.length; i++) {
                 const base = vertices[i];
@@ -270,10 +278,44 @@
                 polygons[i].setAttribute('points', pts.join(' '));
             }
 
-            requestAnimationFrame(render);
+            rafId = requestAnimationFrame(render);
         }
 
-        requestAnimationFrame(render);
+        function startAnimation() {
+            if (running) return;
+            running = true;
+            lastNow = 0;
+            rafId = requestAnimationFrame(render);
+        }
+
+        function stopAnimation() {
+            if (!running) return;
+            running = false;
+            if (rafId !== 0) cancelAnimationFrame(rafId);
+            rafId = 0;
+            lastNow = 0;
+        }
+
+        function isAboutVisible() {
+            const overlay = document.getElementById('about-overlay');
+            return !!(overlay && overlay.classList.contains('visible'));
+        }
+
+        function updateAnimationState() {
+            if (isAboutVisible() && !document.hidden) {
+                startAnimation();
+            } else {
+                stopAnimation();
+            }
+        }
+
+        const overlay = document.getElementById('about-overlay');
+        if (overlay) {
+            const observer = new MutationObserver(updateAnimationState);
+            observer.observe(overlay, { attributes: true, attributeFilter: ['class'] });
+        }
+        document.addEventListener('visibilitychange', updateAnimationState);
+        updateAnimationState();
     }
 
     if (document.readyState === 'loading') {
