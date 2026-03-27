@@ -55,6 +55,10 @@ document.addEventListener('keydown', e => {
             saveProject();     // Ctrl+S → 保存（有路径则直接覆写）
         }
     }
+    if ((e.key === 'o' || e.key === 'O') && (e.ctrlKey || e.metaKey) && !e.shiftKey) {
+        e.preventDefault();
+        openProject();         // Ctrl+O → 打开项目
+    }
 });
 
 // ── Graph embedding helpers ──────────────────────────────────────────
