@@ -164,6 +164,39 @@
         svg.appendChild(headGroup);
 
         const headFill = 'rgb(66, 66, 66)';  // 读写头颜色
+        const shadowId = `about-head-shadow-${Math.random().toString(36).slice(2, 8)}`;
+        const shadowR = 10; // 机头针尖阴影半径
+
+        const defs = document.createElementNS(SVG_NS, 'defs');
+        const grad = document.createElementNS(SVG_NS, 'radialGradient');
+        grad.setAttribute('id', shadowId);
+        grad.setAttribute('gradientUnits', 'userSpaceOnUse');
+        grad.setAttribute('cx', '0');
+        grad.setAttribute('cy', '0');
+        grad.setAttribute('r', String(shadowR));
+
+        const stop0 = document.createElementNS(SVG_NS, 'stop');
+        stop0.setAttribute('offset', '0%');
+        stop0.setAttribute('stop-color', 'black');
+        stop0.setAttribute('stop-opacity', '0.26');
+
+        const stop1 = document.createElementNS(SVG_NS, 'stop');
+        stop1.setAttribute('offset', '100%');
+        stop1.setAttribute('stop-color', 'black');
+        stop1.setAttribute('stop-opacity', '0');
+
+        grad.appendChild(stop0);
+        grad.appendChild(stop1);
+        defs.appendChild(grad);
+        headGroup.appendChild(defs);
+
+        const shadow = document.createElementNS(SVG_NS, 'circle');
+        shadow.setAttribute('cx', '0');
+        shadow.setAttribute('cy', '0');
+        shadow.setAttribute('r', String(shadowR));
+        shadow.setAttribute('fill', `url(#${shadowId})`);
+        shadow.setAttribute('pointer-events', 'none');
+        headGroup.appendChild(shadow);
 
         // Triangle (local coords, SVG y-down): base at y = -triH, tip at (0,0).
         const triH = 16;
