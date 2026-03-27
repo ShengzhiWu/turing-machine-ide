@@ -190,6 +190,24 @@ ipcMain.handle('save-file-to-path', async (event, { filePath, content }) => {
     }
 });
 
+// ── Confirm unsaved changes (Save / Don't Save / Cancel) ──────────────
+// Returns: 'save' | 'discard' | 'cancel'
+ipcMain.handle('confirm-unsaved', async (event, strings) => {
+    const result = await dialog.showMessageBox(mainWindow, {
+        type: 'warning',
+        title:   strings.title   || 'Unsaved Changes',
+        message: strings.message || 'You have unsaved changes. What would you like to do?',
+        buttons: [
+            strings.save    || 'Save',
+            strings.discard || "Don't Save",
+            strings.cancel  || 'Cancel',
+        ],
+        defaultId: 0,
+        cancelId:  2,
+    });
+    return ['save', 'discard', 'cancel'][result.response];
+});
+
 // ── Open project file (returns { content, path }, or null if cancelled)
 ipcMain.handle('open-file', async () => {
     const result = await dialog.showOpenDialog(mainWindow, {

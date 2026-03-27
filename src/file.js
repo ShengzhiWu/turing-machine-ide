@@ -5,6 +5,13 @@
 //   output_filter, tail_steps, example, codeModified, styleModified,
 //   examples, language
 // 依赖函数：normalizeTape(), parseStyleCode(), refresh_graph_embedding(), run_program()
+//
+// i18n.js 中需补充以下 key（供"未保存修改"弹窗使用）：
+//   unsavedTitle   — 弹窗标题，例："未保存的修改" / "Unsaved Changes"
+//   unsavedMessage — 提示文字，例："当前有未保存的修改，是否保存？" / "You have unsaved changes."
+//   unsavedSave    — 保存按钮，例："保存" / "Save"
+//   unsavedDiscard — 不保存按钮，例："不保存" / "Don't Save"
+//   unsavedCancel  — 取消按钮，例："取消" / "Cancel"
 
 // ── Title / dirty-state management ──────────────────────────────────
 
@@ -240,7 +247,34 @@ function menuSaveEmbedding() {
     saveJSONFileAs(buildEmbeddingJSON(), 'embedding.json');
 }
 
-function openProject() {
+async function openProject() {
+    // ── 若有未保存修改，先询问用户 ────────────────────────────────────
+    if (_isDirty) {
+        let choice = 'discard';  // 浏览器环境默认直接丢弃
+        try {
+            const { ipcRenderer } = require('electron');
+            choice = await ipcRenderer.invoke('confirm-unsaved', {
+                title:   t('unsavedTitle'),
+                message: t('unsavedMessage'),
+                save:    t('unsavedSave'),
+                discard: t('unsavedDiscard'),
+                cancel:  t('unsavedCancel'),
+            });
+        } catch (_) {
+            // 非 Electron 环境：用 confirm 模拟（只有保留/丢弃两种结果）
+            const ok = window.confirm(t('unsavedMessage'));
+            choice = ok ? 'discard' : 'cancel';
+        }
+
+        if (choice === 'cancel') return;
+        if (choice === 'save') {
+            await saveProject();
+            // 若保存后仍为 dirty（例如另存为被用户取消），则中止打开
+            if (_isDirty) return;
+        }
+        // choice === 'discard'：继续打开，丢弃当前修改
+    }
+
     openJSONFile(async (obj, fileName) => {
         if (!obj || !obj.version) { alert('Invalid project file.'); return; }
 
