@@ -382,7 +382,7 @@ function encodeWav(pcmFloat32, sampleRate) {
 //
 // history : run_turing_machine output (detailed mode)
 // p       : render params including:
-//   fps, moveFrames, pauseFrames, halflife,
+//   fps, moveFrames, pauseFrames, halflife, speedMultiplier (>=1, 每 N 逻辑帧对应输出 1 帧的倍率),
 //   musicMode ('major'/'minor'), musicRoot ('C4' etc.),
 //   musicLoNote ('C3'), musicHiNote ('C6'),
 //   musicSeed (int), samplesDir (path or '' for synth)
@@ -396,12 +396,13 @@ function bakeAudio(history, p, stateNames) {
     const pauseFrames = Math.max(0, p.pauseFrames);   // allow 0 pause
     const moveFrames  = Math.max(1, p.moveFrames);
     const halflife    = Math.max(1, p.halflife);
+    const speedMult   = Math.max(1, parseInt(p.speedMultiplier, 10) || 1);
 
     // Duration of one "beat" in seconds: movement + pause, minimum 1 frame worth.
     const beatFrames   = moveFrames + pauseFrames;
     const stepDuration = Math.max(beatFrames, 1) / fps;
     // Note-on duration: let it ring for a bit longer than one step but fade naturally
-    const noteDuration = Math.max(stepDuration * 3, 1.5);
+    const noteDuration = Math.max(stepDuration * 3, 1.5) / speedMult;
 
     // Scale / note mapping
     const rootMidi   = noteNameToMidi(p.musicRoot  || 'C4');
@@ -418,21 +419,20 @@ function bakeAudio(history, p, stateNames) {
 
     const noteMap = buildStateNoteMap(stateNames, scaleNotes, seed);
 
-    // Total audio duration mirrors buildFrameSequence / computeTotalFrames logic exactly.
-    // (Must stay in sync with the frame-counting fix for pauseFrames=0.)
+    // Total audio duration: 逻辑总帧数与 iterateRenderFrames 一致，再按 speedMult 缩短（与输出视频帧数一致）。
     const cooldown  = Math.ceil(9 * halflife);
-    let totalFrames = 1 + pauseFrames;   // dark frame + initial pause
+    let totalFramesRaw = 1 + pauseFrames;   // dark frame + initial pause
     for (let i = 1; i < history.length; i++) {
         const posChanged = history[i][1] !== history[i-1][1];
         if (posChanged) {
-            totalFrames += moveFrames + pauseFrames;
+            totalFramesRaw += moveFrames + pauseFrames;
         } else {
-            // No movement: pause frames (or 1 explicit landing frame when pause=0)
-            totalFrames += pauseFrames > 0 ? pauseFrames : 1;
+            totalFramesRaw += pauseFrames > 0 ? pauseFrames : 1;
         }
     }
-    totalFrames += pauseFrames + cooldown;  // final pause + cooldown
-    const totalDuration = totalFrames / fps;
+    totalFramesRaw += pauseFrames + cooldown;  // final pause + cooldown
+    const outputFrameCount = totalFramesRaw === 0 ? 0 : Math.ceil(totalFramesRaw / speedMult);
+    const totalDuration = outputFrameCount / fps;
     const totalSamples  = Math.ceil(totalDuration * SAMPLE_RATE);
 
     const pcm = new Float32Array(totalSamples);
@@ -443,53 +443,88 @@ function bakeAudio(history, p, stateNames) {
         fs.existsSync(DEFAULT_SAMPLES_DIR)            ? DEFAULT_SAMPLES_DIR :
         null;
 
-    // Walk through history and schedule notes.
-    // Frame counter mirrors buildFrameSequence logic exactly.
-    let frameAt = 1 + pauseFrames;  // after dark frame + initial pause
+    // Walk through history and bin note events by *output video frame* index.
+    // Then mix only once per (output frame, midi) using amplitude ~ gain * sqrt(n).
+    // This matches the "sqrt(n) energy density add" idea and avoids per-step synthesis/mixing.
+    const loudCounts = new Array(outputFrameCount); // state changed: gain base 0.9
+    const softCounts = new Array(outputFrameCount); // self-loop: gain base 0.35
 
+    // Note samples cache: midi -> Float32Array
+    const noteSamplesCache = new Map();
+    const getNoteSamplesForMidi = (midi) => {
+        const cached = noteSamplesCache.get(midi);
+        if (cached) return cached;
+
+        let noteSamples = null;
+        if (resolvedSamplesDir) {
+            noteSamples = getSampleNote(midi, resolvedSamplesDir, SAMPLE_RATE);
+        }
+        if (!noteSamples) {
+            const freq = midiToFreq(midi);
+            noteSamples = synthPianoNote(freq, noteDuration, SAMPLE_RATE);
+        }
+        noteSamplesCache.set(midi, noteSamples);
+        return noteSamples;
+    };
+
+    // Frame counter mirrors iterateRenderFrames logic exactly (raw-frame index).
+    let frameAt = 1 + pauseFrames;  // after dark frame + initial pause
     for (let i = 1; i < history.length; i++) {
-        const prev    = history[i - 1];
-        const curr    = history[i];
+        const prev = history[i - 1];
+        const curr = history[i];
         const prevPos = prev[1];
         const currPos = curr[1];
         const posChanged = currPos !== prevPos;
 
         if (posChanged) {
-            // When pause=0, note fires on the last movement frame (same as buildFrameSequence).
-            // When pause>0, note fires at the start of the pause block after movement.
+            // Note fires on the last movement frame (pause=0) or the start of pause (pause>0).
             frameAt += moveFrames;
         }
-        // frameAt now points to the moment the highlight (and note) fires.
 
-        const timeAt   = frameAt / fps;
-        const startSmp = Math.floor(timeAt * SAMPLE_RATE);
+        // output frame index D in [0, outputFrameCount-1]
+        const D = Math.floor(frameAt / speedMult);
+        if (D >= 0 && D < outputFrameCount) {
+            const stateName = curr[3];
+            const midi = noteMap[stateName] !== undefined
+                ? noteMap[stateName]
+                : (scaleNotes[0] || 60);
 
-        const stateName = curr[3];
-        const midi      = noteMap[stateName] !== undefined
-            ? noteMap[stateName]
-            : (scaleNotes[0] || 60);
-        const freq = midiToFreq(midi);
-
-        // State changed → loud (0.9); self-loop (same state) → soft (0.35)
-        const gain = (curr[3] !== prev[3]) ? 0.9 : 0.35;
-
-        let noteSamples;
-        if (resolvedSamplesDir) {
-            noteSamples = getSampleNote(midi, resolvedSamplesDir, SAMPLE_RATE);
+            const isLoud = (curr[3] !== prev[3]); // state changed vs self-loop
+            const targetArr = isLoud ? loudCounts : softCounts;
+            let map = targetArr[D];
+            if (!map) targetArr[D] = map = new Map();
+            map.set(midi, (map.get(midi) || 0) + 1);
         }
-        if (!noteSamples) {
-            noteSamples = synthPianoNote(freq, noteDuration, SAMPLE_RATE);
-        }
-
-        addNote(pcm, noteSamples, startSmp, gain);
 
         // Advance past the pause block (or the 1 landing frame when pause=0 and no movement)
         if (pauseFrames > 0) {
             frameAt += pauseFrames;
         } else if (!posChanged) {
-            frameAt += 1;   // the explicit landing frame inserted by buildFrameSequence
+            frameAt += 1;   // the explicit landing frame inserted by iterateRenderFrames
         }
         // (pause=0 with movement: no extra frames after the last move frame)
+    }
+
+    // Mix: for each output frame, for each midi, add one note scaled by sqrt(count).
+    for (let D = 0; D < outputFrameCount; D++) {
+        const startSmp = Math.floor((D / fps) * SAMPLE_RATE);
+
+        const loudMap = loudCounts[D];
+        if (loudMap) {
+            for (const [midi, n] of loudMap.entries()) {
+                const noteSamples = getNoteSamplesForMidi(midi);
+                const gain = 0.9 * Math.sqrt(n);
+                addNote(pcm, noteSamples, startSmp, gain);
+            }
+        }
+        const softMap = softCounts[D];
+        if (softMap) {
+            for (const [midi, n] of softMap.entries()) {
+                const noteSamples = getNoteSamplesForMidi(midi);
+                const gain = 0.35 * Math.sqrt(n);
+                addNote(pcm, noteSamples, startSmp, gain);
+            }
+        }
     }
 
     return encodeWav(pcm, SAMPLE_RATE);

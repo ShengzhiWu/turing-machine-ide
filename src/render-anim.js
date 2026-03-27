@@ -5,6 +5,7 @@ const _renderDefaultParams = {
     width: 1920, height: 1080,
     fps: 30,
     moveFrames: 10, pauseFrames: 5, halflife: 10,
+    speedMultiplier: 1,  // 每 N 个逻辑帧输出 1 帧（含图像与音频时长）
     graphicScale: 1.0,
     renderImage: true, renderMusic: false,
     movementMode: 'tape',  // 'tape' = 纸带动机头固定；'head' = 机头动纸带固定
@@ -41,6 +42,7 @@ function menuRenderAnimation() {
             lblFps:           t('renderLabelFps'),
             lblMoveFrames:    t('renderLabelMoveFrames'),
             lblPauseFrames:   t('renderLabelPauseFrames'),
+            lblSpeedMultiplier: t('renderLabelSpeedMultiplier'),
             lblHalflife:      t('renderLabelHalflife'),
             lblTotalFrames:   t('renderLabelTotalFrames'),
             lblTotalDuration: t('renderLabelTotalDuration'),
@@ -84,32 +86,35 @@ function getRenderParams() {
     return Object.assign({}, _lastRenderParams);
 }
 
-function computeTotalFrames(history, p) {
-    // Matches buildFrameSequence exactly.
+function computeRawTotalFrames(history, p) {
+    // Matches iterateRenderFrames exactly.
     const pause    = Math.max(0, p.pauseFrames);
     const move     = Math.max(1, p.moveFrames);
     const cooldown = Math.ceil(9 * p.halflife);
     if (!history || history.length === 0) return 0;
-    // 1 dark frame + initial pause (>=0) + transitions + final pause + cooldown
     let total = 1 + pause;
     for (let i = 1; i < history.length; i++) {
         const posChanged = history[i][1] !== history[i-1][1];
         if (posChanged) {
             total += move;
-            // When pause=0, the last movement frame carries the highlight; no extra frame.
             total += pause;
         } else {
-            // No movement frames.
             if (pause > 0) {
                 total += pause;
             } else {
-                // pause=0 and no movement: one explicit landing frame is inserted.
                 total += 1;
             }
         }
     }
     total += pause + cooldown;
     return total;
+}
+
+function computeTotalFrames(history, p) {
+    const raw = computeRawTotalFrames(history, p);
+    if (raw === 0) return 0;
+    const mult = Math.max(1, parseInt(p.speedMultiplier, 10) || 1);
+    return Math.ceil(raw / mult);
 }
 
 // ── IPC listeners (from settings window via main process) ────────────
@@ -150,6 +155,20 @@ function computeTotalFrames(history, p) {
     });
 }
 
+// 在输出帧边界应用高亮：本批内曾点亮的键置 1，否则乘以 decayBatch（等价于跨 stride 个逻辑帧的连乘衰减）。
+function applyBatchBrightness(nodeBrightness, edgeBrightness, batchNodeLit, batchEdgeLit, decayBatch) {
+    const nodeKeys = new Set([...Object.keys(nodeBrightness), ...batchNodeLit]);
+    for (const k of nodeKeys) {
+        if (batchNodeLit.has(k)) nodeBrightness[k] = 1;
+        else nodeBrightness[k] = (nodeBrightness[k] || 0) * decayBatch;
+    }
+    const edgeKeys = new Set([...Object.keys(edgeBrightness), ...batchEdgeLit]);
+    for (const k of edgeKeys) {
+        if (batchEdgeLit.has(k)) edgeBrightness[k] = 1;
+        else edgeBrightness[k] = (edgeBrightness[k] || 0) * decayBatch;
+    }
+}
+
 // ── Main render function ──────────────────────────────────────────────
 async function startRender(p) {
     const { ipcRenderer } = require('electron');
@@ -161,8 +180,8 @@ async function startRender(p) {
     ipcRenderer.send('render-ui-lock', true);
 
     const renderGraph = buildRenderGraphSnapshot();
-    const frames      = buildFrameSequence(history, p);
-    const totalSteps  = frames.length;
+    const stride      = Math.max(1, parseInt(p.speedMultiplier, 10) || 1);
+    let totalRaw      = computeRawTotalFrames(history, p);
 
     // ── Open preview window only when rendering images ────────────────
     if (p.renderImage) {
@@ -175,39 +194,54 @@ async function startRender(p) {
 
     const nodeBrightness = {};
     const edgeBrightness = {};
-    const decay = Math.pow(0.5, 1 / p.halflife);
+    // 与「每逻辑帧乘以 0.5^(1/halflife)」共 stride 次等效的一次性因子
+    const decayBatch = Math.pow(0.5, stride / p.halflife);
+    const batchNodeLit = new Set();
+    const batchEdgeLit = new Set();
     let lastPreviewTime = 0;
 
     try {
-        // ── Image render loop ─────────────────────────────────────────
-        for (let fi = 0; fi < frames.length; fi++) {
-            const frame = frames[fi];
+        // ── Image render：O(步数) 建时间轴 + 仅输出 ceil(totalRaw/stride) 帧，不逐逻辑帧迭代 ──
+        if (p.renderImage && totalRaw > 0) {
+            const timeline = buildRenderTimeline(history, p);
+            if (timeline.totalRaw !== totalRaw) {
+                console.warn('[render] totalRaw mismatch', timeline.totalRaw, totalRaw);
+                totalRaw = timeline.totalRaw;
+            }
+            const { segments, activations } = timeline;
+            const totalOut = Math.ceil(totalRaw / stride);
+            let outFi = 0;
+            for (let D = 0; D < totalRaw; D += stride) {
+                const batchStart = D === 0 ? 0 : D - stride + 1;
+                const batchEnd   = D;
+                collectActivationsInRange(activations, batchStart, batchEnd, batchNodeLit, batchEdgeLit);
+                applyBatchBrightness(
+                    nodeBrightness, edgeBrightness,
+                    batchNodeLit, batchEdgeLit, decayBatch);
+                batchNodeLit.clear();
+                batchEdgeLit.clear();
 
-            for (const k of Object.keys(nodeBrightness)) nodeBrightness[k] *= decay;
-            for (const k of Object.keys(edgeBrightness)) edgeBrightness[k] *= decay;
-            if (frame.activateNode) nodeBrightness[frame.activateNode] = 1.0;
-            if (frame.activateEdge) edgeBrightness[frame.activateEdge] = 1.0;
-
-            if (p.renderImage) {
+                const frame = getFrameStateAt(segments, history, D);
                 drawRenderFrame(ctx, p, renderGraph, frame, nodeBrightness, edgeBrightness);
 
                 const dataURL = offCanvas.toDataURL('image/png');
                 const base64  = dataURL.slice(dataURL.indexOf(',') + 1);
                 const pngBuf  = Buffer.from(base64, 'base64');
-                const num = String(fi).padStart(6, '0');
+                const num = String(outFi).padStart(6, '0');
                 fs.writeFileSync(pathMod.join(p.outputPath, `frame_${num}.png`), pngBuf);
+                outFi++;
 
                 const now = Date.now();
                 if (now - lastPreviewTime >= 150) {
                     lastPreviewTime = now;
                     ipcRenderer.send('render-preview-dataurl', dataURL);
                 }
+
+                const pct = (outFi / totalOut * 100).toFixed(1);
+                ipcRenderer.send('render-progress', { pct, current: outFi, total: totalOut });
+
+                if (outFi % 10 === 0) await new Promise(res => setTimeout(res, 0));
             }
-
-            const pct = ((fi + 1) / totalSteps * 100).toFixed(1);
-            ipcRenderer.send('render-progress', { pct, current: fi + 1, total: totalSteps });
-
-            if (fi % 10 === 0) await new Promise(res => setTimeout(res, 0));
         }
 
         // ── Audio bake ────────────────────────────────────────────────
@@ -245,41 +279,35 @@ function _getStateNames() {
     return [...names];
 }
 
-// ── Build frame sequence ──────────────────────────────────────────────
-function buildFrameSequence(history, p) {
-    const frames = [];
-    // history[i] = [step, position, prevState, state, tape]
-    // history[0] = initial: step=0, position=0, prevState=undefined, state="start"
-
-    if (history.length === 0) return frames;
+// ── Iterate every logical render frame（顺序与 computeRawTotalFrames 一致）──────────
+function* iterateRenderFrames(history, p) {
+    if (history.length === 0) return;
 
     const pause = Math.max(0, p.pauseFrames);
     const move  = Math.max(1, p.moveFrames);
 
-    const pushFrames = (count, headPos, histIdx, currentState, activateNode, activateEdge) => {
+    function* yieldPause(count, headPos, histIdx, currentState, activateNode, activateEdge) {
         for (let i = 0; i < count; i++) {
-            frames.push({
+            yield {
                 headPos,
                 historyIndex: histIdx,
                 currentState,
                 activateNode: i === 0 ? activateNode : null,
                 activateEdge: i === 0 ? activateEdge : null,
-            });
+            };
         }
-    };
+    }
 
-    // ── Frame 0: one dark frame before anything lights up ────────────
     const initial = history[0];
-    frames.push({
+    yield {
         headPos:      initial[1],
         historyIndex: 0,
         currentState: initial[3],
         activateNode: null,
         activateEdge: null,
-    });
+    };
 
-    // Initial pause: head at position of history[0], start node lights up
-    pushFrames(pause, initial[1], 0, initial[3],
+    yield* yieldPause(pause, initial[1], 0, initial[3],
         canonicalStateName(initial[3]), null);
 
     for (let i = 1; i < history.length; i++) {
@@ -289,77 +317,198 @@ function buildFrameSequence(history, p) {
         const currPos    = curr[1];
         const prevState  = prev[3];
         const currState  = curr[3];
-
-        // Edge key for the transition prevState → currState
         const edgeKey = prevState + '||' + currState;
 
-        // Head movement: animate from prevPos to currPos.
-        // During movement the tape and state still show the PREVIOUS step's values,
-        // so the tape write and state change appear to happen once the head has landed.
-        // Skip movement frames if position didn't change (direction was N).
         if (currPos !== prevPos) {
             for (let mf = 0; mf < move; mf++) {
                 const t01   = (mf + 1) / move;
                 const tEase = cubicEase(t01);
-                // On the last movement frame, fire activateNode/activateEdge so the
-                // highlight is always triggered even when pauseFrames = 0.
                 const isLastMoveFrame = (mf === move - 1);
-                frames.push({
+                yield {
                     headPos:      prevPos + (currPos - prevPos) * tEase,
                     historyIndex: isLastMoveFrame ? i : i - 1,
                     currentState: isLastMoveFrame ? currState : prevState,
                     activateNode: isLastMoveFrame ? canonicalStateName(currState) : null,
                     activateEdge: isLastMoveFrame ? edgeKey : null,
-                });
+                };
             }
         }
 
-        // Post-arrival pause: head is at currPos, tape and state flip to curr's values.
-        // Highlight the new state node and the taken edge.
-        // When pauseFrames = 0, skip pushFrames (count = 0, no frames added).
-        // But if there were also no movement frames (position unchanged), we still need
-        // at least one landing frame to fire the highlight — insert it explicitly.
         if (pause > 0) {
-            pushFrames(pause, currPos, i, currState,
+            yield* yieldPause(pause, currPos, i, currState,
                 canonicalStateName(currState), edgeKey);
         } else if (currPos === prevPos) {
-            // No movement frames AND no pause frames: fire highlight in a single frame.
-            frames.push({
+            yield {
                 headPos:      currPos,
                 historyIndex: i,
                 currentState: currState,
                 activateNode: canonicalStateName(currState),
                 activateEdge: edgeKey,
-            });
+            };
         }
-        // (If pause=0 but movement frames existed, the last movement frame already
-        //  carried the highlight above — nothing more needed here.)
     }
 
-    // Final pause at the terminal position/state
     const last = history[history.length - 1];
-    pushFrames(pause, last[1], history.length - 1, last[3],
+    yield* yieldPause(pause, last[1], history.length - 1, last[3],
         canonicalStateName(last[3]), null);
 
-    // Cooldown: continue rendering until glow fully fades.
-    // After 9 half-lives, brightness = 1/2^9 < 0.002, visually black.
     const cooldown = Math.ceil(9 * p.halflife);
-    for (let i = 0; i < cooldown; i++) {
-        frames.push({
+    for (let j = 0; j < cooldown; j++) {
+        yield {
             headPos:      last[1],
             historyIndex: history.length - 1,
             currentState: last[3],
             activateNode: null,
             activateEdge: null,
-        });
+        };
     }
-
-    return frames;
 }
 
 function cubicEase(t) {
     // Ease in-out cubic
     return t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2, 3)/2;
+}
+
+// ── O(步数) 时间轴：与 iterateRenderFrames 语义一致，用于大步长时避免逐逻辑帧迭代 ──
+function buildRenderTimeline(history, p) {
+    const pause = Math.max(0, p.pauseFrames);
+    const move  = Math.max(1, p.moveFrames);
+    const cooldown = Math.ceil(9 * p.halflife);
+    const segments = [];
+    const activations = [];
+
+    if (!history || history.length === 0) {
+        return { totalRaw: 0, segments, activations };
+    }
+
+    function addStatic(g0, len, headPos, histIdx, state) {
+        if (len <= 0) return;
+        segments.push({
+            type: 'static', g0, len, headPos, histIdx, state,
+        });
+    }
+
+    let g = 0;
+    const initial = history[0];
+
+    segments.push({ type: 'dark', g0: 0, len: 1 });
+    g = 1;
+
+    if (pause > 0) {
+        activations.push({ g, node: canonicalStateName(initial[3]), edge: null });
+        addStatic(g, pause, initial[1], 0, initial[3]);
+        g += pause;
+    }
+
+    for (let i = 1; i < history.length; i++) {
+        const prev      = history[i - 1];
+        const curr      = history[i];
+        const prevPos   = prev[1];
+        const currPos   = curr[1];
+        const prevState = prev[3];
+        const currState = curr[3];
+        const edgeKey   = prevState + '||' + currState;
+
+        if (currPos !== prevPos) {
+            activations.push({
+                g: g + move - 1,
+                node: canonicalStateName(currState),
+                edge: edgeKey,
+            });
+            segments.push({
+                type: 'move', g0: g, len: move, move,
+                prevPos, currPos, i, prevState, currState,
+            });
+            g += move;
+            if (pause > 0) {
+                activations.push({ g, node: canonicalStateName(currState), edge: edgeKey });
+                addStatic(g, pause, currPos, i, currState);
+                g += pause;
+            }
+        } else if (pause > 0) {
+            activations.push({ g, node: canonicalStateName(currState), edge: edgeKey });
+            addStatic(g, pause, currPos, i, currState);
+            g += pause;
+        } else {
+            activations.push({ g, node: canonicalStateName(currState), edge: edgeKey });
+            addStatic(g, 1, currPos, i, currState);
+            g += 1;
+        }
+    }
+
+    const last = history[history.length - 1];
+    if (pause > 0) {
+        activations.push({ g, node: canonicalStateName(last[3]), edge: null });
+        addStatic(g, pause, last[1], history.length - 1, last[3]);
+        g += pause;
+    }
+    if (cooldown > 0) {
+        addStatic(g, cooldown, last[1], history.length - 1, last[3]);
+        g += cooldown;
+    }
+
+    return { totalRaw: g, segments, activations };
+}
+
+function findSegmentForIndex(segments, g) {
+    let lo = 0, hi = segments.length - 1;
+    while (lo <= hi) {
+        const mid = (lo + hi) >> 1;
+        const s = segments[mid];
+        if (g < s.g0) hi = mid - 1;
+        else if (g >= s.g0 + s.len) lo = mid + 1;
+        else return s;
+    }
+    return null;
+}
+
+function getFrameStateAt(segments, history, g) {
+    const seg = findSegmentForIndex(segments, g);
+    if (!seg) throw new Error('getFrameStateAt: invalid frame index ' + g);
+    const off = g - seg.g0;
+    if (seg.type === 'dark') {
+        const h = history[0];
+        return {
+            headPos: h[1], historyIndex: 0, currentState: h[3],
+            activateNode: null, activateEdge: null,
+        };
+    }
+    if (seg.type === 'static') {
+        return {
+            headPos: seg.headPos, historyIndex: seg.histIdx, currentState: seg.state,
+            activateNode: null, activateEdge: null,
+        };
+    }
+    if (seg.type === 'move') {
+        const mf   = off;
+        const t01  = (mf + 1) / seg.move;
+        const tEase = cubicEase(t01);
+        const isLast = mf === seg.move - 1;
+        return {
+            headPos: seg.prevPos + (seg.currPos - seg.prevPos) * tEase,
+            historyIndex: isLast ? seg.i : seg.i - 1,
+            currentState: isLast ? seg.currState : seg.prevState,
+            activateNode: null, activateEdge: null,
+        };
+    }
+    throw new Error('getFrameStateAt: unknown segment');
+}
+
+function collectActivationsInRange(activations, batchStart, batchEnd, batchNodeLit, batchEdgeLit) {
+    batchNodeLit.clear();
+    batchEdgeLit.clear();
+    if (!activations.length || batchEnd < batchStart) return;
+    let lo = 0, hi = activations.length;
+    while (lo < hi) {
+        const mid = (lo + hi) >> 1;
+        if (activations[mid].g < batchStart) lo = mid + 1;
+        else hi = mid;
+    }
+    for (let i = lo; i < activations.length && activations[i].g <= batchEnd; i++) {
+        const a = activations[i];
+        if (a.node) batchNodeLit.add(a.node);
+        if (a.edge) batchEdgeLit.add(a.edge);
+    }
 }
 
 function canonicalStateName(state) {
