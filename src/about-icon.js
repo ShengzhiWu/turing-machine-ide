@@ -142,12 +142,13 @@
                 const gid = Number.isFinite(gridIds[i]) ? gridIds[i] : 0;
                 const color = faceColors[Math.max(0, Math.min(faceColors.length - 1, gid))];
                 poly.setAttribute('fill', color);
-                poly.setAttribute('stroke', 'rgba(0, 0, 0, 0.08)');
+                poly.setAttribute('stroke', color);
+                poly.setAttribute('stroke-width', '0.3');
             } else {
                 poly.setAttribute('fill', BACK_FACE_COLOR);
-                poly.setAttribute('stroke', 'rgba(0, 0, 0, 0.05)');
+                poly.setAttribute('stroke', BACK_FACE_COLOR);
+                poly.setAttribute('stroke-width', '0.15');
             }
-            poly.setAttribute('stroke-width', '0.25');
             svg.appendChild(poly);
             polygons.push(poly);
         }
