@@ -40,6 +40,85 @@ function finishEditingTapeCallback(data) {
     }
 }
 
+let tapeEditHintEl = null;
+
+function ensureTapeEditHintElement() {
+    if (tapeEditHintEl) return tapeEditHintEl;
+    const el = document.createElement('div');
+    el.id = 'tape-edit-hint';
+    el.style.position = 'fixed';
+    el.style.zIndex = '1200';
+    el.style.display = 'none';
+    el.style.padding = '8px 10px';
+    el.style.background = 'rgba(255, 255, 255, 0.78)';
+    el.style.color = '#000000';
+    el.style.border = '1px solid rgba(0, 0, 0, 0.35)';
+    el.style.borderRadius = '6px 0 6px 6px';  // 右上角无圆角
+    el.style.fontSize = '12px';
+    el.style.lineHeight = '1.45';
+    el.style.whiteSpace = 'nowrap';
+    el.style.pointerEvents = 'none';
+    el.innerHTML = '';
+    document.body.appendChild(el);
+    tapeEditHintEl = el;
+    const line1 = (typeof t === 'function') ? t('tapeHintTabNext') : 'Tab: next cell';
+    const line2 = (typeof t === 'function') ? t('tapeHintShiftTabPrev') : 'Shift + Tab: previous cell';
+    tapeEditHintEl.innerHTML = `${line1}<br>${line2}`;
+    return tapeEditHintEl;
+}
+
+function updateTapeEditHintText() {
+    if (!tapeEditHintEl) return;
+    const hintEl = tapeEditHintEl;
+    const line1 = (typeof t === 'function') ? t('tapeHintTabNext') : 'Tab: next cell';
+    const line2 = (typeof t === 'function') ? t('tapeHintShiftTabPrev') : 'Shift + Tab: previous cell';
+    hintEl.innerHTML = `${line1}<br>${line2}`;
+}
+
+function isFirstRowEditableCell(el) {
+    if (!el || !history_table || !history_table.rows || !history_table.rows[0]) return false;
+    return el.tagName === 'TD' && el.parentElement === history_table.rows[0] && el.contentEditable === 'true';
+}
+
+function positionTapeEditHint(referenceCell) {
+    const hintEl = ensureTapeEditHintElement();
+    const tapePanelEl = document.getElementById('tape-panel');
+    if (!hintEl || !referenceCell || !tapePanelEl) return;
+
+    const referenceRect = referenceCell.getBoundingClientRect();
+    const tapePanelRect = tapePanelEl.getBoundingClientRect();
+
+    // 先显示（但不可见）以拿到准确宽高，再定位。
+    hintEl.style.display = 'block';
+    hintEl.style.visibility = 'hidden';
+
+    const margin = 0;  // 右边缘贴着结果面板
+    const hintWidth = hintEl.offsetWidth;
+    let left = tapePanelRect.left - margin - hintWidth;
+    if (left < 6) left = 6;
+
+    hintEl.style.left = `${left}px`;
+    hintEl.style.top = `${Math.max(6, referenceRect.top)}px`;
+    hintEl.style.visibility = 'visible';
+}
+
+function showTapeEditHint(cell) {
+    positionTapeEditHint(cell);
+}
+
+function hideTapeEditHint() {
+    const hintEl = ensureTapeEditHintElement();
+    hintEl.style.display = 'none';
+}
+
+function refreshTapeEditHintPositionIfNeeded() {
+    const active = document.activeElement;
+    if (isFirstRowEditableCell(active)) showTapeEditHint(active);
+}
+
+window.addEventListener('resize', refreshTapeEditHintPositionIfNeeded);
+window.addEventListener('scroll', refreshTapeEditHintPositionIfNeeded, true);
+
 function selectAllContentInCell(cell) {
     if (!cell) return;
     const selection = window.getSelection();
@@ -122,6 +201,19 @@ function refresh_history_table(history_table, history) {
                 cellIndex: i - 1,
                 value: cell.textContent
             });
+            // 若焦点仍在首行可编辑格子（例如 Tab 切换），则保持提示；否则隐藏
+            setTimeout(() => {
+                const active = document.activeElement;
+                if (isFirstRowEditableCell(active)) {
+                    showTapeEditHint(active);
+                } else {
+                    hideTapeEditHint();
+                }
+            }, 0);
+        });
+
+        cell.addEventListener('focus', function() {
+            showTapeEditHint(cell);
         });
         
         // 添加键盘事件监听（按下回车）

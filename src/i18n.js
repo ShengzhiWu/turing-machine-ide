@@ -103,6 +103,8 @@ const MENU_I18N = {
         unsavedSave:             '保存',
         unsavedDiscard:          '不保存',
         unsavedCancel:           '取消',
+        tapeHintTabNext:         'Tab：下一格',
+        tapeHintShiftTabPrev:    'Shift + Tab：上一格',
     },
     en: {
         file:           'File',
@@ -206,6 +208,8 @@ const MENU_I18N = {
         unsavedSave:             'Save',
         unsavedDiscard:          "Don't Save",
         unsavedCancel:           'Cancel ',  // 这里加一个空格是因为如果不这样做，Cancel作为特殊字符串会被系统识别导致界面显示异常
+        tapeHintTabNext:         'Tab: next cell',
+        tapeHintShiftTabPrev:    'Shift + Tab: previous cell',
     }
 };
 
@@ -286,6 +290,7 @@ function applyLanguageToUI() {
 
     if (typeof code_editor !== 'undefined') code_editor.lang = language;
     if (typeof style_editor !== 'undefined') style_editor.lang = language;
+    if (typeof updateTapeEditHintText === 'function') updateTapeEditHintText();
 }
 
 function switchLanguage(lang) {
