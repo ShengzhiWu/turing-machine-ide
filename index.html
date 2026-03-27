@@ -233,11 +233,11 @@
         }
 
         #about-dialog {
-            background: hsl(0, 0%, 14%);
-            color: rgba(255,255,255,0.88);
-            border: 1px solid hsl(0,0%,35%);
+            background: rgba(236, 236, 236, 0.651);
+            color: rgba(18, 18, 18, 0.92);
+            border: 1px solid rgba(255, 255, 255, 0.35);
             border-radius: 8px;
-            padding: 28px 34px;
+            padding: 18px 22px;
             min-width: 340px;
             max-width: 480px;
             box-shadow: 0 8px 32px rgba(0,0,0,0.7);
@@ -247,21 +247,66 @@
             position: relative;
         }
 
+        #about-header-row {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 30px;
+        }
+
         #about-dialog h2 {
-            margin: 0 0 12px 0;
+            margin: 0;
             font-size: 16px;
             font-weight: 600;
-            color: white;
+            color: rgba(10, 10, 10, 0.95);
         }
 
         #about-dialog .about-version {
-            color: rgba(255,255,255,0.5);
+            color: rgba(0, 0, 0, 0.58);
             font-size: 12px;
-            margin-bottom: 16px;
+            margin: 0;
+            white-space: nowrap;
+        }
+
+        #about-tape-icon-wrap {
+            width: 168px;
+            height: 168px;
+            margin: 0 auto 10px auto;
+            border-radius: 8px;
+            background: transparent;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        #about-tape-icon {
+            width: 160px;
+            height: 160px;
+            display: block;
+            background: transparent;
+        }
+
+        #about-body p {
+            margin: 0.2em 0;
+        }
+
+        #about-footer-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 14px;
+            margin-top: 10px;
+        }
+
+        #about-footer-row #about-body {
+            flex: 1;
+            min-width: 0;
         }
 
         #about-close-btn {
-            margin-top: 20px;
+            margin-top: 0;
             padding: 6px 22px;
             background: hsl(210, 60%, 40%);
             color: white;
@@ -270,7 +315,7 @@
             cursor: pointer;
             font-size: 13px;
             display: block;
-            margin-left: auto;
+            margin-left: 0;
         }
 
         #about-close-btn:hover {
@@ -465,10 +510,17 @@
     <!-- ── About Dialog ── -->
     <div id="about-overlay">
         <div id="about-dialog">
-            <h2 id="about-title">Turing Machine IDE</h2>
-            <div class="about-version" id="about-version-line">Version 1.0</div>
-            <div id="about-body"></div>
-            <button id="about-close-btn" onclick="closeAbout()"></button>
+            <div id="about-header-row">
+                <h2 id="about-title">Turing Machine IDE</h2>
+                <div class="about-version" id="about-version-line">Version 1.0</div>
+            </div>
+            <div id="about-tape-icon-wrap">
+                <svg id="about-tape-icon" viewBox="0 0 100 100" aria-label="Animated tape icon"></svg>
+            </div>
+            <div id="about-footer-row">
+                <div id="about-body"></div>
+                <button id="about-close-btn" onclick="closeAbout()"></button>
+            </div>
         </div>
     </div>
     <div id="rename-state-overlay">
@@ -705,6 +757,7 @@
     <script src="src/app.js"></script>
     <script src="src/i18n.js"></script>
     <script src="src/file.js"></script>
+    <script src="src/about-icon.js"></script>
     <script src="src/menu.js"></script>
     <script src="src/render-anim.js"></script>
 
