@@ -1,6 +1,7 @@
 (() => {
     const SVG_NS = 'http://www.w3.org/2000/svg';
     const BACK_FACE_COLOR = 'rgb(238, 238, 238)';
+    const BACK_FACE_COLOR_DARKER = 'rgb(218, 218, 218)';
     const PADDING = 8;  // 边距
     const BASE_AMPLITUDE_X = 0.5;  // 振幅
     const BASE_AMPLITUDE_Y = 1.5;  // 振幅
@@ -145,9 +146,16 @@
                 poly.setAttribute('stroke', color);
                 poly.setAttribute('stroke-width', '0.3');
             } else {
-                poly.setAttribute('fill', BACK_FACE_COLOR);
-                poly.setAttribute('stroke', BACK_FACE_COLOR);
-                poly.setAttribute('stroke-width', '0.15');
+                if (vertices[faces[i][0]][0] > 0) {
+                    poly.setAttribute('fill', BACK_FACE_COLOR);
+                    poly.setAttribute('stroke', BACK_FACE_COLOR);
+                    poly.setAttribute('stroke-width', '0.5');
+                }
+                else {
+                    poly.setAttribute('fill', BACK_FACE_COLOR_DARKER);
+                    poly.setAttribute('stroke', BACK_FACE_COLOR_DARKER);
+                    poly.setAttribute('stroke-width', '0.05');
+                }
             }
             svg.appendChild(poly);
             polygons.push(poly);
