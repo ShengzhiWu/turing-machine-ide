@@ -360,6 +360,8 @@ class TmEditor extends HTMLElement {
         this._selectedIdx = 0;
         this._suggestRange = { start: -1, end: -1 };
         this._wholeLine = false;
+        /** 刚因退格/删除使当前元变为空时抑制补全；键入（含逗号）或移动光标后清除 */
+        this._suppressSuggestEmptyAfterDelete = false;
         this._lastMouseEvent = null;
         // 存储错误位置供 tooltip 使用
         this._errorPositions = [];
@@ -719,6 +721,10 @@ class TmEditor extends HTMLElement {
         if (ta.selectionStart !== ta.selectionEnd) { this._hideSuggestions(); return; }
         const { value: text, selectionStart: cursor } = ta;
         const { elemIdx, elemStart, leadingSpaces, prefix } = getElementInfo(text, cursor);
+        if (this._suppressSuggestEmptyAfterDelete && prefix === '') {
+            this._hideSuggestions();
+            return;
+        }
         const ls = lineStartOf(text, cursor);
         let le = cursor; while (le < text.length && text[le] !== '\n') le++;
         if (text.slice(ls, le).replace(/\/\/.*$/, '').trim() === '') { this._hideSuggestions(); return; }
@@ -829,6 +835,14 @@ class TmEditor extends HTMLElement {
         ta.addEventListener('input', e => {
             this._syncHighlight();
             const isNewline = e.inputType === 'insertLineBreak' || e.inputType === 'insertParagraph';
+            const isDelete = e.inputType === 'deleteContentBackward' || e.inputType === 'deleteContentForward'
+                || e.inputType === 'deleteByCut' || e.inputType === 'deleteByDrag';
+            const { prefix } = getElementInfo(ta.value, ta.selectionStart);
+            if (isDelete) {
+                this._suppressSuggestEmptyAfterDelete = prefix === '';
+            } else {
+                this._suppressSuggestEmptyAfterDelete = false;
+            }
             if (!isNewline) this._triggerAutocomplete();
             this._checkCursorLine();
         });
@@ -841,12 +855,16 @@ class TmEditor extends HTMLElement {
         ta.addEventListener('mousemove',  e => { this._lastMouseEvent = e; this._refreshErrorTooltip(); });
         ta.addEventListener('mouseleave', () => { this._lastMouseEvent = null; this._errorTooltip.style.display = 'none'; });
 
-        ta.addEventListener('click',  () => { this._updateFormatBar(); this._hideSuggestions(); this._updateMatchHighlight(); this._checkCursorLine(); });
+        ta.addEventListener('click',  () => {
+            this._suppressSuggestEmptyAfterDelete = false;
+            this._updateFormatBar(); this._hideSuggestions(); this._updateMatchHighlight(); this._checkCursorLine();
+        });
         ta.addEventListener('blur',   () => { setTimeout(() => { if (this._shadow.activeElement !== sb) { this._hideSuggestions(); this._updateFormatBar(); } }, 150); });
 
         ta.addEventListener('keyup', e => {
             if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && sb.style.display === 'block') return;
             if (['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End'].includes(e.key)) {
+                this._suppressSuggestEmptyAfterDelete = false;
                 this._updateFormatBar(); this._hideSuggestions(); this._updateMatchHighlight();
                 this._checkCursorLine();
             }
