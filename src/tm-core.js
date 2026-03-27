@@ -148,6 +148,7 @@ function run_turing_machine(code, tape, max_steps, history_filter, start_positio
     const snapRing = SNAP_BUF > 0 ? new Array(SNAP_BUF) : null;
     let snapHead  = 0;
     let snapCount = 0;
+    let sameStateTapeExtendStreak = 0;  // 连续满足“延长纸带且状态不变”的步数
 
     // 第 0 步作为初始快照，确保总步数 < SNAPSHOT_INTERVAL 时也有可用起跑点
     if (snapRing) {
@@ -162,14 +163,17 @@ function run_turing_machine(code, tape, max_steps, history_filter, start_positio
             break;
 
         const state_0 = state;
+        let tapeExtended = false;
         var actionDict = code[state];
         if(actionDict == undefined) {
             state = "error";
             break;
         }
 
-        if (position >= tape.length)
+        if (position >= tape.length) {
             tape.push('');  // Infinite tape to the right
+            tapeExtended = true;
+        }
         var action = actionDict[tape[position]];
         if (action == undefined)
             action = actionDict[OTHER];
@@ -218,6 +222,7 @@ function run_turing_machine(code, tape, max_steps, history_filter, start_positio
             if (position < 0) {  // 向左移出了纸带，在左边加一格
                 position++;
                 tape.unshift('');
+                tapeExtended = true;
                 history.forEach(record => {
                     record[1]++;
                     record[4].unshift('');  // 在历史记录的每个纸带前面加一个空格
@@ -232,6 +237,14 @@ function run_turing_machine(code, tape, max_steps, history_filter, start_positio
                 }
             }
         }
+
+        // 连续两步都延长纸带且状态不变的情况下自动停机
+        if (tapeExtended && state === state_0)
+            sameStateTapeExtendStreak++;
+        else
+            sameStateTapeExtendStreak = 0;
+        if (sameStateTapeExtendStreak >= 2)
+            break;
 
         // 每隔 SNAPSHOT_INTERVAL 步存一次快照（移动完成后存，含纸带完整拷贝）
         // 快照语义：从此状态出发，下一步执行 step+1
