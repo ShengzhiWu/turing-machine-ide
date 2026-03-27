@@ -146,14 +146,13 @@ function buildEmbeddingJSON() {
  * @param {object} obj        要序列化的 JSON 对象
  * @param {string} defaultName  对话框默认文件名
  */
-function saveJSONFileAs(obj, defaultName) {
+async function saveJSONFileAs(obj, defaultName) {
     const json = JSON.stringify(obj, null, 2);
 
     try {
         const { ipcRenderer } = require('electron');
-        ipcRenderer.invoke('save-file', { defaultName, content: json }).then(savedPath => {
-            if (savedPath) markClean(savedPath);
-        });
+        const savedPath = await ipcRenderer.invoke('save-file', { defaultName, content: json });
+        if (savedPath) markClean(savedPath);
         return;
     } catch (_) {}
 
@@ -173,17 +172,16 @@ function saveJSONFileAs(obj, defaultName) {
  * @param {object} obj
  * @param {string} filePath  完整文件路径
  */
-function saveJSONFileToPath(obj, filePath) {
+async function saveJSONFileToPath(obj, filePath) {
     const json = JSON.stringify(obj, null, 2);
 
     try {
         const { ipcRenderer } = require('electron');
-        ipcRenderer.invoke('save-file-to-path', { filePath, content: json }).then(ok => {
-            if (ok) markClean(filePath);
-        });
+        const ok = await ipcRenderer.invoke('save-file-to-path', { filePath, content: json });
+        if (ok) markClean(filePath);
     } catch (_) {
         // 回退到另存为
-        saveJSONFileAs(obj, filePath.split(/[\\/]/).pop());
+        await saveJSONFileAs(obj, filePath.split(/[\\/]/).pop());
     }
 }
 
@@ -231,16 +229,16 @@ function openJSONFile(callback) {
 async function saveProject() {
     const obj = await buildProjectJSON();
     if (_currentFilePath) {
-        saveJSONFileToPath(obj, _currentFilePath);
+        await saveJSONFileToPath(obj, _currentFilePath);
     } else {
-        saveJSONFileAs(obj, 'project.json');
+        await saveJSONFileAs(obj, 'project.json');
     }
 }
 
 /** 另存为：始终弹对话框，保存后更新当前路径 */
 async function saveProjectAs() {
     const obj = await buildProjectJSON();
-    saveJSONFileAs(obj, _currentFileName || 'project.json');
+    await saveJSONFileAs(obj, _currentFileName || 'project.json');
 }
 
 function menuSaveEmbedding() {
