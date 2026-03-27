@@ -77,6 +77,7 @@ const SHADOW_CSS = `
     display: block;
     width: 100%;
     height: 100%;
+    --tm-line-height: 1.7em;
     font-size: 13px; /* 统一基准：外部改这一个值即可缩放整个编辑器 */
     font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', Consolas, 'Courier New', monospace;
 }
@@ -104,16 +105,18 @@ const SHADOW_CSS = `
 .code-wrapper { display: flex; flex: 1; min-height: 0; background: #171c2b; overflow: hidden; }
 .line-numbers {
     background: #1a1f30; padding: 1.5em 0 1.5em 1em; text-align: right;
-    color: #5d6b93; font-size: 1em; line-height: 1.7; user-select: none;
+    color: #5d6b93; font-size: 1em; line-height: var(--tm-line-height); user-select: none;
     border-right: 1px solid #2f384f; min-width: 3.75em; flex-shrink: 0; overflow: hidden;
 }
-.line-numbers div { padding-right: 0.75em; }
+.line-numbers div {
+    padding-right: 0.75em;
+}
 .editor-area { position: relative; flex-grow: 1; min-width: 0; overflow: hidden; }
 
 pre.highlight-layer {
     position: absolute; top: 0; left: 0; margin: 0; padding: 1.5em 1.75em;
     font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', Consolas, 'Courier New', monospace;
-    font-size: 1em; line-height: 1.7; white-space: pre;
+    font-size: 1em; line-height: var(--tm-line-height); white-space: pre;
     pointer-events: none; overflow: visible; z-index: 1;
 }
 /* 每行高亮内容包在一个 block span 里，与 textarea 行对齐 */
@@ -123,7 +126,7 @@ textarea {
     padding: 1.5em 1.75em; margin: 0; border: none; background: transparent;
     color: transparent; caret-color: #f3f7ff;
     font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', Consolas, 'Courier New', monospace;
-    font-size: 1em; line-height: 1.7; white-space: pre;
+    font-size: 1em; line-height: var(--tm-line-height); white-space: pre;
     overflow: auto; resize: none; outline: none; z-index: 2;
     scrollbar-width: thin; scrollbar-color: #3d4a6b #171c2b;
 }
@@ -549,9 +552,23 @@ class TmEditor extends HTMLElement {
 
     _syncScroll() {
         const ta = this._textarea;
-        this._hlLayer.style.top  = -ta.scrollTop  + 'px';
+        const ln = this._lineNumbers;
+        if (!ta || !ln) return;
+
+        // 各自的实际可滚动范围
+        const taRange = Math.max(0, ta.scrollHeight - ta.clientHeight);
+        const lnRange = Math.max(0, ln.scrollHeight - ln.clientHeight);
+        const maxRange = Math.min(taRange, lnRange);
+
+        // 将滚动限制在双方共同的最大值，防止代码比行号多出一截
+        const clampedScrollTop = maxRange > 0 ? Math.min(ta.scrollTop, maxRange) : 0;
+        if (clampedScrollTop !== ta.scrollTop) {
+            ta.scrollTop = clampedScrollTop;
+        }
+
+        this._hlLayer.style.top  = -clampedScrollTop  + 'px';
         this._hlLayer.style.left = -ta.scrollLeft + 'px';
-        this._lineNumbers.scrollTop = ta.scrollTop;
+        ln.scrollTop = clampedScrollTop;
     }
 
     _syncHighlight() {
