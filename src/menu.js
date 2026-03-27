@@ -60,6 +60,132 @@ function updateGraphLabelsAfterStateRename(mapping) {
     }
 }
 
+function askPrefixSuffixForStateRename() {
+    const overlay = document.getElementById('rename-state-overlay');
+    const titleEl = document.getElementById('rename-state-title');
+    const prefixLabel = document.getElementById('rename-prefix-label');
+    const suffixLabel = document.getElementById('rename-suffix-label');
+    const prefixInput = document.getElementById('rename-prefix-input');
+    const suffixInput = document.getElementById('rename-suffix-input');
+    const cancelBtn = document.getElementById('rename-state-cancel-btn');
+    const applyBtn = document.getElementById('rename-state-apply-btn');
+
+    titleEl.textContent = t('renamePrefixSuffixTitle');
+    prefixLabel.textContent = t('renamePrefixLabel');
+    suffixLabel.textContent = t('renameSuffixLabel');
+    prefixInput.placeholder = t('renamePrefixPlaceholder');
+    suffixInput.placeholder = t('renameSuffixPlaceholder');
+    cancelBtn.textContent = t('renameCancelBtn');
+    applyBtn.textContent = t('renameApplyBtn');
+
+    prefixInput.value = '';
+    suffixInput.value = '';
+    overlay.classList.add('visible');
+
+    return new Promise(resolve => {
+        const cleanup = () => {
+            overlay.classList.remove('visible');
+            overlay.removeEventListener('mousedown', onOverlayMouseDown);
+            cancelBtn.removeEventListener('click', onCancel);
+            applyBtn.removeEventListener('click', onApply);
+            document.removeEventListener('keydown', onKeyDown);
+        };
+
+        const onCancel = () => {
+            cleanup();
+            resolve(null);
+        };
+
+        const onApply = () => {
+            const result = {
+                prefix: prefixInput.value,
+                suffix: suffixInput.value,
+            };
+            cleanup();
+            resolve(result);
+        };
+
+        const onOverlayMouseDown = e => {
+            if (e.target === overlay) onCancel();
+        };
+
+        const onKeyDown = e => {
+            if (!overlay.classList.contains('visible')) return;
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                onCancel();
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                onApply();
+            }
+        };
+
+        overlay.addEventListener('mousedown', onOverlayMouseDown);
+        cancelBtn.addEventListener('click', onCancel);
+        applyBtn.addEventListener('click', onApply);
+        document.addEventListener('keydown', onKeyDown);
+
+        setTimeout(() => prefixInput.focus(), 0);
+    });
+}
+
+async function renameStatesByPrefixSuffix() {
+    const input = await askPrefixSuffixForStateRename();
+    if (!input) return;
+
+    const prefix = input.prefix;
+    const suffix = input.suffix;
+    if (prefix === '' && suffix === '') return;
+
+    const text = code_editor.value || '';
+    const lines = text.split('\n');
+    const mapping = new Map();
+
+    // 收集第1元和第5元中出现的状态名，排除特殊状态
+    for (const line of lines) {
+        const { code } = splitCodeAndComment(line);
+        if (code.trim() === '') continue;
+        const elements = splitElementsKeepRaw(code);
+        [0, 4].forEach(idx => {
+            if (idx >= elements.length) return;
+            const stateName = elements[idx].trim();
+            if (!stateName || SPECIAL_STATES.has(stateName) || mapping.has(stateName)) return;
+            mapping.set(stateName, `${prefix}${stateName}${suffix}`);
+        });
+    }
+
+    if (mapping.size === 0) return;
+
+    const newLines = lines.map(line => {
+        const { code, comment } = splitCodeAndComment(line);
+        if (code.trim() === '') return line;
+
+        const elements = splitElementsKeepRaw(code);
+        if (elements.length === 0) return line;
+
+        const rewriteAt = idx => {
+            if (idx >= elements.length) return;
+            const raw = elements[idx];
+            const trimmed = raw.trim();
+            if (!trimmed || SPECIAL_STATES.has(trimmed) || !mapping.has(trimmed)) return;
+            elements[idx] = raw.replace(trimmed, mapping.get(trimmed));
+        };
+
+        rewriteAt(0);
+        rewriteAt(4);
+
+        return elements.join(',') + comment;
+    });
+
+    const newText = newLines.join('\n');
+    if (newText === text) return;
+
+    code_editor.value = newText;
+    code_editor_value = newText;
+    codeModified = true;
+    updateGraphLabelsAfterStateRename(mapping);
+}
+
 function renameStatesByFirstElementOrder() {
     const text = code_editor.value || '';
     const lines = text.split('\n');
@@ -213,7 +339,8 @@ function buildMenuBar() {
                 {
                     label: t('stateRename'),
                     submenu: [
-                        { label: t('renameStateByFirstElemOrder'), action: renameStatesByFirstElementOrder }
+                        { label: t('renameStateByFirstElemOrder'), action: renameStatesByFirstElementOrder },
+                        { label: t('renameStateByPrefixSuffix'), action: renameStatesByPrefixSuffix }
                     ]
                 }
             ]
