@@ -4,6 +4,114 @@
 //   code_editor, code_editor_value, style_editor, result_table_style
 // 依赖函数：parseStyleCode(), menuRenderAnimation()
 
+const SPECIAL_STATES = new Set(['start', 'end', 'error']);
+
+function splitCodeAndComment(line) {
+    let inStr = false;
+    for (let i = 0; i < line.length - 1; i++) {
+        const ch = line[i];
+        if (ch === '"') inStr = !inStr;
+        if (!inStr && ch === '/' && line[i + 1] === '/') {
+            return { code: line.slice(0, i), comment: line.slice(i) };
+        }
+    }
+    return { code: line, comment: '' };
+}
+
+function splitElementsKeepRaw(codePart) {
+    const elements = [];
+    let inStr = false;
+    let cur = '';
+    for (let i = 0; i < codePart.length; i++) {
+        const ch = codePart[i];
+        if (ch === '"') inStr = !inStr;
+        if (ch === ',' && !inStr) {
+            elements.push(cur);
+            cur = '';
+        } else {
+            cur += ch;
+        }
+    }
+    elements.push(cur);
+    return elements;
+}
+
+function updateGraphLabelsAfterStateRename(mapping) {
+    if (typeof graph === 'undefined' || !Array.isArray(graph) || mapping.size === 0) return;
+
+    const getDisplayName = rawName => {
+        if (rawName.startsWith('end')) return 'end';
+        if (rawName.startsWith('error')) return 'error';
+        return rawName;
+    };
+
+    graph.forEach(node => {
+        if (!Array.isArray(node) || typeof node[0] !== 'string') return;
+        if (!node[0].startsWith('self-connection') && mapping.has(node[0])) {
+            node[0] = mapping.get(node[0]);
+        }
+        const displayName = getDisplayName(node[0]);
+        node._display_name = displayName;
+        if (node._dom && node._dom.name) node._dom.name.textContent = displayName;
+    });
+
+    if (typeof highlighted_vertex_name === 'string' && mapping.has(highlighted_vertex_name)) {
+        highlighted_vertex_name = mapping.get(highlighted_vertex_name);
+    }
+}
+
+function renameStatesByFirstElementOrder() {
+    const text = code_editor.value || '';
+    const lines = text.split('\n');
+    const mapping = new Map();
+    let nextIndex = 0;
+
+    // 第一步：按“第一元”的首次出现顺序收集状态
+    for (const line of lines) {
+        const { code } = splitCodeAndComment(line);
+        if (code.trim() === '') continue;
+        const elements = splitElementsKeepRaw(code);
+        if (elements.length === 0) continue;
+
+        const first = elements[0].trim();
+        if (!first || SPECIAL_STATES.has(first) || mapping.has(first)) continue;
+        mapping.set(first, String(nextIndex));
+        nextIndex++;
+    }
+
+    if (mapping.size === 0) return;
+
+    // 第二步：替换所有状态位（第1元和第5元）
+    const newLines = lines.map(line => {
+        const { code, comment } = splitCodeAndComment(line);
+        if (code.trim() === '') return line;
+
+        const elements = splitElementsKeepRaw(code);
+        if (elements.length === 0) return line;
+
+        const rewriteAt = idx => {
+            if (idx >= elements.length) return;
+            const raw = elements[idx];
+            const trimmed = raw.trim();
+            if (!trimmed || SPECIAL_STATES.has(trimmed) || !mapping.has(trimmed)) return;
+            elements[idx] = raw.replace(trimmed, mapping.get(trimmed));
+        };
+
+        rewriteAt(0);
+        rewriteAt(4);
+
+        return elements.join(',') + comment;
+    });
+
+    const newText = newLines.join('\n');
+    if (newText === text) return;
+
+    code_editor.value = newText;
+    code_editor_value = newText;
+    codeModified = true;
+    updateGraphLabelsAfterStateRename(mapping);
+}
+
 // ── Menu bar rendering ───────────────────────────────────────────────
 
 function buildMenuBar() {
@@ -101,7 +209,14 @@ function buildMenuBar() {
         },
         {
             label: t('edit'),
-            items: []  // 暂时空着
+            items: [
+                {
+                    label: t('stateRename'),
+                    submenu: [
+                        { label: t('renameStateByFirstElemOrder'), action: renameStatesByFirstElementOrder }
+                    ]
+                }
+            ]
         },
         {
             label: t('help'),
