@@ -40,6 +40,54 @@ function finishEditingTapeCallback(data) {
     }
 }
 
+function selectAllContentInCell(cell) {
+    if (!cell) return;
+    const selection = window.getSelection();
+    if (!selection) return;
+    const range = document.createRange();
+    range.selectNodeContents(cell);
+    selection.removeAllRanges();
+    selection.addRange(range);
+}
+
+function focusTapeCell(cellIndex, selectAll = true) {
+    if (!history_table || !history_table.rows || !history_table.rows[0]) return;
+    const targetCell = history_table.rows[0].cells[cellIndex + 1];  // +1 跳过步数列
+    if (!targetCell) return;
+    targetCell.focus();
+    if (selectAll) selectAllContentInCell(targetCell);
+}
+
+function extendTapeForNavigation(direction) {
+    // direction: -1 => 向左扩展；1 => 向右扩展
+    if (direction === 1) {
+        tape.push('');
+        if (Array.isArray(result)) {
+            result.forEach(record => {
+                // 首行 record[4] 可能与全局 tape 是同一数组，避免重复扩展
+                if (Array.isArray(record[4]) && record[4] !== tape) record[4].push('');
+            });
+        }
+    } else if (direction === -1) {
+        tape.unshift('');
+        start_position += 1;  // 保持机头相对纸带内容的位置
+        if (Array.isArray(result)) {
+            result.forEach(record => {
+                // 首行 record[4] 可能与全局 tape 是同一数组，避免重复扩展
+                if (Array.isArray(record[4]) && record[4] !== tape) record[4].unshift('');
+                if (typeof record[1] === 'number') record[1] += 1;
+            });
+        }
+    }
+
+    const minimalCb = document.getElementById('minimal-mode-checkbox');
+    if (minimalCb && minimalCb.checked) {
+        renderBitmap(result);
+    } else {
+        refresh_history_table(history_table, result);
+    }
+}
+
 function refresh_history_table(history_table, history) {
     if (!result_table_style)
         return;
@@ -66,6 +114,7 @@ function refresh_history_table(history_table, history) {
         
         // 设置单元格为可编辑
         cell.contentEditable = true;
+        cell.dataset.cellIndex = String(i - 1);
         
         // 添加失去焦点事件监听
         cell.addEventListener('blur', function(event) {
@@ -80,6 +129,29 @@ function refresh_history_table(history_table, history) {
             if (event.key === 'Enter') {
                 event.preventDefault();  // 防止回车产生新行
                 cell.blur();  // 主动失去焦点。这会触发上面的blur事件
+                return;
+            }
+
+            if (event.key === 'Tab') {
+                event.preventDefault();
+
+                const currentCellIndex = parseInt(cell.dataset.cellIndex, 10);
+                finishEditingTapeCallback({
+                    cellIndex: currentCellIndex,
+                    value: cell.textContent
+                });
+
+                const moveDirection = event.shiftKey ? -1 : 1;
+                let targetCellIndex = currentCellIndex + moveDirection;
+
+                if (targetCellIndex < 0) {
+                    extendTapeForNavigation(-1);
+                    targetCellIndex = 0;
+                } else if (targetCellIndex >= tape.length) {
+                    extendTapeForNavigation(1);
+                }
+
+                focusTapeCell(targetCellIndex, true);
             }
         });
         
