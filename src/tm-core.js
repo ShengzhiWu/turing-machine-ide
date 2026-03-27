@@ -127,6 +127,8 @@ function run_turing_machine(code, tape, max_steps, history_filter, start_positio
     const filterAll         = history_filter === "all";
     const filterOnlyChanges = history_filter === "only-changes" || !history_filter;
     const filterHeadTail    = history_filter === "head-tail";
+    if (filterHeadTail && tail_steps == 1)
+        tail_steps = 0;  // 将 tail_steps 设成0有助于提升性能
     // 周期过滤器：提取步长，0 表示非周期过滤器
     let filterInterval = 0;
     if (!filterAll && !filterOnlyChanges && !filterHeadTail) {
