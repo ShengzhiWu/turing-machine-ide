@@ -17,7 +17,7 @@ function buildMenuBar() {
                 { label: t('openProject'),   action: openProject,   shortcut: 'Ctrl+O' },
                 { label: t('saveProject'),   action: saveProject,   shortcut: 'Ctrl+S' },
                 { label: t('saveProjectAs'), action: saveProjectAs, shortcut: 'Ctrl+Shift+S' },
-                { label: t('saveEmbedding'), action: menuSaveEmbedding },
+                { label: t('saveEmbedding'), action: saveEmbedding },
                 'separator',
                 { label: t('renderAnim'),    action: menuRenderAnimation },
                 'separator',

@@ -241,7 +241,7 @@ async function saveProjectAs() {
     await saveJSONFileAs(obj, _currentFileName || 'project.json');
 }
 
-function menuSaveEmbedding() {
+function saveEmbedding() {
     saveJSONFileAs(buildEmbeddingJSON(), 'embedding.json');
 }
 
