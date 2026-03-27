@@ -218,6 +218,20 @@
             display: flex;
         }
 
+        /* ── File Drop Overlay ── */
+        #file-drop-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(255, 255, 255, 0.35);
+            z-index: 2500;
+            pointer-events: none;
+        }
+
+        #file-drop-overlay.visible {
+            display: block;
+        }
+
         #about-dialog {
             background: hsl(0, 0%, 14%);
             color: rgba(255,255,255,0.88);
@@ -379,6 +393,7 @@
             <button id="about-close-btn" onclick="closeAbout()"></button>
         </div>
     </div>
+    <div id="file-drop-overlay"></div>  <!-- 文件拖拽视觉提示 -->
 
     <!-- ── Main content area (panels) ── -->
     <div id="main-area">

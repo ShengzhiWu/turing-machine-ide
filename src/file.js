@@ -246,91 +246,99 @@ function saveEmbedding() {
 }
 
 async function openProject() {
-    // ── 若有未保存修改，先询问用户 ────────────────────────────────────
-    if (_isDirty) {
-        let choice = 'discard';  // 浏览器环境默认直接丢弃
-        try {
-            const { ipcRenderer } = require('electron');
-            choice = await ipcRenderer.invoke('confirm-unsaved', {
-                title:   t('unsavedTitle'),
-                message: t('unsavedMessage'),
-                save:    t('unsavedSave'),
-                discard: t('unsavedDiscard'),
-                cancel:  t('unsavedCancel'),
-            });
-        } catch (_) {
-            // 非 Electron 环境：用 confirm 模拟（只有保留/丢弃两种结果）
-            const ok = window.confirm(t('unsavedMessage'));
-            choice = ok ? 'discard' : 'cancel';
-        }
+    if (!(await _confirmProceedWithUnsavedChanges())) return;
+    openJSONFile((obj, fileName) => {
+        loadProjectFromObject(obj, fileName);
+    });
+}
 
-        if (choice === 'cancel') return;
-        if (choice === 'save') {
-            await saveProject();
-            // 若保存后仍为 dirty（例如另存为被用户取消），则中止打开
-            if (_isDirty) return;
-        }
-        // choice === 'discard'：继续打开，丢弃当前修改
+async function _confirmProceedWithUnsavedChanges() {
+    // ── 若有未保存修改，先询问用户 ────────────────────────────────────
+    if (!_isDirty) return true;
+
+    let choice = 'discard';  // 浏览器环境默认直接丢弃
+    try {
+        const { ipcRenderer } = require('electron');
+        choice = await ipcRenderer.invoke('confirm-unsaved', {
+            title:   t('unsavedTitle'),
+            message: t('unsavedMessage'),
+            save:    t('unsavedSave'),
+            discard: t('unsavedDiscard'),
+            cancel:  t('unsavedCancel'),
+        });
+    } catch (_) {
+        // 非 Electron 环境：用 confirm 模拟（只有保留/丢弃两种结果）
+        const ok = window.confirm(t('unsavedMessage'));
+        choice = ok ? 'discard' : 'cancel';
     }
 
-    openJSONFile(async (obj, fileName) => {
-        if (!obj || !obj.version) { alert('Invalid project file.'); return; }
+    if (choice === 'cancel') return false;
+    if (choice === 'save') {
+        await saveProject();
+        // 若保存后仍为 dirty（例如另存为被用户取消），则中止打开
+        if (_isDirty) return false;
+    }
+    // choice === 'discard'：继续打开，丢弃当前修改
+    return true;
+}
 
-        // 恢复代码
-        if (typeof obj.code === 'string') {
-            code_editor.value = obj.code;
-            code_editor_value = obj.code;
+async function loadProjectFromObject(obj, fileName) {
+    if (!obj || !obj.version) { alert('Invalid project file.'); return; }
+
+    // 恢复代码
+    if (typeof obj.code === 'string') {
+        code_editor.value = obj.code;
+        code_editor_value = obj.code;
+    }
+    // 恢复样式代码
+    if (typeof obj.style === 'string') {
+        style_editor.value = obj.style;
+        result_table_style = parseStyleCode(obj.style);
+    }
+
+    // 恢复图嵌入（先刷新图结构，再覆盖坐标）
+    refresh_graph_embedding();
+    if (obj.embedding) applyGraphEmbedding(obj.embedding);
+
+    // 恢复纸带
+    start_position = 0;
+    if (Array.isArray(obj.tape)) tape = normalizeTape([...obj.tape]);
+
+    if (typeof obj["start-position"] === 'number') start_position = obj["start-position"];
+    if (typeof obj["max-steps"] === 'number') max_steps_input.value = obj["max-steps"];
+    if (obj["output-filter"] !== undefined) {
+        const sel = document.getElementById('result-filter-select');
+        const known = sel ? Array.from(sel.options).map(o => o.value) : [];
+        output_filter = known.includes(obj["output-filter"]) ? obj["output-filter"] : "only-changes";
+        if (sel) sel.value = output_filter;
+    }
+    if (typeof obj["tail-steps"] === 'number') {
+        const sel = document.getElementById('tail-steps-select');
+        const known = sel ? Array.from(sel.options).map(o => parseInt(o.value)) : [];
+        tail_steps = known.includes(obj["tail-steps"]) ? obj["tail-steps"] : 1;
+        if (sel) sel.value = tail_steps;
+    }
+    if (typeof obj["minimal-mode"] === 'boolean') document.getElementById('minimal-mode-checkbox').checked = obj["minimal-mode"];
+    if (typeof obj["pixel-scale-x"] === 'number') document.getElementById('pixel-scale-x-input').value = obj["pixel-scale-x"];
+    if (typeof obj["pixel-scale-y"] === 'number') document.getElementById('pixel-scale-y-input').value = obj["pixel-scale-y"];
+
+    // ── 恢复渲染设置（旧文件中无此字段时静默跳过）──────────────────
+    if (obj["render-settings"] !== undefined &&
+        obj["render-settings"] !== null &&
+        typeof obj["render-settings"] === 'object') {
+        try {
+            const { ipcRenderer } = require('electron');
+            await ipcRenderer.invoke('set-render-params', obj["render-settings"]);
+        } catch (e) {
+            console.warn('[file.js] set-render-params failed, skipping render settings restore:', e);
         }
-        // 恢复样式代码
-        if (typeof obj.style === 'string') {
-            style_editor.value = obj.style;
-            result_table_style = parseStyleCode(obj.style);
-        }
+    }
 
-        // 恢复图嵌入（先刷新图结构，再覆盖坐标）
-        refresh_graph_embedding();
-        if (obj.embedding) applyGraphEmbedding(obj.embedding);
+    // 标记已保存，记录完整路径（供后续 Ctrl+S 直接覆写）
+    markClean(fileName);  // fileName 可能是完整路径，也可能为 null（浏览器回退读取）
 
-        // 恢复纸带
-        start_position = 0;
-        if (Array.isArray(obj.tape)) tape = normalizeTape([...obj.tape]);
-
-        if (typeof obj["start-position"] === 'number') start_position = obj["start-position"];
-        if (typeof obj["max-steps"] === 'number') max_steps_input.value = obj["max-steps"];
-        if (obj["output-filter"] !== undefined) {
-            const sel = document.getElementById('result-filter-select');
-            const known = sel ? Array.from(sel.options).map(o => o.value) : [];
-            output_filter = known.includes(obj["output-filter"]) ? obj["output-filter"] : "only-changes";
-            if (sel) sel.value = output_filter;
-        }
-        if (typeof obj["tail-steps"] === 'number') {
-            const sel = document.getElementById('tail-steps-select');
-            const known = sel ? Array.from(sel.options).map(o => parseInt(o.value)) : [];
-            tail_steps = known.includes(obj["tail-steps"]) ? obj["tail-steps"] : 1;
-            if (sel) sel.value = tail_steps;
-        }
-        if (typeof obj["minimal-mode"] === 'boolean') document.getElementById('minimal-mode-checkbox').checked = obj["minimal-mode"];
-        if (typeof obj["pixel-scale-x"] === 'number') document.getElementById('pixel-scale-x-input').value = obj["pixel-scale-x"];
-        if (typeof obj["pixel-scale-y"] === 'number') document.getElementById('pixel-scale-y-input').value = obj["pixel-scale-y"];
-
-        // ── 恢复渲染设置（旧文件中无此字段时静默跳过）──────────────────
-        if (obj["render-settings"] !== undefined &&
-            obj["render-settings"] !== null &&
-            typeof obj["render-settings"] === 'object') {
-            try {
-                const { ipcRenderer } = require('electron');
-                await ipcRenderer.invoke('set-render-params', obj["render-settings"]);
-            } catch (e) {
-                console.warn('[file.js] set-render-params failed, skipping render settings restore:', e);
-            }
-        }
-
-        // 标记已保存，记录完整路径（供后续 Ctrl+S 直接覆写）
-        markClean(fileName);  // fileName 此处实为完整路径，由 open-file invoke 返回
-
-        // 重新运行
-        run_program();
-    });
+    // 重新运行
+    run_program();
 }
 
 function loadExample(key) {
@@ -427,4 +435,96 @@ function loadExample(key) {
         const { ipcRenderer } = require('electron');
         ipcRenderer.on('render-params-changed', markDirty);
     } catch (_) {}
+})();
+
+// ── Drag & Drop: 将工程 JSON 文件拖入窗口直接打开 ─────────────────────
+(function bindProjectDropOpen() {
+    const dropOverlay = document.getElementById('file-drop-overlay');
+    let dragDepth = 0;
+
+    function _containsFiles(dt) {
+        if (!dt || !dt.types) return false;
+        return Array.from(dt.types).includes('Files');
+    }
+
+    function _setDropOverlayVisible(visible) {
+        if (!dropOverlay) return;
+        dropOverlay.classList.toggle('visible', !!visible);
+    }
+
+    function _isJsonName(name) {
+        return typeof name === 'string' && /\.json$/i.test(name);
+    }
+
+    async function _loadDroppedFile(file) {
+        let text = null;
+        let fullPath = null;
+
+        try {
+            if (file && typeof file.path === 'string' && file.path) {
+                const fs = require('fs');
+                text = fs.readFileSync(file.path, 'utf8');
+                fullPath = file.path;
+            }
+        } catch (_) {}
+
+        if (text === null && file && typeof file.text === 'function') {
+            text = await file.text();
+        }
+
+        if (typeof text !== 'string') {
+            alert('Failed to read file.');
+            return;
+        }
+
+        try {
+            const obj = JSON.parse(text);
+            await loadProjectFromObject(obj, fullPath);
+        } catch (err) {
+            alert('Failed to parse JSON: ' + err.message);
+        }
+    }
+
+    window.addEventListener('dragenter', e => {
+        if (!_containsFiles(e.dataTransfer)) return;
+        dragDepth += 1;
+        _setDropOverlayVisible(true);
+    });
+
+    window.addEventListener('dragover', e => {
+        if (!_containsFiles(e.dataTransfer)) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'copy';
+        _setDropOverlayVisible(true);
+    });
+
+    window.addEventListener('dragleave', e => {
+        if (!_containsFiles(e.dataTransfer)) return;
+        dragDepth = Math.max(0, dragDepth - 1);
+        if (dragDepth === 0) _setDropOverlayVisible(false);
+    });
+
+    window.addEventListener('drop', async e => {
+        if (!_containsFiles(e.dataTransfer)) return;
+        e.preventDefault();
+        dragDepth = 0;
+        _setDropOverlayVisible(false);
+
+        const files = e.dataTransfer.files;
+        if (!files || files.length === 0) return;
+
+        const file = files[0];
+        if (!_isJsonName(file.name)) {
+            alert('Please drop a .json project file.');
+            return;
+        }
+
+        if (!(await _confirmProceedWithUnsavedChanges())) return;
+        await _loadDroppedFile(file);
+    });
+
+    window.addEventListener('dragend', () => {
+        dragDepth = 0;
+        _setDropOverlayVisible(false);
+    });
 })();
