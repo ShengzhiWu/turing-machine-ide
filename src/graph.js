@@ -445,9 +445,11 @@ function update_graph_dom(graph) {
                     dom.text.setAttribute("y", tl[1]+4);
                     dom.path.setAttribute("visibility", "visible");
                     dom.arrow.setAttribute("visibility", "visible");
+                    dom.text.setAttribute("visibility", "visible");
                 } else {
                     dom.path.setAttribute("visibility", "hidden");
                     dom.arrow.setAttribute("visibility", "hidden");
+                    dom.text.setAttribute("visibility", "hidden");
                 }
             }
         });
