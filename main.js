@@ -5,7 +5,8 @@ const { ipcMain, dialog, Menu } = electron;
 
 Menu.setApplicationMenu(null);  // 移除 Electron 默认菜单栏，使用应用内自定义菜单
 
-var mainWindow          = null;
+var mainWindow                 = null;
+var mainWindowCloseConfirmed   = false;
 var settingsWindow      = null;  // Render settings child window
 var previewWindow       = null;  // Render preview child window
 var currentRenderParams = null;  // Last known render settings (persisted in project file)
@@ -168,6 +169,13 @@ ipcMain.on('set-title', (event, title) => {
     if (mainWindow && !mainWindow.isDestroyed()) mainWindow.setTitle(title);
 });
 
+// ── Main window close: let renderer run same unsaved flow as open-file ──
+ipcMain.on('main-window-close-allowed', () => {
+    mainWindowCloseConfirmed = true;
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.close();
+    mainWindowCloseConfirmed = false;
+});
+
 // ── Save project file (returns chosen path, or null if cancelled) ─────
 ipcMain.handle('save-file', async (event, { defaultName, content }) => {
     const result = await dialog.showSaveDialog(mainWindow, {
@@ -230,5 +238,10 @@ app.on('ready', () => {
     });
     // mainWindow.webContents.openDevTools();  // 打开开发人员工具
     mainWindow.loadFile('index.html');
+    mainWindow.on('close', e => {
+        if (mainWindowCloseConfirmed) return;
+        e.preventDefault();
+        sendTo(mainWindow, 'request-close-confirm');
+    });
     mainWindow.on('closed', () => { mainWindow = null; });
 });

@@ -8,7 +8,8 @@
 //
 // i18n.js 中需补充以下 key（供"未保存修改"弹窗使用）：
 //   unsavedTitle   — 弹窗标题，例："未保存的修改" / "Unsaved Changes"
-//   unsavedMessage — 提示文字，例："当前有未保存的修改，是否保存？" / "You have unsaved changes."
+//   unsavedMessage      — 打开/拖入文件前
+//   unsavedCloseMessage — 关闭窗口前
 //   unsavedSave    — 保存按钮，例："保存" / "Save"
 //   unsavedDiscard — 不保存按钮，例："不保存" / "Don't Save"
 //   unsavedCancel  — 取消按钮，例："取消" / "Cancel"
@@ -246,14 +247,19 @@ function saveEmbedding() {
 }
 
 async function openProject() {
-    if (!(await _confirmProceedWithUnsavedChanges())) return;
+    if (!(await _confirmUnsavedChanges())) return;
     openJSONFile((obj, fileName) => {
         loadProjectFromObject(obj, fileName);
     });
 }
 
-async function _confirmProceedWithUnsavedChanges() {
-    // ── 若有未保存修改，先询问用户 ────────────────────────────────────
+/**
+ * 若有未保存修改则弹窗（与主进程 confirm-unsaved 一致）：保存 / 不保存 / 取消。
+ * @param {string} [message]  不传则使用 t('unsavedMessage')（打开文件等场景）
+ * @returns {Promise<boolean>}  true 表示可继续（无修改、已保存、或不保存）；false 表示取消
+ */
+async function _confirmUnsavedChanges(message) {
+    const msg = message !== undefined && message !== null ? message : t('unsavedMessage');
     if (!_isDirty) return true;
 
     let choice = 'discard';  // 浏览器环境默认直接丢弃
@@ -261,24 +267,22 @@ async function _confirmProceedWithUnsavedChanges() {
         const { ipcRenderer } = require('electron');
         choice = await ipcRenderer.invoke('confirm-unsaved', {
             title:   t('unsavedTitle'),
-            message: t('unsavedMessage'),
+            message: msg,
             save:    t('unsavedSave'),
             discard: t('unsavedDiscard'),
             cancel:  t('unsavedCancel'),
         });
     } catch (_) {
         // 非 Electron 环境：用 confirm 模拟（只有保留/丢弃两种结果）
-        const ok = window.confirm(t('unsavedMessage'));
+        const ok = window.confirm(msg);
         choice = ok ? 'discard' : 'cancel';
     }
 
     if (choice === 'cancel') return false;
     if (choice === 'save') {
         await saveProject();
-        // 若保存后仍为 dirty（例如另存为被用户取消），则中止打开
         if (_isDirty) return false;
     }
-    // choice === 'discard'：继续打开，丢弃当前修改
     return true;
 }
 
@@ -434,7 +438,20 @@ function loadExample(key) {
     try {
         const { ipcRenderer } = require('electron');
         ipcRenderer.on('render-params-changed', markDirty);
-    } catch (_) {}
+        // 6. 关闭主窗口前：与打开文件相同的未保存确认流程
+        ipcRenderer.on('request-close-confirm', async () => {
+            if (await _confirmUnsavedChanges(t('unsavedCloseMessage'))) {
+                ipcRenderer.send('main-window-close-allowed');
+            }
+        });
+    } catch (_) {
+        // 纯浏览器：用原生离开页面前提示
+        window.addEventListener('beforeunload', e => {
+            if (!_isDirty) return;
+            e.preventDefault();
+            e.returnValue = '';
+        });
+    }
 })();
 
 // ── Drag & Drop: 将工程 JSON 文件拖入窗口直接打开 ─────────────────────
@@ -519,7 +536,7 @@ function loadExample(key) {
             return;
         }
 
-        if (!(await _confirmProceedWithUnsavedChanges())) return;
+        if (!(await _confirmUnsavedChanges())) return;
         await _loadDroppedFile(file);
     });
 

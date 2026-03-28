@@ -109,6 +109,7 @@ const MENU_I18N = {
         mouseHintRotate:         'Alt + 左键拖动：旋转画布',
         unsavedTitle:            '未保存的修改',
         unsavedMessage:          '当前工程有未保存的修改，是否在打开前保存？',
+        unsavedCloseMessage:     '当前工程有未保存的修改，是否在关闭前保存？',
         unsavedSave:             '保存',
         unsavedDiscard:          '不保存',
         unsavedCancel:           '取消',
@@ -223,6 +224,7 @@ const MENU_I18N = {
         mouseHintRotate:         'Alt + left drag: rotate',
         unsavedTitle:            'Unsaved Changes',
         unsavedMessage:          'The current project has unsaved changes. Save before opening?',
+        unsavedCloseMessage:     'The current project has unsaved changes. Save before closing?',
         unsavedSave:             'Save',
         unsavedDiscard:          "Don't Save",
         unsavedCancel:           'Cancel ',  // 这里加一个空格是因为如果不这样做，Cancel作为特殊字符串会被系统识别导致界面显示异常
