@@ -96,13 +96,7 @@ function getTapeInitial() {
 
 // ── JSON builders ────────────────────────────────────────────────────
 
-/**
- * 构建工程 JSON 对象。
- * 若 electronAPI.getRenderParams 可用，会异步读取渲染设置并合并进去；
- * 否则仍正常返回（不含渲染设置字段）。
- * 返回值：Promise<object>
- */
-async function buildProjectJSON() {
+async function buildProjectJSON() {  // 构建工程 JSON 对象
     const obj = {
         version: '1.0',
         code:      (typeof code_editor_value !== 'undefined') ? code_editor_value : '',
@@ -121,7 +115,7 @@ async function buildProjectJSON() {
     // ── 读取渲染设置（Electron 环境）────────────────────────────────
     try {
         const { ipcRenderer } = require('electron');
-        const renderParams = await ipcRenderer.invoke('get-render-params');
+        const renderParams = await ipcRenderer.invoke('get-render-params');  // 获取渲染设置
         if (renderParams && typeof renderParams === 'object') {
             obj["render-settings"] = renderParams;
         }

@@ -1,8 +1,5 @@
 // ── Menu bar UI ──────────────────────────────────────────────────────
 // 依赖：i18n.js（t()、MENU_I18N）、file.js（saveProject 等）
-// 以及全局变量：language, examples, example, codeModified, styleModified,
-//   code_editor, code_editor_value, style_editor, result_table_style
-// 依赖函数：parseStyleCode(), menuRenderAnimation()
 
 const SPECIAL_STATES = new Set(['start', 'end', 'error']);
 

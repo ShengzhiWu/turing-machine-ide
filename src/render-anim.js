@@ -15,20 +15,19 @@ const _renderDefaultParams = {
 };
 let _lastRenderParams = Object.assign({}, _renderDefaultParams);
 
-function menuRenderAnimation() {
+function menuRenderAnimation() {  // 点击菜单->文件->渲染动画触发此函数
     const { ipcRenderer } = require('electron');
 
-    // Compute run history
+    // 计算运行历史
     const renderCode    = parseProgramCode(code_editor_value);
-    const renderHistory = run_turing_machine(renderCode, tape, start_position, "start", parseInt(max_steps_input.value), "all", 0);
+    const renderHistory = run_turing_machine(renderCode, tape, start_position, "start", parseInt(max_steps_input.value), "all", 0);  // TODO: 步数过高时这里会内存溢出
 
-    // Stash history on a module-level variable for use during render
+    // 存储历史记录
     window._renderHistory = renderHistory;
-    window._renderCode    = renderCode;
 
     const totalFrames = computeTotalFrames(renderHistory, _lastRenderParams);
 
-    ipcRenderer.invoke('open-render-settings', {
+    ipcRenderer.invoke('open-render-settings', {  // 打开渲染设置面板
         params: _lastRenderParams,
         totalFrames,
         strings: {
@@ -81,12 +80,7 @@ function menuRenderAnimation() {
     });
 }
 
-function getRenderParams() {
-    // Return last-known params (updated via IPC from settings window)
-    return Object.assign({}, _lastRenderParams);
-}
-
-function computeRawTotalFrames(history, p) {
+function computeRawTotalFrames(history, p) {  // 计算总帧数
     // Matches iterateRenderFrames exactly.
     const pause    = Math.max(0, p.pauseFrames);
     const move     = Math.max(1, p.moveFrames);
@@ -110,7 +104,7 @@ function computeRawTotalFrames(history, p) {
     return total;
 }
 
-function computeTotalFrames(history, p) {
+function computeTotalFrames(history, p) {  // 计算总帧数
     const raw = computeRawTotalFrames(history, p);
     if (raw === 0) return 0;
     const mult = Math.max(1, parseInt(p.speedMultiplier, 10) || 1);
@@ -891,5 +885,3 @@ function drawTapeOnCanvas(ctx, p, record, headPos, currentState, areaY, areaH, W
     ctx.textAlign    = 'left';
     ctx.textBaseline = 'alphabetic';
 }
-
-// ── menuRenderAnimation is already defined, register it ──────────────
