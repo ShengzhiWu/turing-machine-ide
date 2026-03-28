@@ -20,7 +20,7 @@ function menuRenderAnimation() {
 
     // Compute run history
     const renderCode    = parseProgramCode(code_editor_value);
-    const renderHistory = run_turing_machine(renderCode, tape, parseInt(max_steps_input.value), "all", start_position, 0);
+    const renderHistory = run_turing_machine(renderCode, tape, start_position, "start", parseInt(max_steps_input.value), "all", 0);
 
     // Stash history on a module-level variable for use during render
     window._renderHistory = renderHistory;

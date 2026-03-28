@@ -110,11 +110,19 @@ function parseStyleCode(code) {  // 解析风格代码
 //   "head-tail"        — 仅记录开头和结尾
 //
 // tail_steps: 末尾保留步数。无论过滤器如何，最后 tail_steps 步始终保留在历史中。
-function run_turing_machine(code, tape, max_steps, history_filter, start_position, tail_steps) {  // 运行图灵机
+function run_turing_machine(
+    code,  // 代码
+    tape,  // 纸带
+    start_position,  // 起始位置
+    start_state,  // 起始状态
+    max_steps,  // 最大步数
+    history_filter,  // 结果过滤器，取值："all", "only-changes", "every-100", "every-1000", "every-10000", "every-100000", "every-1000000", "every-10000000", "every-100000000", "every-1000000000", "head-tail"
+    tail_steps  // 末尾保留步数
+) {  // 运行图灵机
     let t0 = performance.now();
-    var step = 0;
+    var step = start_step || 0;
     var position = start_position || 0;
-    var state = "start";
+    var state = start_state;
     const history = [[step, position, undefined, state, [...tape]]];  // 步数, 位置, 上一个状态, 当前状态, 纸带
 
     while (tape[start_position] === undefined)  // 确保起始位置有格子
