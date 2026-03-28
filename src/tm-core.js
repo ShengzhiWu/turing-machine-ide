@@ -120,7 +120,7 @@ function run_turing_machine(
     tail_steps  // 末尾保留步数
 ) {  // 运行图灵机
     let t0 = performance.now();
-    var step = start_step || 0;
+    var step = 0;
     var position = start_position || 0;
     var state = start_state;
     const history = [[step, position, undefined, state, [...tape]]];  // 步数, 位置, 上一个状态, 当前状态, 纸带
@@ -279,51 +279,25 @@ function run_turing_machine(
                 if (bestSnap === null || snap[0] > bestSnap[0]) bestSnap = snap;
             }
         }
-        // 若所有快照都在 targetFrom 之后（步数很少），直接用第 0 步作为起点
-        if (bestSnap === null) bestSnap = [0, history[0][1], history[0][3], [...history[0][4]]];
+        if (bestSnap === null)
+            bestSnap = [0, history[0][1], history[0][3], [...history[0][4]]];
 
         // 建立 history 中已有步号的查找集合
         const inHistory = new Set(history.map(r => r[0]));
+        const subHistory = run_turing_machine(
+            code,
+            [...bestSnap[3]],
+            bestSnap[1],
+            bestSnap[2],
+            finalStep - bestSnap[0],
+            "all",
+            0
+        );
+        const snap0 = bestSnap[0];
+        for (let i = 0; i < subHistory.length; i++)
+            subHistory[i][0] += snap0;
+        const captured = subHistory.filter(r => r[0] > targetFrom && !inHistory.has(r[0]));
 
-        // 从快照出发重跑，收集末尾 tailSize 步中缺失的条目
-        let tape2   = [...bestSnap[3]];
-        let pos2    = bestSnap[1];
-        let state2  = bestSnap[2];
-        let step2   = bestSnap[0];
-        const captured = [];
-
-        while (step2 < finalStep && state2 != "end" && state2 != "error") {
-            step2++;
-            const state2_0 = state2;
-            const aDict = code[state2];
-            if (aDict == undefined) { state2 = "error"; break; }
-            if (pos2 >= tape2.length) tape2.push('');
-            let act = aDict[tape2[pos2]];
-            if (act == undefined) act = aDict[OTHER];
-            if (act == undefined) { state2 = "error"; break; }
-            state2 = act[2];
-            if (act[0] == NOT_VALID) { state2 = "error"; break; }
-            if (act[0] != N) tape2[pos2] = act[0];
-            if (act[1] == NOT_VALID) { state2 = "error"; break; }
-
-            // 只捕获末尾 tailSize 步范围内、且不在 history 的步
-            if (step2 > targetFrom && !inHistory.has(step2)) {
-                captured.push([step2, pos2, state2_0, state2, [...tape2]]);
-            }
-
-            if (act[1] === "R") {
-                pos2++;
-            } else if (act[1] === "L") {
-                pos2--;
-                if (pos2 < 0) {
-                    pos2++;
-                    tape2.unshift('');
-                    captured.forEach(r => { r[1]++; r[4].unshift(''); });
-                }
-            }
-        }
-
-        // 双指针合并 captured 到 history（两者均已升序）
         if (captured.length > 0) {
             let ci = 0, hi = 0;
             const merged = [];
