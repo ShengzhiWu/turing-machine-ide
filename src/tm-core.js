@@ -134,6 +134,8 @@ function run_turing_machine(
     const filterAll         = history_filter === "all";
     const filterOnlyChanges = history_filter === "only-changes" || !history_filter;
     const filterHeadTail    = history_filter === "head-tail";
+    if (filterAll)
+        tail_steps = 0;  // 将 tail_steps 设成 0 有助于提升性能
     if (filterHeadTail && tail_steps == 1)
         tail_steps = 0;  // 将 tail_steps 设成 0 有助于提升性能
     // 周期过滤器：提取步长，0 表示非周期过滤器
