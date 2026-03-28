@@ -123,7 +123,7 @@ function run_turing_machine(
     var step = 0;
     var position = start_position || 0;
     var state = start_state;
-    const history = [[step, position, undefined, state, [...tape]]];  // 步数, 位置, 上一个状态, 当前状态, 纸带
+    let history = [[step, position, undefined, state, [...tape]]];  // 步数, 位置, 上一个状态, 当前状态, 纸带
 
     while (tape[start_position] === undefined)  // 确保起始位置有格子
         tape.push('');  // 在末尾加一个空格
@@ -264,14 +264,11 @@ function run_turing_machine(
         history.push([step, position, history[history.length - 1][3], state, [...tape]]);
     }
 
-    // 末尾保留：从最近快照重跑，捕获末尾 tailSize 步中不在 history 的条目
+    // 末尾保留：从最近快照递归重跑，用 subHistory 的尾部替换原 history 的尾部
     if (snapRing) {
-        // 找到起跑快照：选步号 <= (finalStep - tailSize) 的最新快照
-        // 从该快照出发，最多跑 tailSize + snapshotInterval 步即可覆盖末尾 tailSize 步
         const finalStep = step;
-        const targetFrom = finalStep - tail_steps;  // 需要覆盖的起始步号
+        const targetFrom = finalStep - tail_steps;
 
-        // 找最合适的快照（步号尽量大但不超过 targetFrom）
         let bestSnap = null;
         for (let i = 0; i < snapCount; i++) {
             const snap = snapRing[(snapHead - snapCount + i + SNAP_BUF) % SNAP_BUF];
@@ -282,9 +279,7 @@ function run_turing_machine(
         if (bestSnap === null)
             bestSnap = [0, history[0][1], history[0][3], [...history[0][4]]];
 
-        // 建立 history 中已有步号的查找集合
-        const inHistory = new Set(history.map(r => r[0]));
-        const subHistory = run_turing_machine(
+        const subHistory = run_turing_machine(  // 从快照开始再把最后的若干步跑一遍
             code,
             [...bestSnap[3]],
             bestSnap[1],
@@ -294,21 +289,13 @@ function run_turing_machine(
             0
         );
         const snap0 = bestSnap[0];
-        for (let i = 0; i < subHistory.length; i++)
+        for (let i = 0; i < subHistory.length; i++)  // 步号偏移
             subHistory[i][0] += snap0;
-        const captured = subHistory.filter(r => r[0] > targetFrom && !inHistory.has(r[0]));
 
-        if (captured.length > 0) {
-            let ci = 0, hi = 0;
-            const merged = [];
-            while (hi < history.length || ci < captured.length) {
-                const hStep = hi < history.length  ? history[hi][0]  : Infinity;
-                const cStep = ci < captured.length ? captured[ci][0] : Infinity;
-                merged.push(hStep <= cStep ? history[hi++] : captured[ci++]);
-            }
-            history.length = 0;
-            for (let i = 0; i < merged.length; i++) history.push(merged[i]);
-        }
+        // 合并历史记录
+        const head = history.filter(r => r[0] <= targetFrom);
+        const tail = subHistory.filter(r => r[0] > targetFrom);
+        history = [...head, ...tail];
     }
 
     // 将纸带补到每次记录一样长
