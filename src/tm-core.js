@@ -110,7 +110,6 @@ function parseStyleCode(code) {  // 解析风格代码
 //   "head-tail"        — 仅记录开头和结尾
 //
 // tail_steps: 末尾保留步数。无论过滤器如何，最后 tail_steps 步始终保留在历史中。
-//   用环形缓冲区实现，主循环里开销为 O(1)，对大步数运行没有性能影响。
 function run_turing_machine(code, tape, max_steps, history_filter, start_position, tail_steps) {  // 运行图灵机
     let t0 = performance.now();
     var step = 0;
@@ -128,7 +127,7 @@ function run_turing_machine(code, tape, max_steps, history_filter, start_positio
     const filterOnlyChanges = history_filter === "only-changes" || !history_filter;
     const filterHeadTail    = history_filter === "head-tail";
     if (filterHeadTail && tail_steps == 1)
-        tail_steps = 0;  // 将 tail_steps 设成0有助于提升性能
+        tail_steps = 0;  // 将 tail_steps 设成 0 有助于提升性能
     // 周期过滤器：提取步长，0 表示非周期过滤器
     let filterInterval = 0;
     if (!filterAll && !filterOnlyChanges && !filterHeadTail) {
@@ -136,19 +135,17 @@ function run_turing_machine(code, tape, max_steps, history_filter, start_positio
         if (m) filterInterval = parseInt(m[1]);
     }
 
-    // 末尾保留：快照环形缓冲区
-    // snapshotInterval 固定为 1000，每 1000 步存一次完整快照。
-    // 2亿步只拷贝 20万次，均摊开销极低。
-    // 缓冲区大小 = ceil(tailSize / snapshotInterval) + 1，保证最近的快照
-    // 距末尾不超过 snapshotInterval 步，从而第二遍扫描至多跑 tailSize + snapshotInterval 步。
+    // 用于实现末尾步数保留的快照环形缓冲区
+    // 缓冲区大小 = ceil(tailSize / snapshotInterval) + 1，确保从快照出发能恢复出末尾步数
+    // 第二遍扫描至多跑 tailSize + snapshotInterval 步
     const tailSize = (tail_steps > 0) ? tail_steps : 0;
-    const SNAPSHOT_INTERVAL = 1000;
+    const SNAPSHOT_INTERVAL = 1000;  // 每这么多步存一次快照
     const SNAP_BUF = tailSize > 0 ? (Math.ceil(tailSize / SNAPSHOT_INTERVAL) + 1) : 0;
     // 每个快照：[step, position, state, tape_clone]
     const snapRing = SNAP_BUF > 0 ? new Array(SNAP_BUF) : null;
     let snapHead  = 0;
     let snapCount = 0;
-    let sameStateTapeExtendStreak = 0;  // 连续满足“延长纸带且状态不变”的步数
+    let sameStateTapeExtendStreak = 0;  // 连续满足“延长纸带且状态不变”的步数，用于自动停机判断
 
     // 第 0 步作为初始快照，确保总步数 < SNAPSHOT_INTERVAL 时也有可用起跑点
     if (snapRing) {
@@ -203,7 +200,6 @@ function run_turing_machine(code, tape, max_steps, history_filter, start_positio
         } else if (filterInterval > 0) {
             need_record = (step % filterInterval === 0);
         } else {
-            // head-tail：不在循环中记录中间步，结束后补充
             need_record = false;
         }
 
@@ -246,9 +242,7 @@ function run_turing_machine(code, tape, max_steps, history_filter, start_positio
         if (sameStateTapeExtendStreak >= 2)
             break;
 
-        // 每隔 SNAPSHOT_INTERVAL 步存一次快照（移动完成后存，含纸带完整拷贝）
-        // 快照语义：从此状态出发，下一步执行 step+1
-        // 2亿步只触发 20万次，均摊开销极低
+        // 每隔 SNAPSHOT_INTERVAL 步存一次快照
         if (snapRing && step % SNAPSHOT_INTERVAL === 0) {
             snapRing[snapHead] = [step, position, state, [...tape]];
             snapHead  = (snapHead + 1) % SNAP_BUF;
