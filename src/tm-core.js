@@ -136,11 +136,9 @@ function run_turing_machine(code, tape, max_steps, history_filter, start_positio
     }
 
     // 用于实现末尾步数保留的快照环形缓冲区
-    // 缓冲区大小 = ceil(tailSize / snapshotInterval) + 1，确保从快照出发能恢复出末尾步数
-    // 第二遍扫描至多跑 tailSize + snapshotInterval 步
-    const tailSize = (tail_steps > 0) ? tail_steps : 0;
+    // 第二遍扫描至多跑 tail_steps + SNAPSHOT_INTERVAL 步
     const SNAPSHOT_INTERVAL = 1000;  // 每这么多步存一次快照
-    const SNAP_BUF = tailSize > 0 ? (Math.ceil(tailSize / SNAPSHOT_INTERVAL) + 1) : 0;
+    const SNAP_BUF = tail_steps > 0 ? (Math.ceil(tail_steps / SNAPSHOT_INTERVAL) + 1) : 0;  // 缓冲区大小
     // 每个快照：[step, position, state, tape_clone]
     const snapRing = SNAP_BUF > 0 ? new Array(SNAP_BUF) : null;
     let snapHead  = 0;
@@ -154,7 +152,7 @@ function run_turing_machine(code, tape, max_steps, history_filter, start_positio
         snapCount++;
     }
 
-    while(state != "end" && state != "error") {
+    while(state != "end" && state != "error") {  // 主循环
         step ++;
         if(step > max_steps)
             break;
@@ -253,17 +251,17 @@ function run_turing_machine(code, tape, max_steps, history_filter, start_positio
     console.log(performance.now() - t0, "ms");
     t0 = performance.now();
 
-    // head-tail 模式：补充最终状态（若与开头不同）
+    // head-tail 模式下补充最终状态
     if (filterHeadTail && step > 0) {
         history.push([step, position, history[history.length - 1][3], state, [...tape]]);
     }
 
     // 末尾保留：从最近快照重跑，捕获末尾 tailSize 步中不在 history 的条目
-    if (snapRing && snapCount > 0 && tailSize > 0) {
+    if (snapRing) {
         // 找到起跑快照：选步号 <= (finalStep - tailSize) 的最新快照
         // 从该快照出发，最多跑 tailSize + snapshotInterval 步即可覆盖末尾 tailSize 步
         const finalStep = step;
-        const targetFrom = finalStep - tailSize;  // 需要覆盖的起始步号
+        const targetFrom = finalStep - tail_steps;  // 需要覆盖的起始步号
 
         // 找最合适的快照（步号尽量大但不超过 targetFrom）
         let bestSnap = null;
