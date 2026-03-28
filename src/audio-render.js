@@ -409,7 +409,7 @@ function bakeAudio(history, renderParams, stateNames) {
 
     const noteMap = buildStateNoteMap(stateNames, scaleNotes, seed);
 
-    // Total audio duration: 逻辑总帧数与 iterateRenderFrames 一致，再按 speedMult 缩短（与输出视频帧数一致）。
+    // Total audio duration: 逻辑总帧数与 buildRenderTimeline / 图像渲染一致，再按 speedMult 缩短。
     const cooldown  = Math.ceil(9 * halflife);
     let totalFramesRaw = 1 + pauseFrames;   // dark frame + initial pause
     for (let i = 1; i < history.length; i++) {
@@ -457,7 +457,7 @@ function bakeAudio(history, renderParams, stateNames) {
         return noteSamples;
     };
 
-    // Frame counter mirrors iterateRenderFrames logic exactly (raw-frame index).
+    // Frame counter mirrors buildRenderTimeline 语义 (raw-frame index).
     let frameAt = 1 + pauseFrames;  // after dark frame + initial pause
     for (let i = 1; i < history.length; i++) {
         const prev = history[i - 1];
@@ -490,7 +490,7 @@ function bakeAudio(history, renderParams, stateNames) {
         if (pauseFrames > 0) {
             frameAt += pauseFrames;
         } else if (!posChanged) {
-            frameAt += 1;   // the explicit landing frame inserted by iterateRenderFrames
+            frameAt += 1;   // pause=0 且无位移时的单帧 landing（与 render-anim 时间轴一致）
         }
         // (pause=0 with movement: no extra frames after the last move frame)
     }

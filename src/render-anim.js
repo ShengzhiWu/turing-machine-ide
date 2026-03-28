@@ -270,97 +270,12 @@ function _getStateNames() {
     return [...names];
 }
 
-// ── Iterate every logical render frame（顺序与 computeRawTotalFrames 一致）──────────
-function* iterateRenderFrames(history, renderParams) {  // TODO: 这个函数似乎没有用到，考虑移除
-    if (history.length === 0) return;
-
-    const pause = Math.max(0, renderParams.pauseFrames);
-    const move  = Math.max(1, renderParams.moveFrames);
-
-    function* yieldPause(count, headPos, histIdx, currentState, activateNode, activateEdge) {
-        for (let i = 0; i < count; i++) {
-            yield {
-                headPos,
-                historyIndex: histIdx,
-                currentState,
-                activateNode: i === 0 ? activateNode : null,
-                activateEdge: i === 0 ? activateEdge : null,
-            };
-        }
-    }
-
-    const initial = history[0];
-    yield {
-        headPos:      initial[1],
-        historyIndex: 0,
-        currentState: initial[3],
-        activateNode: null,
-        activateEdge: null,
-    };
-
-    yield* yieldPause(pause, initial[1], 0, initial[3],
-        canonicalStateName(initial[3]), null);
-
-    for (let i = 1; i < history.length; i++) {
-        const prev = history[i - 1];
-        const curr = history[i];
-        const prevPos    = prev[1];
-        const currPos    = curr[1];
-        const prevState  = prev[3];
-        const currState  = curr[3];
-        const edgeKey = prevState + '||' + currState;
-
-        if (currPos !== prevPos) {
-            for (let mf = 0; mf < move; mf++) {
-                const t01   = (mf + 1) / move;
-                const tEase = cubicEase(t01);
-                const isLastMoveFrame = (mf === move - 1);
-                yield {
-                    headPos:      prevPos + (currPos - prevPos) * tEase,
-                    historyIndex: isLastMoveFrame ? i : i - 1,
-                    currentState: isLastMoveFrame ? currState : prevState,
-                    activateNode: isLastMoveFrame ? canonicalStateName(currState) : null,
-                    activateEdge: isLastMoveFrame ? edgeKey : null,
-                };
-            }
-        }
-
-        if (pause > 0) {
-            yield* yieldPause(pause, currPos, i, currState,
-                canonicalStateName(currState), edgeKey);
-        } else if (currPos === prevPos) {
-            yield {
-                headPos:      currPos,
-                historyIndex: i,
-                currentState: currState,
-                activateNode: canonicalStateName(currState),
-                activateEdge: edgeKey,
-            };
-        }
-    }
-
-    const last = history[history.length - 1];
-    yield* yieldPause(pause, last[1], history.length - 1, last[3],
-        canonicalStateName(last[3]), null);
-
-    const cooldown = Math.ceil(9 * renderParams.halflife);
-    for (let j = 0; j < cooldown; j++) {
-        yield {
-            headPos:      last[1],
-            historyIndex: history.length - 1,
-            currentState: last[3],
-            activateNode: null,
-            activateEdge: null,
-        };
-    }
-}
-
 function cubicEase(t) {
     // Ease in-out cubic
     return t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2, 3)/2;
 }
 
-// ── O(步数) 时间轴：与 iterateRenderFrames 语义一致，用于大步长时避免逐逻辑帧迭代 ──
+// ── O(步数) 时间轴：用于大步长时避免逐逻辑帧迭代 ──
 function buildRenderTimeline(history, renderParams) {
     const pause = Math.max(0, renderParams.pauseFrames);
     const move  = Math.max(1, renderParams.moveFrames);
@@ -543,7 +458,7 @@ function drawRenderFrame(ctx, renderParams, snapGraph, frame, nodeBrightness, ed
     ctx.fillRect(0, 0, W, H);  // fill whole frame with graph color; tape area has no separate bg
 
     // ── Draw Graph ───────────────────────────────────────────────────
-    drawGraphOnCanvas(ctx, snapGraph, W, graphH, frame, nodeBrightness, edgeBrightness, renderParams);
+    drawGraphOnCanvas(ctx, snapGraph, W, graphH, nodeBrightness, edgeBrightness, renderParams);
 
     // ── Draw Tape ───────────────────────────────────────────────────
     const hist = window._renderHistory;
@@ -552,7 +467,7 @@ function drawRenderFrame(ctx, renderParams, snapGraph, frame, nodeBrightness, ed
         tapeAreaY, tapeAreaH, W);
 }
 
-function drawGraphOnCanvas(ctx, snapGraph, W, H, animFrame, nodeBrightness, edgeBrightness, renderParams) {
+function drawGraphOnCanvas(ctx, snapGraph, W, H, nodeBrightness, edgeBrightness, renderParams) {
     if (!snapGraph || snapGraph.length === 0) return;
 
     // Compute bounding box of ALL nodes (including hidden self-connection helper nodes),
@@ -617,7 +532,6 @@ function drawGraphOnCanvas(ctx, snapGraph, W, H, animFrame, nodeBrightness, edge
             const target = snapGraph[conn.targetIndex];
             if (!target) return;
             const b = toScreen(target.pos);
-            const dom_fake = {};
 
             const v = vector_subtract(b, a);
             const l = vector_length(v);
