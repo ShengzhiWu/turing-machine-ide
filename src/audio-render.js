@@ -379,24 +379,14 @@ function encodeWav(pcmFloat32, sampleRate) {
 }
 
 // ── Main export function ──────────────────────────────────────────────────────
-//
-// history : run_turing_machine output (detailed mode)
-// p       : render params including:
-//   fps, moveFrames, pauseFrames, halflife, speedMultiplier (>=1, 每 N 逻辑帧对应输出 1 帧的倍率),
-//   musicMode ('major'/'minor'), musicRoot ('C4' etc.),
-//   musicLoNote ('C3'), musicHiNote ('C6'),
-//   musicSeed (int), samplesDir (path or '' for synth)
-// stateNames : array of all state names in the program
-//
-// Returns a Buffer containing a valid WAV file.
 
-function bakeAudio(history, p, stateNames) {
+function bakeAudio(history, renderParams, stateNames) {
     const SAMPLE_RATE = 44100;
-    const fps         = Math.max(1, p.fps || 30);
-    const pauseFrames = Math.max(0, p.pauseFrames);   // allow 0 pause
-    const moveFrames  = Math.max(1, p.moveFrames);
-    const halflife    = Math.max(1, p.halflife);
-    const speedMult   = Math.max(1, parseInt(p.speedMultiplier, 10) || 1);
+    const fps         = Math.max(1, renderParams.fps || 30);
+    const pauseFrames = Math.max(0, renderParams.pauseFrames);   // allow 0 pause
+    const moveFrames  = Math.max(1, renderParams.moveFrames);
+    const halflife    = Math.max(1, renderParams.halflife);
+    const speedMult   = Math.max(1, parseInt(renderParams.speedMultiplier, 10) || 1);
 
     // Duration of one "beat" in seconds: movement + pause, minimum 1 frame worth.
     const beatFrames   = moveFrames + pauseFrames;
@@ -405,11 +395,11 @@ function bakeAudio(history, p, stateNames) {
     const noteDuration = Math.max(stepDuration * 3, 1.5) / speedMult;
 
     // Scale / note mapping
-    const rootMidi   = noteNameToMidi(p.musicRoot  || 'C4');
-    const loMidi     = noteNameToMidi(p.musicLoNote || 'C3');
-    const hiMidi     = noteNameToMidi(p.musicHiNote || 'C6');
-    const mode       = (p.musicMode === 'minor') ? 'minor' : 'major';
-    const seed       = parseInt(p.musicSeed) || 0;
+    const rootMidi   = noteNameToMidi(renderParams.musicRoot  || 'C4');
+    const loMidi     = noteNameToMidi(renderParams.musicLoNote || 'C3');
+    const hiMidi     = noteNameToMidi(renderParams.musicHiNote || 'C6');
+    const mode       = (renderParams.musicMode === 'minor') ? 'minor' : 'major';
+    const seed       = parseInt(renderParams.musicSeed) || 0;
 
     const scaleNotes = buildScaleNotes(rootMidi, mode, loMidi, hiMidi);
     if (scaleNotes.length === 0) {
@@ -439,7 +429,7 @@ function bakeAudio(history, p, stateNames) {
 
     // Resolve samples directory once, outside the loop
     const resolvedSamplesDir =
-        (p.samplesDir && fs.existsSync(p.samplesDir)) ? p.samplesDir :
+        (renderParams.samplesDir && fs.existsSync(renderParams.samplesDir)) ? renderParams.samplesDir :
         fs.existsSync(DEFAULT_SAMPLES_DIR)            ? DEFAULT_SAMPLES_DIR :
         null;
 

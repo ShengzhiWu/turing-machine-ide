@@ -141,8 +141,9 @@ function extendTapeForNavigation(direction) {
     // direction: -1 => 向左扩展；1 => 向右扩展
     if (direction === 1) {
         tape.push('');
-        if (Array.isArray(result)) {
-            result.forEach(record => {
+        const hist = result && result.history;
+        if (Array.isArray(hist)) {
+            hist.forEach(record => {
                 // 首行 record[4] 可能与全局 tape 是同一数组，避免重复扩展
                 if (Array.isArray(record[4]) && record[4] !== tape) record[4].push('');
             });
@@ -150,8 +151,9 @@ function extendTapeForNavigation(direction) {
     } else if (direction === -1) {
         tape.unshift('');
         start_position += 1;  // 保持机头相对纸带内容的位置
-        if (Array.isArray(result)) {
-            result.forEach(record => {
+        const hist = result && result.history;
+        if (Array.isArray(hist)) {
+            hist.forEach(record => {
                 // 首行 record[4] 可能与全局 tape 是同一数组，避免重复扩展
                 if (Array.isArray(record[4]) && record[4] !== tape) record[4].unshift('');
                 if (typeof record[1] === 'number') record[1] += 1;
@@ -161,9 +163,9 @@ function extendTapeForNavigation(direction) {
 
     const minimalCb = document.getElementById('minimal-mode-checkbox');
     if (minimalCb && minimalCb.checked) {
-        renderBitmap(result);
+        renderBitmap(result.history);
     } else {
-        refresh_history_table(history_table, result);
+        refresh_history_table(history_table, result.history);
     }
 }
 
@@ -259,7 +261,7 @@ function refresh_history_table(history_table, history) {
     });
 }
 
-refresh_history_table(history_table, result);
+refresh_history_table(history_table, result.history);
 
 function refresh_graph_embedding() {  // 根据代码重建有向图（这个函数不用每帧执行，只在图架构有变化时才需要执行）
     // TODO: real-time compile
@@ -272,12 +274,12 @@ function run_program() {
     code = parseProgramCode(code_editor_value);  // 解析代码文本
     tape = normalizeTape(tape);  // 确保纸带右侧有适当数量的空格，方便编辑。也去除左侧多余的空格（但会保持机头和纸带的相对位置不变）
     result = run_turing_machine(code, tape, start_position, "start", parseInt(max_steps_input.value), output_filter, tail_steps);
-    tape = result[0][4];  // 因为运行过程中使用的部分可能逐渐变长，为了用户正确地编辑纸带，把最终的纸带状态覆盖回 tape 变量
-    start_position = result[0][1];
-    refresh_history_table(history_table, result);
+    tape = result.history[0][4];  // 因为运行过程中使用的部分可能逐渐变长，为了用户正确地编辑纸带，把最终的纸带状态覆盖回 tape 变量
+    start_position = result.history[0][1];
+    refresh_history_table(history_table, result.history);
     // 极简模式下同步更新位图
     const minimalCb = document.getElementById('minimal-mode-checkbox');
-    if (minimalCb && minimalCb.checked) renderBitmap(result);
+    if (minimalCb && minimalCb.checked) renderBitmap(result.history);
 }
 
 // ── 事件监听 ─────────────────────────────────────────────────────────────────
@@ -307,13 +309,13 @@ document.getElementById('minimal-mode-checkbox').addEventListener('change', func
 // 横向缩放输入：实时重绘位图
 document.getElementById('pixel-scale-x-input').addEventListener('input', function() {
     const minimalCb = document.getElementById('minimal-mode-checkbox');
-    if (minimalCb && minimalCb.checked) renderBitmap(result);
+    if (minimalCb && minimalCb.checked) renderBitmap(result.history);
 });
 
 // 纵向缩放输入：实时重绘位图
 document.getElementById('pixel-scale-y-input').addEventListener('input', function() {
     const minimalCb = document.getElementById('minimal-mode-checkbox');
-    if (minimalCb && minimalCb.checked) renderBitmap(result);
+    if (minimalCb && minimalCb.checked) renderBitmap(result.history);
 });
 
 code_editor.addEventListener('tm-refresh-graph', e => {  // 按 F4 刷新图
@@ -374,9 +376,9 @@ style_editor.addEventListener('cm-change', e => {  // 风格编辑器内容变�
     result_table_style = parseStyleCode(result_table_style_text);
     const minimalCb = document.getElementById('minimal-mode-checkbox');
     if (minimalCb && minimalCb.checked) {
-        renderBitmap(result);
+        renderBitmap(result.history);
     } else {
-        refresh_history_table(history_table, result);
+        refresh_history_table(history_table, result.history);
     }
     styleModified = true;  // 标记用户已修改样式代码
 });
@@ -434,9 +436,9 @@ function refreshDisplayMode() {
     document.getElementById('pixel-scale-wrapper').style.display = minimal ? 'flex' : 'none';
 
     if (minimal) {
-        renderBitmap(result);
+        renderBitmap(result.history);
     } else {
-        refresh_history_table(history_table, result);
+        refresh_history_table(history_table, result.history);
     }
 }
 
@@ -486,9 +488,9 @@ function renderBitmap(history) {
  * 格式：每行为"步数,纸带格0,纸带格1,..."
  */
 function saveTableData() {
-    if (!result || result.length === 0) return;
+    if (!result || !result.history || result.history.length === 0) return;
 
-    const lines = result.map(record => {
+    const lines = result.history.map(record => {
         return [record[0], ...record[4]].join(',');
     });
     const csv = lines.join('\n');
@@ -509,10 +511,10 @@ function saveAsImage() {
         canvas.toBlob(blob => _downloadBlob(blob, 'bitmap.png'));
     } else {
         // 根据 result 和 result_table_style 在离屏 canvas 上重绘表格后导出
-        if (!result || result.length === 0 || !result_table_style) return;
+        if (!result || !result.history || result.history.length === 0 || !result_table_style) return;
 
-        const rows = result.length;
-        const cols = Math.max(...result.map(record => record[4].length)) + 1;  // +1 为步数列
+        const rows = result.history.length;
+        const cols = Math.max(...result.history.map(record => record[4].length)) + 1;  // +1 为步数列
 
         const cellW = 20, cellH = 16;
         const offCanvas = document.createElement('canvas');
@@ -525,7 +527,7 @@ function saveAsImage() {
         ctx.textBaseline = 'middle';
 
         for (let r = 0; r < rows; r++) {
-            const record = result[r];
+            const record = result.history[r];
 
             // 步数列（浅灰背景）
             ctx.fillStyle = '#f0f0f0';

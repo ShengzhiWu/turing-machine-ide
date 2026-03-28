@@ -96,20 +96,10 @@ function parseStyleCode(code) {  // 解析风格代码
     return result;
 }
 
-// history_filter 取值：
-//   "all"              — 记录每一步
-//   "only-changes"     — 仅记录纸带有变化的步（默认）
-//   "every-100"        — 每 10² 步记录一次
-//   "every-1000"       — 每 10³ 步记录一次
-//   "every-10000"      — 每 10⁴ 步记录一次
-//   "every-100000"     — 每 10⁵ 步记录一次
-//   "every-1000000"    — 每 10⁶ 步记录一次
-//   "every-10000000"   — 每 10⁷ 步记录一次
-//   "every-100000000"  — 每 10⁸ 步记录一次
-//   "every-1000000000" — 每 10⁹ 步记录一次
-//   "head-tail"        — 仅记录开头和结尾
-//
-// tail_steps: 末尾保留步数。无论过滤器如何，最后 tail_steps 步始终保留在历史中。
+// 返回值：{ history, steps, movements }
+//   history    — 过滤后的历史记录列表，每项 [步号, 机头位置, 上一状态, 当前状态, 纸带副本]
+//   steps      — 实际步数
+//   movements — 实际移动次数
 function run_turing_machine(
     code,  // 代码
     tape,  // 纸带
@@ -123,6 +113,7 @@ function run_turing_machine(
     var step = 0;
     var position = start_position || 0;
     var state = start_state;
+    let movements = 0;
     let history = [[step, position, undefined, state, [...tape]]];  // 步数, 位置, 上一个状态, 当前状态, 纸带
 
     while (tape[start_position] === undefined)  // 确保起始位置有格子
@@ -161,6 +152,8 @@ function run_turing_machine(
         snapHead = (snapHead + 1) % SNAP_BUF;
         snapCount++;
     }
+
+    let lastStepMoved = false;
 
     while(state != "end" && state != "error") {  // 主循环
         step ++;
@@ -214,13 +207,17 @@ function run_turing_machine(
         if (need_record) {
             history.push([step, position, state_0, state, [...tape]]);
         }
+        lastStepMoved = false;
 
         if (action[1] == NOT_VALID) {
             state = "error";
             break;
         }
-        if(action[1]=="R")
+        if(action[1]=="R") {
             position ++;
+            movements++;
+            lastStepMoved = true;
+        }
         else if (action[1]=="L") {
             position --;
             if (position < 0) {  // 向左移出了纸带，在左边加一格
@@ -240,6 +237,8 @@ function run_turing_machine(
                     }
                 }
             }
+            movements++;
+            lastStepMoved = true;
         }
 
         // 连续两步都延长纸带且状态不变的情况下自动停机
@@ -247,8 +246,10 @@ function run_turing_machine(
             sameStateTapeExtendStreak++;
         else
             sameStateTapeExtendStreak = 0;
-        if (sameStateTapeExtendStreak >= 2)
+        if (sameStateTapeExtendStreak >= 2) {
+            step++;
             break;
+        }
 
         // 每隔 SNAPSHOT_INTERVAL 步存一次快照
         if (snapRing && step % SNAPSHOT_INTERVAL === 0) {
@@ -257,6 +258,9 @@ function run_turing_machine(
             if (snapCount < SNAP_BUF) snapCount++;
         }
     }
+
+    if (lastStepMoved)  // 在（过滤前）最后一次记录后，最后一步移动了，那么 movements 比有记录的步数多 1，要减去
+        movements--;
 
     console.log(performance.now() - t0, "ms");
     t0 = performance.now();
@@ -281,7 +285,7 @@ function run_turing_machine(
         if (bestSnap === null)
             bestSnap = [0, history[0][1], history[0][3], [...history[0][4]]];
 
-        const subHistory = run_turing_machine(  // 从快照开始再把最后的若干步跑一遍
+        const subResult = run_turing_machine(  // 从快照开始再把最后的若干步跑一遍
             code,
             [...bestSnap[3]],
             bestSnap[1],
@@ -290,6 +294,7 @@ function run_turing_machine(
             "all",
             0
         );
+        const subHistory = subResult.history;
         const snap0 = bestSnap[0];
         for (let i = 0; i < subHistory.length; i++)  // 步号偏移
             subHistory[i][0] += snap0;
@@ -309,7 +314,7 @@ function run_turing_machine(
     
     console.log(performance.now() - t0, "ms");
 
-    return history;
+    return { history, steps: step, movements };
 }
 
 // 保持纸带右侧有适当数量的空格，方便编辑。这个函数在机头初始位置左侧有很多空格的情况下也会修改机头初始位置

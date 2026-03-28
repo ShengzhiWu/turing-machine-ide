@@ -15,20 +15,28 @@ const _renderDefaultParams = {
 };
 let _lastRenderParams = Object.assign({}, _renderDefaultParams);  // 渲染设置
 
-function menuRenderAnimation() {  // 点击菜单->文件->渲染动画触发此函数
+async function menuRenderAnimation() {  // 点击菜单->文件->渲染动画触发此函数
     const { ipcRenderer } = require('electron');
 
     // 计算运行历史
     const renderCode    = parseProgramCode(code_editor_value);
-    const renderHistory = run_turing_machine(renderCode, tape, start_position, "start", parseInt(max_steps_input.value), "all", 0);  // TODO: 步数过高时这里会内存溢出
+    const runOut = run_turing_machine(renderCode, tape, start_position, "start", parseInt(max_steps_input.value), "all", 0);  // TODO: 步数过高时这里会内存溢出
+    const renderHistory = runOut.history;
 
-    // 存储历史记录
+    // 存储历史记录；帧数统计用 run_turing_machine 返回的 steps 与 movements（L/R 次数）
     window._renderHistory = renderHistory;
+    window._renderRunStats = {
+        steps: runOut.steps,
+        movements: runOut.movements,
+    };
 
-    const totalFrames = computeTotalFrames(renderHistory, _lastRenderParams);
+    const cached = await ipcRenderer.invoke('get-render-params');
+    const mergedParams = Object.assign({}, _lastRenderParams, cached || {});
+    Object.assign(_lastRenderParams, mergedParams);
+    const totalFrames = computeTotalFrames(window._renderRunStats, mergedParams);
 
-    ipcRenderer.invoke('open-render-settings', {  // 打开渲染设置面板
-        params: _lastRenderParams,
+    await ipcRenderer.invoke('open-render-settings', {  // 打开渲染设置面板
+        params: mergedParams,
         totalFrames,
         strings: {
             secSize:          t('renderSecSize'),
@@ -80,28 +88,20 @@ function menuRenderAnimation() {  // 点击菜单->文件->渲染动画触发此
     });
 }
 
-function computeRawTotalFrames(history, renderParams) {  // 计算总帧数（不考虑倍速）
-    // Matches iterateRenderFrames exactly.
+/**
+ * 逻辑渲染帧总数（不含倍速抽样）。steps 为转移步数，movements 为 L/R 移动次数（与 run_turing_machine 一致）。
+ */
+function computeRawTotalFrames(steps, movements, renderParams) {
     const pause    = Math.max(0, renderParams.pauseFrames);
     const move     = Math.max(1, renderParams.moveFrames);
     const cooldown = Math.ceil(9 * renderParams.halflife);  // 9倍半衰期，亮度衰减到最初的 2 ^ -9，这样即使是白色也会衰减到看不见。加这个是为了确保动画一直延续到所有高亮熄灭
-    if (!history || history.length === 0) return 0;
-    let total = 1 + pause;
-    for (let i = 1; i < history.length; i++) {
-        const posChanged = history[i][1] !== history[i-1][1];
-        if (posChanged) {  // 移动了
-            total += move;
-            total += pause;
-        } else {  // 没移动
-            total += Math.max(1, pause);
-        }
-    }
-    total += pause + cooldown;
-    return total;
+    const still = steps - movements;
+    return 1 + pause + movements * (move + pause) + still * Math.max(1, pause) + cooldown;
 }
 
-function computeTotalFrames(history, renderParams) {  // 计算总帧数（考虑倍速）
-    const raw = computeRawTotalFrames(history, renderParams);
+/** stats: { steps, movements }，来自 window._renderRunStats */
+function computeTotalFrames(stats, renderParams) {
+    const raw = computeRawTotalFrames(stats.steps, stats.movements, renderParams);
     if (raw === 0) return 0;
     const mult = Math.max(1, parseInt(renderParams.speedMultiplier, 10) || 1);
     return Math.ceil(raw / mult);
@@ -114,7 +114,7 @@ function computeTotalFrames(history, renderParams) {  // 计算总帧数（考�
     // Settings window changed params → recompute total frames and send back
     ipcRenderer.on('render-params-changed', (event, params) => {
         Object.assign(_lastRenderParams, params);
-        const n = computeTotalFrames(window._renderHistory || [], _lastRenderParams);
+        const n = computeTotalFrames(window._renderRunStats, _lastRenderParams);
         ipcRenderer.send('render-total-frames', n);
     });
 
@@ -160,7 +160,7 @@ function applyBatchBrightness(nodeBrightness, edgeBrightness, batchNodeLit, batc
 }
 
 // ── Main render function ──────────────────────────────────────────────
-async function startRender(p) {
+async function startRender(renderParams) {
     const { ipcRenderer } = require('electron');
     const fs      = require('fs');
     const pathMod = require('path');
@@ -170,30 +170,31 @@ async function startRender(p) {
     ipcRenderer.send('render-ui-lock', true);
 
     const renderGraph = buildRenderGraphSnapshot();
-    const stride      = Math.max(1, parseInt(p.speedMultiplier, 10) || 1);
-    let totalRaw      = computeRawTotalFrames(history, p);
+    const stride      = Math.max(1, parseInt(renderParams.speedMultiplier, 10) || 1);
+    const stats = window._renderRunStats;
+    let totalRaw      = stats ? computeRawTotalFrames(stats.steps, stats.movements || 0, renderParams) : 0;
 
     // ── Open preview window only when rendering images ────────────────
-    if (p.renderImage) {
-        await ipcRenderer.invoke('open-render-preview', { width: p.width, height: p.height, strings: { renderRendering: t('renderRendering'), renderDone: t('renderDone') } });
+    if (renderParams.renderImage) {
+        await ipcRenderer.invoke('open-render-preview', { width: renderParams.width, height: renderParams.height, strings: { renderRendering: t('renderRendering'), renderDone: t('renderDone') } });
     }
 
-    const offCanvas = p.renderImage ? document.createElement('canvas') : null;
-    if (offCanvas) { offCanvas.width = p.width; offCanvas.height = p.height; }
+    const offCanvas = renderParams.renderImage ? document.createElement('canvas') : null;
+    if (offCanvas) { offCanvas.width = renderParams.width; offCanvas.height = renderParams.height; }
     const ctx = offCanvas ? offCanvas.getContext('2d') : null;
 
     const nodeBrightness = {};
     const edgeBrightness = {};
     // 与「每逻辑帧乘以 0.5^(1/halflife)」共 stride 次等效的一次性因子
-    const decayBatch = Math.pow(0.5, stride / p.halflife);
+    const decayBatch = Math.pow(0.5, stride / renderParams.halflife);
     const batchNodeLit = new Set();
     const batchEdgeLit = new Set();
     let lastPreviewTime = 0;
 
     try {
         // ── Image render：O(步数) 建时间轴 + 仅输出 ceil(totalRaw/stride) 帧，不逐逻辑帧迭代 ──
-        if (p.renderImage && totalRaw > 0) {
-            const timeline = buildRenderTimeline(history, p);
+        if (renderParams.renderImage && totalRaw > 0) {
+            const timeline = buildRenderTimeline(history, renderParams);
             if (timeline.totalRaw !== totalRaw) {
                 console.warn('[render] totalRaw mismatch', timeline.totalRaw, totalRaw);
                 totalRaw = timeline.totalRaw;
@@ -212,13 +213,13 @@ async function startRender(p) {
                 batchEdgeLit.clear();
 
                 const frame = getFrameStateAt(segments, history, D);
-                drawRenderFrame(ctx, p, renderGraph, frame, nodeBrightness, edgeBrightness);
+                drawRenderFrame(ctx, renderParams, renderGraph, frame, nodeBrightness, edgeBrightness);
 
                 const dataURL = offCanvas.toDataURL('image/png');
                 const base64  = dataURL.slice(dataURL.indexOf(',') + 1);
                 const pngBuf  = Buffer.from(base64, 'base64');
                 const num = String(outFi).padStart(6, '0');
-                fs.writeFileSync(pathMod.join(p.outputPath, `frame_${num}.png`), pngBuf);
+                fs.writeFileSync(pathMod.join(renderParams.outputPath, `frame_${num}.png`), pngBuf);
                 outFi++;
 
                 const now = Date.now();
@@ -235,26 +236,26 @@ async function startRender(p) {
         }
 
         // ── Audio bake ────────────────────────────────────────────────
-        if (p.renderMusic) {
+        if (renderParams.renderMusic) {
             ipcRenderer.send('render-preview-status', 'Baking audio…');
             await new Promise(res => setTimeout(res, 0));  // yield so status shows
 
             const { bakeAudio } = require('./src/audio-render.js');
             const stateNames = _getStateNames();
-            const wavBuf = bakeAudio(history, p, stateNames);
-            const wavPath = pathMod.join(p.outputPath, 'audio.wav');
+            const wavBuf = bakeAudio(history, renderParams, stateNames);
+            const wavPath = pathMod.join(renderParams.outputPath, 'audio.wav');
             fs.writeFileSync(wavPath, wavBuf);
         }
 
-        if (p.renderImage) ipcRenderer.send('render-preview-status', t('renderDone') || 'Done');
+        if (renderParams.renderImage) ipcRenderer.send('render-preview-status', t('renderDone') || 'Done');
         setTimeout(() => {
-            if (p.renderImage) ipcRenderer.send('close-render-preview');
+            if (renderParams.renderImage) ipcRenderer.send('close-render-preview');
             ipcRenderer.send('render-settings-close');
-        }, p.renderImage ? 800 : 0);
+        }, renderParams.renderImage ? 800 : 0);
 
     } catch(e) {
         console.error('Render error', e);
-        if (p.renderImage) ipcRenderer.send('render-preview-status', 'Error: ' + e.message);
+        if (renderParams.renderImage) ipcRenderer.send('render-preview-status', 'Error: ' + e.message);
         alert('Render error: ' + e.message);
     } finally {
         ipcRenderer.send('render-ui-lock', false);
@@ -270,11 +271,11 @@ function _getStateNames() {
 }
 
 // ── Iterate every logical render frame（顺序与 computeRawTotalFrames 一致）──────────
-function* iterateRenderFrames(history, p) {
+function* iterateRenderFrames(history, renderParams) {  // TODO: 这个函数似乎没有用到，考虑移除
     if (history.length === 0) return;
 
-    const pause = Math.max(0, p.pauseFrames);
-    const move  = Math.max(1, p.moveFrames);
+    const pause = Math.max(0, renderParams.pauseFrames);
+    const move  = Math.max(1, renderParams.moveFrames);
 
     function* yieldPause(count, headPos, histIdx, currentState, activateNode, activateEdge) {
         for (let i = 0; i < count; i++) {
@@ -342,7 +343,7 @@ function* iterateRenderFrames(history, p) {
     yield* yieldPause(pause, last[1], history.length - 1, last[3],
         canonicalStateName(last[3]), null);
 
-    const cooldown = Math.ceil(9 * p.halflife);
+    const cooldown = Math.ceil(9 * renderParams.halflife);
     for (let j = 0; j < cooldown; j++) {
         yield {
             headPos:      last[1],
@@ -360,10 +361,10 @@ function cubicEase(t) {
 }
 
 // ── O(步数) 时间轴：与 iterateRenderFrames 语义一致，用于大步长时避免逐逻辑帧迭代 ──
-function buildRenderTimeline(history, p) {
-    const pause = Math.max(0, p.pauseFrames);
-    const move  = Math.max(1, p.moveFrames);
-    const cooldown = Math.ceil(9 * p.halflife);
+function buildRenderTimeline(history, renderParams) {
+    const pause = Math.max(0, renderParams.pauseFrames);
+    const move  = Math.max(1, renderParams.moveFrames);
+    const cooldown = Math.ceil(9 * renderParams.halflife);
     const segments = [];
     const activations = [];
 
@@ -527,8 +528,8 @@ function buildRenderGraphSnapshot() {
 }
 
 // ── Draw one render frame ─────────────────────────────────────────────
-function drawRenderFrame(ctx, p, snapGraph, frame, nodeBrightness, edgeBrightness) {
-    const W = p.width, H = p.height;
+function drawRenderFrame(ctx, renderParams, snapGraph, frame, nodeBrightness, edgeBrightness) {
+    const W = renderParams.width, H = renderParams.height;
 
     // Layout: graph area takes most of the frame; tape strip is compact at the bottom.
     // tapeAreaH is computed to just fit: top-padding + headBox + tape strip + bottom-padding.
@@ -542,12 +543,12 @@ function drawRenderFrame(ctx, p, snapGraph, frame, nodeBrightness, edgeBrightnes
     ctx.fillRect(0, 0, W, H);  // fill whole frame with graph color; tape area has no separate bg
 
     // ── Draw Graph ───────────────────────────────────────────────────
-    drawGraphOnCanvas(ctx, snapGraph, W, graphH, frame, nodeBrightness, edgeBrightness, p);
+    drawGraphOnCanvas(ctx, snapGraph, W, graphH, frame, nodeBrightness, edgeBrightness, renderParams);
 
     // ── Draw Tape ───────────────────────────────────────────────────
     const hist = window._renderHistory;
     const record = hist[Math.min(frame.historyIndex, hist.length - 1)];
-    drawTapeOnCanvas(ctx, p, record, frame.headPos, frame.currentState,
+    drawTapeOnCanvas(ctx, renderParams, record, frame.headPos, frame.currentState,
         tapeAreaY, tapeAreaH, W);
 }
 
@@ -743,14 +744,14 @@ function drawArrowHead(ctx, tip, dir, len, wid) {
     ctx.fill();
 }
 
-function drawTapeOnCanvas(ctx, p, record, headPos, currentState, areaY, areaH, W) {
+function drawTapeOnCanvas(ctx, renderParams, record, headPos, currentState, areaY, areaH, W) {
     if (!record) return;
     const tape = record[4];
     if (!tape) return;
 
     // movementMode: 'tape' (default) = head fixed at screen center, tape scrolls
     //               'head'           = tape origin fixed at screen center, head moves
-    const headMoving = (p.movementMode === 'head');
+    const headMoving = (renderParams.movementMode === 'head');
 
     // ── Vertical layout & shrink factor ──────────────────────────────
     const cellH0        = Math.round(areaH * 0.28);
