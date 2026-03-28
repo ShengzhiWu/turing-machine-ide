@@ -93,11 +93,7 @@ function computeRawTotalFrames(history, renderParams) {  // 计算总帧数（�
             total += move;
             total += pause;
         } else {  // 没移动
-            if (pause > 0) {
-                total += pause;
-            } else {
-                total += 1;
-            }
+            total += Math.max(1, pause);
         }
     }
     total += pause + cooldown;
@@ -419,14 +415,11 @@ function buildRenderTimeline(history, p) {
                 addStatic(g, pause, currPos, i, currState);
                 g += pause;
             }
-        } else if (pause > 0) {
-            activations.push({ g, node: canonicalStateName(currState), edge: edgeKey });
-            addStatic(g, pause, currPos, i, currState);
-            g += pause;
         } else {
+            const hold = Math.max(1, pause);
             activations.push({ g, node: canonicalStateName(currState), edge: edgeKey });
-            addStatic(g, 1, currPos, i, currState);
-            g += 1;
+            addStatic(g, hold, currPos, i, currState);
+            g += hold;
         }
     }
 
