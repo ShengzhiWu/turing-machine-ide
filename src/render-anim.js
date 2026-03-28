@@ -13,7 +13,7 @@ const _renderDefaultParams = {
     musicSeed: 0, samplesDir: '',
     outputPath: '',
 };
-let _lastRenderParams = Object.assign({}, _renderDefaultParams);
+let _lastRenderParams = Object.assign({}, _renderDefaultParams);  // 渲染设置
 
 function menuRenderAnimation() {  // 点击菜单->文件->渲染动画触发此函数
     const { ipcRenderer } = require('electron');
@@ -80,19 +80,19 @@ function menuRenderAnimation() {  // 点击菜单->文件->渲染动画触发此
     });
 }
 
-function computeRawTotalFrames(history, p) {  // 计算总帧数
+function computeRawTotalFrames(history, renderParams) {  // 计算总帧数（不考虑倍速）
     // Matches iterateRenderFrames exactly.
-    const pause    = Math.max(0, p.pauseFrames);
-    const move     = Math.max(1, p.moveFrames);
-    const cooldown = Math.ceil(9 * p.halflife);
+    const pause    = Math.max(0, renderParams.pauseFrames);
+    const move     = Math.max(1, renderParams.moveFrames);
+    const cooldown = Math.ceil(9 * renderParams.halflife);  // 9倍半衰期，亮度衰减到最初的 2 ^ -9，这样即使是白色也会衰减到看不见。加这个是为了确保动画一直延续到所有高亮熄灭
     if (!history || history.length === 0) return 0;
     let total = 1 + pause;
     for (let i = 1; i < history.length; i++) {
         const posChanged = history[i][1] !== history[i-1][1];
-        if (posChanged) {
+        if (posChanged) {  // 移动了
             total += move;
             total += pause;
-        } else {
+        } else {  // 没移动
             if (pause > 0) {
                 total += pause;
             } else {
@@ -104,10 +104,10 @@ function computeRawTotalFrames(history, p) {  // 计算总帧数
     return total;
 }
 
-function computeTotalFrames(history, p) {  // 计算总帧数
-    const raw = computeRawTotalFrames(history, p);
+function computeTotalFrames(history, renderParams) {  // 计算总帧数（考虑倍速）
+    const raw = computeRawTotalFrames(history, renderParams);
     if (raw === 0) return 0;
-    const mult = Math.max(1, parseInt(p.speedMultiplier, 10) || 1);
+    const mult = Math.max(1, parseInt(renderParams.speedMultiplier, 10) || 1);
     return Math.ceil(raw / mult);
 }
 
