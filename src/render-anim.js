@@ -273,7 +273,7 @@ async function startRender(renderParams) {
 /** 与打开渲染设置时同一份初始纸带/程序；用于导出帧时按需 run 到 history[idx] 对应的全局步号 */
 function _createTapeRenderCache(seed) {
     const code = parseProgramCode(seed.codeStr);
-    const r0 = run_turing_machine(code, [...seed.tape], seed.start_position, "start", 0, "all", 0, false, false);
+    const r0 = run_turing_machine(code, [...seed.tape], seed.start_position, "start", 0, "heat-tail", 0, false, false);
     return {
         code,
         stepDone: 0,
@@ -295,7 +295,7 @@ function _tapeAtHistoryIndexForRender(history, idx, cache) {
     if (!seed) return null;
 
     if (targetStep < cache.stepDone) {
-        const r0 = run_turing_machine(cache.code, [...seed.tape], seed.start_position, "start", 0, "all", 0, false, false);
+        const r0 = run_turing_machine(cache.code, [...seed.tape], seed.start_position, "start", 0, "heat-tail", 0, false, false);
         cache.stepDone = 0;
         cache.tape = r0.endTape;
         cache.position = r0.endPosition;
