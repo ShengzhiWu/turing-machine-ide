@@ -322,7 +322,7 @@ function run_turing_machine(
     
     console.log(performance.now() - t0, "ms");
 
-    return { history, steps: step, movements, stateArrivals };
+    return { history, steps: step, movements, stateArrivals, endTape: tape };
 }
 
 // 保持纸带右侧有适当数量的空格，方便编辑。这个函数在机头初始位置左侧有很多空格的情况下也会修改机头初始位置
