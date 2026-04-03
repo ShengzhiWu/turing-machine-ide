@@ -102,7 +102,8 @@ function run_turing_machine(
     max_steps,  // 最大步数
     history_filter,  // 结果过滤器，取值："all", "only-changes", "every-100", "every-1000", "every-10000", "every-100000", "every-1000000", "every-10000000", "every-100000000", "every-1000000000", "head-tail"
     tail_steps,  // 末尾保留步数
-    calculate_state_arrivals  // 计算状态到达次数，开启此功能会导致主循环变慢 24% 左右
+    calculate_state_arrivals,  // 计算状态到达次数，开启此功能会导致主循环变慢 24% 左右
+    recordTape = true  // 为 false 时 history 每条记录最后一项为 undefined，不复制纸带
 ) {  // 运行图灵机
     let t0 = performance.now();
     var step = 0;
@@ -114,7 +115,7 @@ function run_turing_machine(
         stateArrivals = {};
         stateArrivals[start_state] = 1;
     }
-    let history = [[step, position, undefined, state, [...tape]]];  // 步数, 位置, 上一个状态, 当前状态, 纸带
+    let history = [[step, position, undefined, state, recordTape ? [...tape] : undefined]];  // 步数, 位置, 上一个状态, 当前状态, 纸带
 
     while (tape[start_position] === undefined)  // 确保起始位置有格子
         tape.push('');  // 在末尾加一个空格
@@ -207,7 +208,7 @@ function run_turing_machine(
         }
 
         if (need_record) {
-            history.push([step, position, state_0, state, [...tape]]);
+            history.push([step, position, state_0, state, recordTape ? [...tape] : undefined]);
         }
         lastStepMoved = false;
 
@@ -228,7 +229,8 @@ function run_turing_machine(
                 tapeExtended = true;
                 history.forEach(record => {
                     record[1]++;
-                    record[4].unshift('');  // 在历史记录的每个纸带前面加一个空格
+                    if (record[4] !== undefined)
+                        record[4].unshift('');  // 在历史记录的每个纸带前面加一个空格
                 });
                 // 快照缓冲区里的记录也要同步修正
                 if (snapRing) {
@@ -269,7 +271,7 @@ function run_turing_machine(
 
     // head-tail 模式下补充最终状态
     if (filterHeadTail && step > 0) {
-        history.push([step, position, history[history.length - 1][3], state, [...tape]]);
+        history.push([step, position, history[history.length - 1][3], state, recordTape ? [...tape] : undefined]);
     }
 
     // 末尾保留：从最近快照递归重跑，用 subHistory 的尾部替换原 history 的尾部
@@ -295,7 +297,8 @@ function run_turing_machine(
             finalStep - bestSnap[0],
             "all",
             0,
-            false
+            false,
+            true
         );
         const subHistory = subResult.history;
         const snap0 = bestSnap[0];
@@ -309,11 +312,13 @@ function run_turing_machine(
     }
 
     // 将纸带补到每次记录一样长
-    const tapeLength = history[history.length - 1][4].length;
-    history.forEach(record => {
-        while (record[4].length < tapeLength)
-            record[4].push('');
-    });
+    if (recordTape) {
+        const tapeLength = history[history.length - 1][4].length;
+        history.forEach(record => {
+            while (record[4].length < tapeLength)
+                record[4].push('');
+        });
+    }
     
     console.log(performance.now() - t0, "ms");
 

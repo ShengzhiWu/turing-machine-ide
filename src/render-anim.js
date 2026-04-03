@@ -20,7 +20,7 @@ async function menuRenderAnimation() {  // 点击菜单->文件->渲染动画触
 
     // 计算运行历史
     const renderCode    = parseProgramCode(code_editor_value);
-    const runOut = run_turing_machine(renderCode, tape, start_position, "start", parseInt(max_steps_input.value), "all", 0, false);  // TODO: 步数过高时这里会内存溢出
+    const runOut = run_turing_machine(renderCode, tape, start_position, "start", parseInt(max_steps_input.value), "all", 0, false, true);  // TODO: 步数过高时这里会内存溢出
     const renderHistory = runOut.history;
 
     // 存储历史记录；帧数统计用 run_turing_machine 返回的 steps 与 movements（L/R 次数）

@@ -750,7 +750,7 @@
         var tape = normalizeTape([...examples[example]['tapes'][0]]);
         var output_filter = "only-changes";  // 可以是 "all", "only-changes", "every-100", "every-1000", "every-10000", "every-100000", "every-1000000", "every-10000000", "every-100000000", "every-1000000000", "head-tail"
         var tail_steps = 1;  // 末尾保留步数
-        var result = run_turing_machine(code, tape, start_position, "start", parseInt(max_steps_input.value), output_filter, tail_steps, false);
+        var result = run_turing_machine(code, tape, start_position, "start", parseInt(max_steps_input.value), output_filter, tail_steps, false, true);
         tape = result.history[0][4];
         start_position = result.history[0][1];
     </script>
