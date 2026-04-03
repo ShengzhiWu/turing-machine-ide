@@ -18,13 +18,18 @@ let _lastRenderParams = Object.assign({}, _renderDefaultParams);  // 渲染设�
 async function menuRenderAnimation() {  // 点击菜单->文件->渲染动画触发此函数
     const { ipcRenderer } = require('electron');
 
-    // 计算运行历史
+    // 计算运行历史，但不含纸带记录从而避免内存溢出
     const renderCode    = parseProgramCode(code_editor_value);
-    const runOut = run_turing_machine(renderCode, tape, start_position, "start", parseInt(max_steps_input.value), "all", 0, false, true);  // TODO: 步数过高时这里会内存溢出
+    const runOut = run_turing_machine(renderCode, tape, start_position, "start", parseInt(max_steps_input.value), "all", 0, false, false);
     const renderHistory = runOut.history;
 
-    // 存储历史记录；帧数统计用 run_turing_machine 返回的 steps 与 movements（L/R 次数）
+    // 存储历史记录（无纸带副本，避免步数大时 OOM）；帧数统计用 steps / movements；图像序列导出时按需重放得到 endTape
     window._renderHistory = renderHistory;
+    window._renderTapeSeed = {
+        codeStr: code_editor_value,
+        tape: [...tape],
+        start_position,
+    };
     window._renderRunStats = {
         steps: runOut.steps,
         movements: runOut.movements,
@@ -202,6 +207,7 @@ async function startRender(renderParams) {
             const { segments, activations } = timeline;
             const totalOut = Math.ceil(totalRaw / stride);
             let outFi = 0;
+            const tapeCache = window._renderTapeSeed ? _createTapeRenderCache(window._renderTapeSeed) : null;
             for (let D = 0; D < totalRaw; D += stride) {
                 const batchStart = D === 0 ? 0 : D - stride + 1;
                 const batchEnd   = D;
@@ -213,7 +219,9 @@ async function startRender(renderParams) {
                 batchEdgeLit.clear();
 
                 const frame = getFrameStateAt(segments, history, D);
-                drawRenderFrame(ctx, renderParams, renderGraph, frame, nodeBrightness, edgeBrightness);
+                const hi = Math.min(frame.historyIndex, history.length - 1);
+                const tapeNow = tapeCache ? _tapeAtHistoryIndexForRender(history, hi, tapeCache) : null;
+                drawRenderFrame(ctx, renderParams, renderGraph, frame, nodeBrightness, edgeBrightness, tapeNow);
 
                 const dataURL = offCanvas.toDataURL('image/png');
                 const base64  = dataURL.slice(dataURL.indexOf(',') + 1);
@@ -260,6 +268,57 @@ async function startRender(renderParams) {
     } finally {
         ipcRenderer.send('render-ui-lock', false);
     }
+}
+
+/** 与打开渲染设置时同一份初始纸带/程序；用于导出帧时按需 run 到 history[idx] 对应的全局步号 */
+function _createTapeRenderCache(seed) {
+    const code = parseProgramCode(seed.codeStr);
+    const r0 = run_turing_machine(code, [...seed.tape], seed.start_position, "start", 0, "all", 0, false, false);
+    return {
+        code,
+        stepDone: 0,
+        tape: r0.endTape,
+        position: r0.endPosition,
+        state: r0.endState,
+    };
+}
+
+/**
+ * 将模拟推进到 history[idx] 对应的全局步号（record[0]），返回该时刻的纸带（与 recordTape:true 时 [4] 一致）。
+ * cache 在多次调用之间复用，按步号单调前进时均摊 O(1) 次转移/帧。
+ */
+function _tapeAtHistoryIndexForRender(history, idx, cache) {
+    const row = history[idx];
+    if (!row) return null;
+    const targetStep = row[0];
+    const seed = window._renderTapeSeed;
+    if (!seed) return null;
+
+    if (targetStep < cache.stepDone) {
+        const r0 = run_turing_machine(cache.code, [...seed.tape], seed.start_position, "start", 0, "all", 0, false, false);
+        cache.stepDone = 0;
+        cache.tape = r0.endTape;
+        cache.position = r0.endPosition;
+        cache.state = r0.endState;
+    }
+    while (cache.stepDone < targetStep) {
+        const delta = targetStep - cache.stepDone;
+        const stateBefore = cache.state;
+        const r = run_turing_machine(cache.code, [...cache.tape], cache.position, cache.state, delta, "all", 0, false, false);
+        const chunkTrans = r.history.length - 1;
+        if (chunkTrans === 0) {
+            if (stateBefore === "end" || stateBefore === "error") {
+                break;
+            }
+            console.warn("[render] tape replay: no progress toward step", targetStep);
+            break;
+        }
+        cache.stepDone += chunkTrans;
+        cache.tape = r.endTape;
+        cache.position = r.endPosition;
+        cache.state = r.endState;
+    }
+    return cache.tape;
 }
 
 // Collect all unique state names from current run history for note mapping
@@ -443,7 +502,7 @@ function buildRenderGraphSnapshot() {
 }
 
 // ── Draw one render frame ─────────────────────────────────────────────
-function drawRenderFrame(ctx, renderParams, snapGraph, frame, nodeBrightness, edgeBrightness) {
+function drawRenderFrame(ctx, renderParams, snapGraph, frame, nodeBrightness, edgeBrightness, tapeForFrame) {
     const W = renderParams.width, H = renderParams.height;
 
     // Layout: graph area takes most of the frame; tape strip is compact at the bottom.
@@ -460,10 +519,8 @@ function drawRenderFrame(ctx, renderParams, snapGraph, frame, nodeBrightness, ed
     // ── Draw Graph ───────────────────────────────────────────────────
     drawGraphOnCanvas(ctx, snapGraph, W, graphH, nodeBrightness, edgeBrightness, renderParams);
 
-    // ── Draw Tape ───────────────────────────────────────────────────
-    const hist = window._renderHistory;
-    const record = hist[Math.min(frame.historyIndex, hist.length - 1)];
-    drawTapeOnCanvas(ctx, renderParams, record, frame.headPos, frame.currentState,
+    // ── Draw Tape（tapeForFrame 由按需重放得到；无则跳过纸带条）────────────────
+    drawTapeOnCanvas(ctx, renderParams, tapeForFrame, frame.headPos, frame.currentState,
         tapeAreaY, tapeAreaH, W);
 }
 
@@ -658,10 +715,8 @@ function drawArrowHead(ctx, tip, dir, len, wid) {
     ctx.fill();
 }
 
-function drawTapeOnCanvas(ctx, renderParams, record, headPos, currentState, areaY, areaH, W) {
-    if (!record) return;
-    const tape = record[4];
-    if (!tape) return;
+function drawTapeOnCanvas(ctx, renderParams, tape, headPos, currentState, areaY, areaH, W) {
+    if (!tape || !Array.isArray(tape)) return;
 
     // movementMode: 'tape' (default) = head fixed at screen center, tape scrolls
     //               'head'           = tape origin fixed at screen center, head moves
