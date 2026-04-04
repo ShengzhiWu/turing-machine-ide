@@ -642,8 +642,20 @@ function layoutRenderTapeGeometry(renderParams, tape, W, H) {
 
     const cellHDesired = cellH0 * shrink;
     const cellH = Math.max(0, Math.min(cellHDesired, maxStack / rowUnits));
-    const cellFontSize = Math.round(cellH * 0.52);
-    const cellW = Math.max(Math.round(cellFontSize * 1.9), Math.round(W / 30)) * shrink;
+    let cellFontSize = Math.round(cellH * 0.52);
+    let cellW = Math.max(Math.round(cellFontSize * 1.9), Math.round(W / 30)) * shrink;
+
+    // 机头移动模式：有意义格应横向铺满画布。shrink 按未压缩的 cellH0 计算，但 cellH 被 maxStack
+    // 压窄后若不重算 cellW，会出现 L*cellW < W（或 maxPerRow*cellW < W）的左右留白（见 40e72a47）。
+    if (headMoving) {
+        if (wrapLines) {
+            cellW = W / maxPerRow;
+        } else if (L > 0) {
+            cellW = W / L;
+        }
+        const capFromW = Math.floor(cellW / 1.9);
+        cellFontSize = Math.max(6, Math.min(Math.round(cellH * 0.52), capFromW));
+    }
 
     const stackH = cellH * rowUnits;
     const graphH = H - bottomPad - stackH;
