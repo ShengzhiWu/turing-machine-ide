@@ -143,8 +143,14 @@ function computeTotalFrames(stats, renderParams) {
     const { ipcRenderer } = require('electron');
 
     let _renderSettingsPreviewTimer = null;
+    function clearRenderSettingsPreviewTimer() {
+        if (_renderSettingsPreviewTimer) {
+            clearTimeout(_renderSettingsPreviewTimer);
+            _renderSettingsPreviewTimer = null;
+        }
+    }
     function scheduleRenderSettingsPreview() {
-        if (_renderSettingsPreviewTimer) clearTimeout(_renderSettingsPreviewTimer);
+        clearRenderSettingsPreviewTimer();
         _renderSettingsPreviewTimer = setTimeout(() => {
             _renderSettingsPreviewTimer = null;
             const url = getRenderFirstFramePreviewDataURL(_lastRenderParams);
@@ -152,27 +158,36 @@ function computeTotalFrames(stats, renderParams) {
         }, 120);
     }
 
-    function applyRenderParamsFromSettings(params, markDocumentDirty) {
+    /** markDocumentDirty：是否标工程未保存。opts：关窗时 skipPreview/skipTotalFrames 避免 JPEG 与无意义 IPC */
+    function applyRenderParamsFromSettings(params, markDocumentDirty, opts) {
+        opts = opts || {};
         Object.assign(_lastRenderParams, params);
         if (markDocumentDirty && typeof markDirty === 'function') markDirty();
-        const n = computeTotalFrames(window._renderRunStats, _lastRenderParams);
-        ipcRenderer.send('render-total-frames', n);
-        scheduleRenderSettingsPreview();
+        if (!opts.skipTotalFrames) {
+            const n = computeTotalFrames(window._renderRunStats, _lastRenderParams);
+            ipcRenderer.send('render-total-frames', n);
+        }
+        if (!opts.skipPreview) scheduleRenderSettingsPreview();
     }
 
-    // Settings window: user edits
-    ipcRenderer.on('render-params-changed', (event, params) => {
-        applyRenderParamsFromSettings(params, true);
-    });
-    // Settings window: open / reload form only (same state, do not mark project dirty)
-    ipcRenderer.on('render-params-sync', (event, params) => {
-        applyRenderParamsFromSettings(params, false);
-    });
+    function renderParamsEqual(a, b) {
+        if (a === b) return true;
+        if (!a || !b) return false;
+        for (const k of new Set([...Object.keys(a), ...Object.keys(b)]))
+            if (a[k] !== b[k]) return false;
+        return true;
+    }
 
-    // Settings window closed without rendering
-    ipcRenderer.on('render-settings-closed', () => {
-        // nothing to clean up in main window for now
+    ipcRenderer.on('render-params-changed', (e, params) => applyRenderParamsFromSettings(params, true));
+    ipcRenderer.on('render-params-sync', (e, params) => applyRenderParamsFromSettings(params, false));
+    ipcRenderer.on('render-settings-close-flush', (e, params) => {
+        clearRenderSettingsPreviewTimer();
+        applyRenderParamsFromSettings(params, !renderParamsEqual(_lastRenderParams, params), {
+            skipPreview: true,
+            skipTotalFrames: true,
+        });
     });
+    ipcRenderer.on('render-settings-closed', clearRenderSettingsPreviewTimer);
 
     // Settings window clicked Render
     ipcRenderer.on('render-start', (event, params) => {

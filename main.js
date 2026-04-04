@@ -17,6 +17,10 @@ var previewWindow       = null;  // Render preview child window
 var currentRenderParams = null;  // Last known render settings (persisted in project file)
 var mainSavedBackgroundThrottling = true;  // restore after image/audio export
 
+/** 设置页内联脚本中的 getParams() → JSON，供关窗时读未 blur 的输入（避免子窗口 sendSync 卡顿） */
+const RENDER_SETTINGS_GET_PARAMS_JS =
+    '(function(){try{return JSON.stringify(getParams());}catch(x){return"";}})()';
+
 // ── Helper: safely send to a window if it still exists ───────────────
 function sendTo(win, channel, ...args) {
     if (win && !win.isDestroyed()) win.webContents.send(channel, ...args);
@@ -60,13 +64,32 @@ ipcMain.handle('open-render-settings', async (event, initData) => {
     settingsWindow.webContents.on('did-finish-load', () => {
         sendTo(settingsWindow, 'render-settings-init', initData);
     });
-    settingsWindow.on('close', () => {
+    settingsWindow.on('close', async (e) => {
         try {
-            if (!settingsWindow || settingsWindow.isDestroyed()) return;
-            const b = settingsWindow.getBounds();
-            if (b.width >= RENDER_SETTINGS_WIN_MIN.w && b.height >= RENDER_SETTINGS_WIN_MIN.h)
-                renderSettingsSessionBounds = { width: b.width, height: b.height };  // 记下渲染设置窗口的尺寸，这样用户下次打开时尺寸不变
-        } catch (e) { /* ignore */ }
+            if (settingsWindow && !settingsWindow.isDestroyed()) {
+                const b = settingsWindow.getBounds();
+                if (b.width >= RENDER_SETTINGS_WIN_MIN.w && b.height >= RENDER_SETTINGS_WIN_MIN.h)
+                    renderSettingsSessionBounds = { width: b.width, height: b.height };
+            }
+        } catch (_) {}
+
+        if (settingsWindow._allowSettingsClose) return;
+        e.preventDefault();
+
+        try {
+            const wc = settingsWindow && !settingsWindow.isDestroyed() ? settingsWindow.webContents : null;
+            if (wc) {
+                const str = await wc.executeJavaScript(RENDER_SETTINGS_GET_PARAMS_JS);
+                if (typeof str === 'string' && str.length > 0) {
+                    const params = JSON.parse(str);
+                    currentRenderParams = params;
+                    setImmediate(() => sendTo(mainWindow, 'render-settings-close-flush', params));
+                }
+            }
+        } catch (_) { /* 页面未就绪或 JSON 异常 */ }
+
+        settingsWindow._allowSettingsClose = true;
+        if (settingsWindow && !settingsWindow.isDestroyed()) settingsWindow.close();
     });
     settingsWindow.on('closed', () => {
         settingsWindow = null;
