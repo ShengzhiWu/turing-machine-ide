@@ -113,6 +113,7 @@ const MENU_I18N = {
         saveAsImage:             '保存为图片',
         mouseHintPan:            '中键拖动：平移画布',
         mouseHintRotate:         'Alt + 左键拖动：旋转画布',
+        mouseHintPin:            '双击节点：固定/取消固定',
         unsavedTitle:            '未保存的修改',
         unsavedMessage:          '当前工程有未保存的修改，是否在打开前保存？',
         unsavedCloseMessage:     '当前工程有未保存的修改，是否在关闭前保存？',
@@ -234,6 +235,7 @@ const MENU_I18N = {
         saveAsImage:             'Save as image',
         mouseHintPan:            'Middle-click drag: move',
         mouseHintRotate:         'Alt + left drag: rotate',
+        mouseHintPin:            'Double-click a node: pin/unpin',
         unsavedTitle:            'Unsaved Changes',
         unsavedMessage:          'The current project has unsaved changes. Save before opening?',
         unsavedCloseMessage:     'The current project has unsaved changes. Save before closing?',
@@ -319,6 +321,9 @@ function applyLanguageToUI() {
 
     const graphHintRotate = document.getElementById('graph-hint-rotate');
     if (graphHintRotate) graphHintRotate.textContent = t('mouseHintRotate');
+
+    const graphHintPin = document.getElementById('graph-hint-pin');
+    if (graphHintPin) graphHintPin.textContent = t('mouseHintPin');
 
     if (typeof code_editor !== 'undefined') code_editor.lang = language;
     if (typeof style_editor !== 'undefined') style_editor.lang = language;

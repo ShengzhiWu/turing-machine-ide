@@ -8,6 +8,13 @@ var vertex_prefered_distance = 1.4 * global_size_factor;  //0.8
 var vertex_repel_strength = 0.01 * global_force_factor;  // 0.02
 var connection_length_preserve_strength = 0.01 * global_force_factor;  // 0.02
 
+/** 延迟执行「单击跳转编辑器」，以便与双击固定节点区分（需略小于系统双击间隔） */
+var pendingGraphNodeJumpTimer = null;
+var GRAPH_NODE_JUMP_DELAY_MS = 450;
+
+function nodeIsPinnedForPhysics(node) {
+    return !!(node && node._pinned);
+}
 
 function makeRng(seed) {
     let state = seed;
@@ -213,6 +220,14 @@ function build_graph_dom(graph) {
         dom.circle = svgEl("circle", {r: vertex_r, fill: color, stroke:"black","stroke-width":"1"});
         // 高亮圆环（默认隐藏）
         dom.highlight = svgEl("circle", {r: vertex_r + 8, fill:"none", stroke:color, "stroke-width":"2", visibility:"hidden"});
+        dom.pinLineH = svgEl("line", {
+            stroke: "black", "stroke-width": "1.2", "stroke-linecap": "round", visibility: "hidden",
+            "pointer-events": "none"
+        });
+        dom.pinLineV = svgEl("line", {
+            stroke: "black", "stroke-width": "1.2", "stroke-linecap": "round", visibility: "hidden",
+            "pointer-events": "none"
+        });
         dom.label  = svgEl("text", {fill:"black", style:"font-size:12px"});
         dom.label.textContent = node[4] || "";
         dom.name   = svgEl("text", {fill:"black", style:"font-size:12px"});
@@ -220,21 +235,50 @@ function build_graph_dom(graph) {
 
         vert_group.appendChild(dom.circle);
         vert_group.appendChild(dom.highlight);
+        vert_group.appendChild(dom.pinLineH);
+        vert_group.appendChild(dom.pinLineV);
         vert_group.appendChild(dom.label);
         vert_group.appendChild(dom.name);
 
         node._dom = dom;           // 将 DOM 引用挂在 node 上
         node._display_name = node_name;
 
-        // ── 点击节点 → 编辑器光标跳转 / 拖动节点 ───────────────
+        // ── 单击跳转 / 双击固定节点 / 拖动节点 ───────────────────────
+        let didDragThisGesture = false;
         [dom.circle, dom.name].forEach(el => {
             el.style.cursor = 'pointer';
+            el.addEventListener('click', e => {
+                if (e.altKey) return;
+                if (didDragThisGesture) return;
+                e.stopPropagation();
+                if (e.detail === 1) {
+                    if (pendingGraphNodeJumpTimer) {
+                        clearTimeout(pendingGraphNodeJumpTimer);
+                        pendingGraphNodeJumpTimer = null;
+                    }
+                    pendingGraphNodeJumpTimer = setTimeout(() => {
+                        pendingGraphNodeJumpTimer = null;
+                        jumpEditorToState(node[0], node_name, node._jumpInfo);
+                    }, GRAPH_NODE_JUMP_DELAY_MS);
+                } else if (e.detail === 2) {
+                    if (pendingGraphNodeJumpTimer) {
+                        clearTimeout(pendingGraphNodeJumpTimer);
+                        pendingGraphNodeJumpTimer = null;
+                    }
+                    node._pinned = !node._pinned;
+                    if (typeof markDirty === 'function') markDirty();
+                } else if (e.detail > 2 && pendingGraphNodeJumpTimer) {
+                    clearTimeout(pendingGraphNodeJumpTimer);
+                    pendingGraphNodeJumpTimer = null;
+                }
+            });
             el.addEventListener('mousedown', e => {
                 if (e.button !== 0) return;  // 只响应左键
                 if (e.altKey) return;  // Alt 键时让事件冒泡，由图旋转逻辑处理
                 if (typeof closeAllMenus === 'function') closeAllMenus();  // 隐藏菜单
                 e.stopPropagation();
                 e.preventDefault();
+                didDragThisGesture = false;
 
                 const startScreenX = e.clientX;
                 const startScreenY = e.clientY;
@@ -246,6 +290,11 @@ function build_graph_dom(graph) {
                     const totalDy = e.clientY - startScreenY;
                     if (!dragged && Math.sqrt(totalDx*totalDx + totalDy*totalDy) > DRAG_THRESHOLD) {
                         dragged = true;
+                        didDragThisGesture = true;
+                        if (pendingGraphNodeJumpTimer) {
+                            clearTimeout(pendingGraphNodeJumpTimer);
+                            pendingGraphNodeJumpTimer = null;
+                        }
                         dragging_node = node;
                         graph_view.style.cursor = 'grabbing';
                         el.style.cursor = 'grabbing';
@@ -269,11 +318,7 @@ function build_graph_dom(graph) {
                     graph_view.style.cursor = '';
                     el.style.cursor = 'pointer';
 
-                    if (!dragged) {
-                        // 没有拖动 → 触发跳转
-                        jumpEditorToState(node[0], node_name, node._jumpInfo);
-                    } else {
-                        // 手动拖动了节点 → 标记未保存
+                    if (dragged) {
                         if (typeof markDirty === 'function') markDirty();
                     }
                 };
@@ -467,6 +512,20 @@ function update_graph_dom(graph) {
         // 高亮圆环显隐
         dom.highlight.setAttribute("visibility",
             node._display_name === highlighted_vertex_name ? "visible" : "hidden");
+        const pinVis = node._pinned ? "visible" : "hidden";
+        dom.pinLineH.setAttribute("visibility", pinVis);
+        dom.pinLineV.setAttribute("visibility", pinVis);
+        if (node._pinned) {
+            const pa = 4;
+            dom.pinLineH.setAttribute("x1", p[0] - pa);
+            dom.pinLineH.setAttribute("y1", p[1]);
+            dom.pinLineH.setAttribute("x2", p[0] + pa);
+            dom.pinLineH.setAttribute("y2", p[1]);
+            dom.pinLineV.setAttribute("x1", p[0]);
+            dom.pinLineV.setAttribute("y1", p[1] - pa);
+            dom.pinLineV.setAttribute("x2", p[0]);
+            dom.pinLineV.setAttribute("y2", p[1] + pa);
+        }
         dom.label.setAttribute("x", p[0]-3);
         dom.label.setAttribute("y", p[1]+4);
         dom.name.setAttribute("x",  p[0]+vertex_name_text_offset[0]-3);
@@ -485,8 +544,10 @@ function graph_evolve() {
             const d = vector_length(v);
             if(d<vertex_prefered_distance) {
                 const force = vector_scale((1-d/vertex_prefered_distance)*vertex_repel_strength/d, v);
-                if(graph[j] !== dragging_node) delta[j] = vector_plus(delta[j], force);
-                if(graph[i] !== dragging_node) delta[i] = vector_subtract(delta[i], force);
+                if(graph[j] !== dragging_node && !nodeIsPinnedForPhysics(graph[j]))
+                    delta[j] = vector_plus(delta[j], force);
+                if(graph[i] !== dragging_node && !nodeIsPinnedForPhysics(graph[i]))
+                    delta[i] = vector_subtract(delta[i], force);
             }
         }
 
@@ -502,13 +563,16 @@ function graph_evolve() {
             const v = vector_subtract(node2[1], node1[1]);
             const d = vector_length(v);
             const force = vector_scale((1-d/prefered_length)*connection_length_preserve_strength/d, v);
-            if(node2 !== dragging_node) delta[idx2] = vector_plus(delta[idx2], force);
-            if(node1 !== dragging_node) delta[idx1] = vector_subtract(delta[idx1], force);
+            if(node2 !== dragging_node && !nodeIsPinnedForPhysics(node2))
+                delta[idx2] = vector_plus(delta[idx2], force);
+            if(node1 !== dragging_node && !nodeIsPinnedForPhysics(node1))
+                delta[idx1] = vector_subtract(delta[idx1], force);
         });
     });
 
-    // 统一应用位移
+    // 统一应用位移（拖动中与已固定节点不随力布局移动）
     graph.forEach((node, idx) => {
+        if (node === dragging_node || nodeIsPinnedForPhysics(node)) return;
         node[1] = vector_plus(node[1], delta[idx]);
     });
 }

@@ -263,10 +263,21 @@ function refresh_history_table(history_table, history) {
 
 refresh_history_table(history_table, result.history);
 
-function refresh_graph_embedding() {  // 根据代码重建有向图（这个函数不用每帧执行，只在图架构有变化时才需要执行）
+/**
+ * 根据代码重建有向图（仅在图结构变化时调用，非每帧）。
+ * @param {{ preserveNodePins?: boolean }} [opts]  preserveNodePins 默认 true（F4 等）；载入工程/样例时传 false，避免沿用上一次的固定状态。
+ */
+function refresh_graph_embedding(opts) {
     // TODO: real-time compile
+    const preservePins = !opts || opts.preserveNodePins !== false;
+    const prevPins = preservePins && typeof graph !== 'undefined' && Array.isArray(graph)
+        ? Object.fromEntries(graph.map(n => [n[0], !!n._pinned]))
+        : {};
     code = parseProgramCode(code_editor_value);  // 解析代码文本
     graph = construct_directed_graph_with_code(code);
+    graph.forEach(node => {
+        if (prevPins[node[0]]) node._pinned = true;
+    });
     build_graph_dom(graph);  // 图结构变了，重建 DOM
 }
 

@@ -85,6 +85,30 @@ function applyGraphEmbedding(embedding) {
     });
 }
 
+function getGraphPinnedState() {
+    if (typeof graph === 'undefined') return {};
+    const o = {};
+    graph.forEach(node => { o[node[0]] = !!node._pinned; });
+    return o;
+}
+
+/** @param {object|boolean[]|undefined} pinned  按节点 id 的布尔表，或与 graph 等长的布尔数组（旧格式） */
+function applyGraphPinned(pinned) {
+    if (typeof graph === 'undefined' || pinned == null) return;
+    if (Array.isArray(pinned)) {
+        graph.forEach((node, i) => {
+            node._pinned = !!pinned[i];
+        });
+        return;
+    }
+    if (typeof pinned !== 'object') return;
+    graph.forEach(node => {
+        node._pinned = Object.prototype.hasOwnProperty.call(pinned, node[0])
+            ? !!pinned[node[0]]
+            : false;
+    });
+}
+
 // ── Tape helper ──────────────────────────────────────────────────────
 
 function getTapeInitial() {
@@ -102,6 +126,7 @@ async function buildProjectJSON() {  // 构建工程 JSON 对象
         code:      (typeof code_editor_value !== 'undefined') ? code_editor_value : '',
         style:     (typeof style_editor      !== 'undefined') ? style_editor.value : '',
         embedding: getGraphEmbedding(),
+        "graph-pinned": getGraphPinnedState(),
         tape:      getTapeInitial(),
         "start-position": start_position,
         "max-steps": parseInt(max_steps_input.value),
@@ -294,9 +319,10 @@ async function loadProjectFromObject(obj, fileName) {
         result_table_style = parseStyleCode(obj.style);
     }
 
-    // 恢复图嵌入（先刷新图结构，再覆盖坐标）
-    refresh_graph_embedding();
+    // 恢复图嵌入（先刷新图结构，再覆盖坐标与固定状态）
+    refresh_graph_embedding({ preserveNodePins: false });
     if (obj.embedding) applyGraphEmbedding(obj.embedding);
+    if (obj["graph-pinned"] !== undefined) applyGraphPinned(obj["graph-pinned"]);
 
     // 恢复纸带
     start_position = 0;
@@ -369,8 +395,8 @@ function loadExample(key) {
     start_position = 0;
     tape = normalizeTape([...ex['tapes'][0]]);
 
-    // 刷新有向图
-    refresh_graph_embedding();
+    // 刷新有向图（不沿用上一文件的节点固定状态）
+    refresh_graph_embedding({ preserveNodePins: false });
 
     // 若有预设嵌入坐标则应用
     if (ex['embedding'] !== undefined) {
