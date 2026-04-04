@@ -137,6 +137,27 @@ function focusTapeCell(cellIndex, selectAll = true) {
     if (selectAll) selectAllContentInCell(targetCell);
 }
 
+function getHistoryScrollEl() {
+    const minimalCb = document.getElementById('minimal-mode-checkbox');
+    if (minimalCb && minimalCb.checked)
+        return document.getElementById('bitmap-container');
+    return document.getElementById('history-table-scroll');
+}
+
+function scrollHistoryToBottomIfLocked() {
+    const btn = document.getElementById('history-autoscroll-lock-btn');
+    if (!btn || btn.getAttribute('aria-pressed') !== 'true')
+        return;
+    const el = getHistoryScrollEl();
+    if (!el)
+        return;
+    requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+            el.scrollTop = el.scrollHeight;
+        });
+    });
+}
+
 function extendTapeForNavigation(direction) {
     // direction: -1 => 向左扩展；1 => 向右扩展
     if (direction === 1) {
@@ -259,6 +280,8 @@ function refresh_history_table(history_table, history) {
         const record = history[i];
         row.title = `state: ${(record[2] != undefined ? record[2] + " → " : "")}${(record[3] != undefined ? record[3] : "")}`;
     });
+
+    scrollHistoryToBottomIfLocked();
 }
 
 refresh_history_table(history_table, result.history);
@@ -316,6 +339,18 @@ max_steps_input.addEventListener('change', function() {
 document.getElementById('minimal-mode-checkbox').addEventListener('change', function() {
     refreshDisplayMode();
 });
+
+// 结果历史：锁定后始终滚到底（表格滚动区或极简位图滚动区）
+(function setupHistoryAutoscrollLockBtn() {
+    const btn = document.getElementById('history-autoscroll-lock-btn');
+    if (!btn) return;
+    btn.addEventListener('click', function() {
+        const on = this.getAttribute('aria-pressed') === 'true';
+        this.setAttribute('aria-pressed', on ? 'false' : 'true');
+        if (!on)
+            scrollHistoryToBottomIfLocked();
+    });
+})();
 
 // 横向缩放输入：实时重绘位图
 document.getElementById('pixel-scale-x-input').addEventListener('input', function() {
@@ -490,6 +525,8 @@ function renderBitmap(history) {
             ctx.fillRect(c * scaleX, r * scaleY, scaleX, scaleY);
         }
     }
+
+    scrollHistoryToBottomIfLocked();
 }
 
 // ── 保存功能 ─────────────────────────────────────────────────────────────────

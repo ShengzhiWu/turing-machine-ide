@@ -418,6 +418,21 @@
             user-select: none;
         }
 
+        /* 极简模式与「滚到底」按钮同一行，按钮在右、不压到表格区域 */
+        #minimal-autoscroll-row {
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.5em;
+            width: 100%;
+        }
+
+        #minimal-autoscroll-row > label {
+            flex: 1 1 auto;
+            min-width: 0;
+        }
+
         /*
          * 横纵缩放行。
          * CSS 里不写 display:none，避免 JS 用 display='' 回退时仍被 CSS 覆盖。
@@ -472,6 +487,55 @@
             display: block;
             image-rendering: pixelated;
             image-rendering: crisp-edges;
+        }
+
+        /* 结果历史：表格 / 极简位图 共用区域 */
+        #history-view-wrapper {
+            flex: 1;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        #history-view-wrapper > #table-container,
+        #history-view-wrapper > #bitmap-container {
+            flex: 1;
+            min-height: 0;
+        }
+
+        #history-autoscroll-lock-btn {
+            flex-shrink: 0;
+            width: 1.85em;
+            height: 1.85em;
+            margin: 0;
+            padding: 0;
+            border: 1px solid rgba(0, 0, 0, 0.22);
+            border-radius: 4px;
+            background: rgba(255, 255, 255, 0.94);
+            color: #333;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        #history-autoscroll-lock-btn:hover {
+            background: #fff;
+            border-color: rgba(0, 0, 0, 0.32);
+        }
+
+        #history-autoscroll-lock-btn[aria-pressed="true"] {
+            background: hsl(210, 42%, 86%);
+            border-color: hsl(210, 48%, 42%);
+            color: hsl(215, 55%, 22%);
+        }
+
+        #history-autoscroll-lock-btn svg {
+            width: 1.32em;
+            height: 1.32em;
+            display: block;
         }
 
         /* (Render Animation and Preview are now separate Electron windows) */
@@ -614,10 +678,21 @@
                     <option value="1000" id="tail-steps-opt-1000">1000 步</option>
                 </select>
             </div>
-            <label>
-                <input type="checkbox" id="minimal-mode-checkbox">
-                <span id="minimal-mode-label">极简模式</span>
-            </label>
+            <div id="minimal-autoscroll-row">
+                <label>
+                    <input type="checkbox" id="minimal-mode-checkbox">
+                    <span id="minimal-mode-label">极简模式</span>
+                </label>
+                <button type="button" id="history-autoscroll-lock-btn" aria-pressed="false">
+                    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                        <g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 3v8"/>
+                            <path d="M8 8l4 4 4-4"/>
+                            <line x1="6" y1="19" x2="18" y2="19"/>
+                        </g>
+                    </svg>
+                </button>
+            </div>
 
             <!-- 横纵缩放（极简模式时才显示）
                  初始 display:none 写在 inline style 里，CSS 里不写，
@@ -631,20 +706,22 @@
 
         </div>
 
-        <!-- 普通表格容器 -->
-        <div id="table-container" style="flex: 1; overflow: hidden; min-height: 0;">
-            <div style="overflow: scroll; height: 100%;">
-                <div style="width: max-content; padding-bottom: 1em; background-color: white;">
-                    <table id="history-table" style="line-height: 1.2em; border-collapse: collapse; text-align:center; font-size:0.75em;"></table>
+        <div id="history-view-wrapper">
+            <!-- 普通表格容器 -->
+            <div id="table-container" style="flex: 1; overflow: hidden; min-height: 0;">
+                <div id="history-table-scroll" style="overflow: scroll; height: 100%;">
+                    <div style="width: max-content; padding-bottom: 1em; background-color: white;">
+                        <table id="history-table" style="line-height: 1.2em; border-collapse: collapse; text-align:center; font-size:0.75em;"></table>
+                    </div>
                 </div>
             </div>
-        </div>
 
-        <!-- 极简位图容器
-             初始 display:none 写在 inline style 里，CSS 里不写，
-             JS 显示时设 display='flex'，隐藏时设 display='none'。 -->
-        <div id="bitmap-container" style="display: none;">
-            <canvas id="bitmap-canvas"></canvas>
+            <!-- 极简位图容器
+                 初始 display:none 写在 inline style 里，CSS 里不写，
+                 JS 显示时设 display='flex'，隐藏时设 display='none'。 -->
+            <div id="bitmap-container" style="display: none;">
+                <canvas id="bitmap-canvas"></canvas>
+            </div>
         </div>
 
         <!-- 6. 保存按钮 -->

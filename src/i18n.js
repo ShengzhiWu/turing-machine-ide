@@ -124,6 +124,7 @@ const MENU_I18N = {
         unsavedCancel:           '取消',
         tapeHintTabNext:         'Tab：下一格',
         tapeHintShiftTabPrev:    'Shift + Tab：上一格',
+        historyAutoscrollLockTitle: '自动滚动到最下面',
     },
     en: {
         file:           'File',
@@ -248,6 +249,7 @@ const MENU_I18N = {
         unsavedCancel:           'Cancel ',  // 这里加一个空格是因为如果不这样做，Cancel作为特殊字符串会被系统识别导致界面显示异常
         tapeHintTabNext:         'Tab: next cell',
         tapeHintShiftTabPrev:    'Shift + Tab: previous cell',
+        historyAutoscrollLockTitle: 'Auto-scroll to bottom',
     }
 };
 
@@ -328,6 +330,13 @@ function applyLanguageToUI() {
 
     const graphHintPin = document.getElementById('graph-hint-pin');
     if (graphHintPin) graphHintPin.textContent = t('mouseHintPin');
+
+    const historyAutoscrollBtn = document.getElementById('history-autoscroll-lock-btn');
+    if (historyAutoscrollBtn) {
+        const tip = t('historyAutoscrollLockTitle');
+        historyAutoscrollBtn.title = tip;
+        historyAutoscrollBtn.setAttribute('aria-label', tip);
+    }
 
     if (typeof code_editor !== 'undefined') code_editor.lang = language;
     if (typeof style_editor !== 'undefined') style_editor.lang = language;
