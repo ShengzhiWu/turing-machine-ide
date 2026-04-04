@@ -509,17 +509,19 @@ function findSegmentForIndex(segments, g) {
 /**
  * 与导出第一输出帧一致：逻辑帧 0（暗帧），结点/边无高亮，纸带与机头为 history[0] 初始状态。
  * 按设置的分辨率绘制（线宽等为像素单位，与导出一致）；返回 JPEG data URL，失败或无历史时返回 null。
+ * 不构建完整时间轴（buildRenderTimeline 为 O(步数)，预览只需 history[0] + seed 上 0 步纸带）。
  */
 function getRenderFirstFramePreviewDataURL(renderParams) {
     const history = window._renderHistory;
     if (!history || history.length === 0) return null;
-    const timeline = buildRenderTimeline(history, renderParams);
-    if (!timeline.segments.length) return null;
+    const h0 = history[0];
+    const frame = {
+        headPos: h0[1], historyIndex: 0, currentState: h0[3],
+        activateNode: null, activateEdge: null,
+    };
     const renderGraph = buildRenderGraphSnapshot();
-    const frame = getFrameStateAt(timeline.segments, history, 0);
-    const hi = Math.min(frame.historyIndex, history.length - 1);
     const tapeCache = window._renderTapeSeed ? _createTapeRenderCache(window._renderTapeSeed) : null;
-    const tapeNow = tapeCache ? _tapeAtHistoryIndexForRender(history, hi, tapeCache) : null;
+    const tapeNow = tapeCache ? tapeCache.tape : null;
     const W = Math.max(1, renderParams.width);
     const H = Math.max(1, renderParams.height);
     const canvas = document.createElement('canvas');
