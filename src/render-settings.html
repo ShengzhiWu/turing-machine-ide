@@ -368,17 +368,28 @@ function getParams() {  // 获取渲染设置，用于保存
     };
 }
 
-['width','height','fps','move-frames','pause-frames','halflife','speed-multiplier','min-tail-continuation','graphic-scale','graph-relative-margin',
- 'render-image','render-music','music-mode','music-root','music-lo','music-hi',
- 'music-seed','music-samples','output-path','movement-mode-tape','movement-mode-head',
- 'max-cells-per-row'].forEach(id => {
+/** 推送到主窗口：文本/数字框仅在 change（失焦提交）或按 Enter 时调用，避免每键触发 */
+function pushRenderParams() {
+    ipcRenderer.send('render-params-changed', getParams());
+}
+
+const TYPING_PARAM_IDS = [
+    'width', 'height', 'fps', 'move-frames', 'pause-frames', 'halflife', 'speed-multiplier', 'min-tail-continuation',
+    'graphic-scale', 'graph-relative-margin', 'music-root', 'music-lo', 'music-hi', 'music-seed',
+    'music-samples', 'output-path', 'max-cells-per-row',
+];
+TYPING_PARAM_IDS.forEach(id => {
     const el = document.getElementById(id);
-    el.addEventListener('input',  () => ipcRenderer.send('render-params-changed', getParams()));
-    el.addEventListener('change', () => ipcRenderer.send('render-params-changed', getParams()));
+    el.addEventListener('change', pushRenderParams);
+    el.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            pushRenderParams();
+        }
+    });
 });
-['movement-mode-tape', 'movement-mode-head'].forEach(id => {
-    document.getElementById(id).addEventListener('change', updateHeadTapeWrapOptions);
-});
+
+document.getElementById('music-mode').addEventListener('change', pushRenderParams);
 
 function updateSubsections() {
     document.getElementById('music-options').classList.toggle(
@@ -400,11 +411,23 @@ function updateHeadTapeWrapOptions() {
     // 与「音乐」未启用时一致：用 subsection-disabled 降低透明度并禁止指针，不用 input.disabled
     maxCellsWrap.classList.toggle('subsection-disabled', !wrapCb.checked);
 }
-document.getElementById('render-music').addEventListener('change', updateSubsections);
-document.getElementById('render-image').addEventListener('change', updateSubsections);
+document.getElementById('render-music').addEventListener('change', () => {
+    updateSubsections();
+    pushRenderParams();
+});
+document.getElementById('render-image').addEventListener('change', () => {
+    updateSubsections();
+    pushRenderParams();
+});
+['movement-mode-tape', 'movement-mode-head'].forEach(id => {
+    document.getElementById(id).addEventListener('change', () => {
+        updateHeadTapeWrapOptions();
+        pushRenderParams();
+    });
+});
 document.getElementById('tape-wrap-lines').addEventListener('change', () => {
     updateHeadTapeWrapOptions();
-    ipcRenderer.send('render-params-changed', getParams());
+    pushRenderParams();
 });
 
 document.getElementById('browse-btn').addEventListener('click', async () => {
