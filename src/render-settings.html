@@ -125,7 +125,7 @@
             <label id="lbl-graph-relative-margin">Relative margin</label>
             <input id="graph-relative-margin" type="number" value="0.1" min="0" max="0.49" step="0.01">
         </div>
-        <div class="row" style="margin-top:6px;gap:40px;">
+        <div class="row" style="margin-top:6px;flex-direction:column;align-items:flex-start;gap:8px;">
             <label style="display:flex;align-items:center;gap:6px;width:auto;cursor:pointer;">
                 <input type="radio" name="movement-mode" id="movement-mode-tape" value="tape" checked
                        style="width:14px;height:14px;cursor:pointer;accent-color:hsl(210,60%,55%);">
@@ -136,6 +136,15 @@
                        style="width:14px;height:14px;cursor:pointer;accent-color:hsl(210,60%,55%);">
                 <span id="lbl-movement-mode-head">Head moves, tape fixed</span>
             </label>
+            <label style="display:flex;align-items:center;gap:6px;width:auto;cursor:pointer;">
+                <input type="radio" name="movement-mode" id="movement-mode-head-recenter" value="headRecenter"
+                       style="width:14px;height:14px;cursor:pointer;accent-color:hsl(210,60%,55%);">
+                <span id="lbl-movement-mode-head-recenter">Head moves, slow recenter</span>
+            </label>
+        </div>
+        <div id="recenter-halflife-row" class="row" style="display:none;">
+            <label id="lbl-recenter-halflife-frames" for="recenter-halflife-frames">Recenter half-life (frames)</label>
+            <input id="recenter-halflife-frames" type="number" value="60" min="1" max="1000000">
         </div>
         <div id="head-tape-wrap-options">
             <div class="row" style="margin-top:8px;">
@@ -240,6 +249,8 @@ ipcRenderer.on('render-settings-init', (e, data) => {
     setText('lbl-graph-relative-margin', 'lblGraphRelativeMargin', 'Relative margin');
     setText('lbl-movement-mode-tape',  'renderMovementModeTape',  'Tape moves, head fixed');
     setText('lbl-movement-mode-head',  'renderMovementModeHead',  'Head moves, tape fixed');
+    setText('lbl-movement-mode-head-recenter', 'renderMovementModeHeadRecenter', 'Head moves, slow recenter');
+    setText('lbl-recenter-halflife-frames', 'lblRecenterHalflifeFrames', 'Recenter half-life (frames)');
     setText('lbl-tape-wrap-lines',     'lblTapeWrapLines',        'Wrap tape to multiple rows');
     setText('lbl-max-cells-first-row',  'lblMaxCellsFirstRow',  'Max cells on first row');
     setText('lbl-max-cells-other-rows', 'lblMaxCellsOtherRows', 'Max cells on other rows');
@@ -301,6 +312,8 @@ ipcRenderer.on('render-settings-init', (e, data) => {
         : (legacyM !== undefined && legacyM !== null ? legacyM : 70);
     document.getElementById('max-cells-first-row').value = firstRow;
     document.getElementById('max-cells-other-rows').value = otherRows;
+    if (p.recenterHalflifeFrames !== undefined && p.recenterHalflifeFrames !== null)
+        set('recenter-halflife-frames', p.recenterHalflifeFrames);
     updateSubsections();
     updateHeadTapeWrapOptions();
     updateTotalFrames(data.totalFrames || 0);
@@ -370,6 +383,7 @@ function getParams() {  // 获取渲染设置，用于保存
         tapeWrapLines: document.getElementById('tape-wrap-lines').checked,
         maxCellsFirstRow: Math.max(1, parseInt(document.getElementById('max-cells-first-row').value, 10) || 40),
         maxCellsOtherRows: Math.max(1, parseInt(document.getElementById('max-cells-other-rows').value, 10) || 70),
+        recenterHalflifeFrames: Math.max(1, parseInt(document.getElementById('recenter-halflife-frames').value, 10) || 60),
         renderImage:  document.getElementById('render-image').checked,
         renderMusic:  document.getElementById('render-music').checked,
         musicMode:    document.getElementById('music-mode').value,
@@ -390,7 +404,7 @@ function pushRenderParams() {
 const TYPING_PARAM_IDS = [
     'width', 'height', 'fps', 'move-frames', 'pause-frames', 'halflife', 'speed-multiplier', 'min-tail-continuation',
     'graphic-scale', 'graph-relative-margin', 'music-root', 'music-lo', 'music-hi', 'music-seed',
-    'music-samples', 'output-path', 'max-cells-first-row', 'max-cells-other-rows',
+    'music-samples', 'output-path', 'max-cells-first-row', 'max-cells-other-rows', 'recenter-halflife-frames',
 ];
 TYPING_PARAM_IDS.forEach(id => {
     const el = document.getElementById(id);
@@ -413,17 +427,19 @@ function updateSubsections() {
     updateHeadTapeWrapOptions();
 }
 
-/** 仅「渲染图像 + 纸带固定机头动」时显示分行选项；动纸带模式下隐藏 */
+/** 仅「渲染图像 + 纸带固定机头动」时显示分行选项；动纸带 / 缓慢回中模式下隐藏 */
 function updateHeadTapeWrapOptions() {
     const wrapBlock = document.getElementById('head-tape-wrap-options');
     const imgOn = document.getElementById('render-image').checked;
-    const headMode = document.getElementById('movement-mode-head').checked;
-    const show = imgOn && headMode;
+    const show = imgOn && document.getElementById('movement-mode-head').checked;
     wrapBlock.style.display = show ? '' : 'none';
     const maxCellsWrap = document.getElementById('max-cells-per-row-wrap');
     const wrapCb = document.getElementById('tape-wrap-lines');
     // 与「音乐」未启用时一致：用 subsection-disabled 降低透明度并禁止指针，不用 input.disabled
     maxCellsWrap.classList.toggle('subsection-disabled', !wrapCb.checked);
+    const recRow = document.getElementById('recenter-halflife-row');
+    const recOn = imgOn && document.getElementById('movement-mode-head-recenter').checked;
+    recRow.style.display = recOn ? '' : 'none';
 }
 document.getElementById('render-music').addEventListener('change', () => {
     updateSubsections();
@@ -433,7 +449,7 @@ document.getElementById('render-image').addEventListener('change', () => {
     updateSubsections();
     pushRenderParams();
 });
-['movement-mode-tape', 'movement-mode-head'].forEach(id => {
+['movement-mode-tape', 'movement-mode-head', 'movement-mode-head-recenter'].forEach(id => {
     document.getElementById(id).addEventListener('change', () => {
         updateHeadTapeWrapOptions();
         pushRenderParams();

@@ -11,8 +11,10 @@ const _renderDefaultParams = {
     /** 有向图适配：较短画布边的留白比例（与 drawGraphOnCanvas 中 margin 一致） */
     graphRelativeMargin: 0.1,
     renderImage: true, renderMusic: false,
-    movementMode: 'tape',  // 'tape' = 纸带动机头固定；'head' = 机头动纸带固定
-    tapeWrapLines: true,   // 仅机头动模式：多行绘制纸带
+    movementMode: 'tape',  // 'tape' | 'head' | 'headRecenter'
+    /** headRecenter：纸带滚动锚点逼近真实机头位置的半衰期（逻辑帧）；越大纸带越慢、机头仍可立即对准格 */
+    recenterHalflifeFrames: 60,
+    tapeWrapLines: true,   // 仅「纸带固定机头动」模式：多行绘制纸带
     maxCellsFirstRow: 40,  // 首行最大格数（格更大，便于看清纸带开头）
     maxCellsOtherRows: 70, // 其余行最大格数
     musicMode: 'major', musicRoot: 'C4', musicLoNote: 'C3', musicHiNote: 'C6',
@@ -94,6 +96,8 @@ async function menuRenderAnimation() {  // 点击菜单->文件->渲染动画触
             renderDone:       t('renderDone'),
             renderMovementModeTape:  t('renderMovementModeTape'),
             renderMovementModeHead:  t('renderMovementModeHead'),
+            renderMovementModeHeadRecenter: t('renderMovementModeHeadRecenter'),
+            lblRecenterHalflifeFrames: t('renderLabelRecenterHalflifeFrames'),
             lblTapeWrapLines: t('renderTapeWrapLines'),
             lblMaxCellsFirstRow: t('renderCellsFirstRow'),
             lblMaxCellsOtherRows: t('renderCellsOtherRows'),
@@ -180,9 +184,9 @@ function computeTotalFrames(stats, renderParams) {
         return true;
     }
 
-    ipcRenderer.on('render-params-changed', (e, params) => applyRenderParamsFromSettings(params, true));
-    ipcRenderer.on('render-params-sync', (e, params) => applyRenderParamsFromSettings(params, false));
-    ipcRenderer.on('render-settings-close-flush', (e, params) => {
+    ipcRenderer.on('render-params-changed', (_e, params) => applyRenderParamsFromSettings(params, true));
+    ipcRenderer.on('render-params-sync', (_e, params) => applyRenderParamsFromSettings(params, false));
+    ipcRenderer.on('render-settings-close-flush', (_e, params) => {
         clearRenderSettingsPreviewTimer();
         applyRenderParamsFromSettings(params, !renderParamsEqual(_lastRenderParams, params), {
             skipPreview: true,
@@ -192,13 +196,13 @@ function computeTotalFrames(stats, renderParams) {
     ipcRenderer.on('render-settings-closed', clearRenderSettingsPreviewTimer);
 
     // Settings window clicked Render
-    ipcRenderer.on('render-start', (event, params) => {
+    ipcRenderer.on('render-start', (_event, params) => {
         Object.assign(_lastRenderParams, params);
         startRender(params);
     });
 
     // Settings window requested audio preview
-    ipcRenderer.on('render-music-preview', (event, params) => {
+    ipcRenderer.on('render-music-preview', (_event, params) => {
         Object.assign(_lastRenderParams, params);
         try {
             const { bakeAudio } = require('./src/audio-render.js');
@@ -274,12 +278,21 @@ async function startRender(renderParams) {
             const totalOut = Math.ceil(totalRaw / stride) + (needsFinalFrame ? 1 : 0);
             let outFi = 0;
             const tapeCache = window._renderTapeSeed ? _createTapeRenderCache(window._renderTapeSeed) : null;
+            const isHeadRecenter = renderParams.movementMode === 'headRecenter';
+            const recenterHL = Math.max(1, parseInt(renderParams.recenterHalflifeFrames, 10) || 60);
+            const recenterAlpha = isHeadRecenter ? 1 - Math.pow(0.5, 1 / recenterHL) : 0;
+            /** 纸带滚动锚点：按半衰期逼近真实 headPos；H 大时纸带几乎不动，机头仍跟 headPos 读正确格 */
+            let headPosVis = getFrameStateAt(segments, history, 0).headPos;
+            let prevEmittedG = -1;
 
             const writeOneOutputFrame = async (D) => {
                 const frame = getFrameStateAt(segments, history, D);
                 const hi = Math.min(frame.historyIndex, history.length - 1);
                 const tapeNow = tapeCache ? _tapeAtHistoryIndexForRender(history, hi, tapeCache) : null;
-                drawRenderFrame(ctx, renderParams, renderGraph, frame, nodeBrightness, edgeBrightness, tapeNow);
+                const drawFrame = isHeadRecenter
+                    ? Object.assign({}, frame, { headPosVis })
+                    : frame;
+                drawRenderFrame(ctx, renderParams, renderGraph, drawFrame, nodeBrightness, edgeBrightness, tapeNow);
 
                 const dataURL = offCanvas.toDataURL('image/png');
                 const base64  = dataURL.slice(dataURL.indexOf(',') + 1);
@@ -301,6 +314,15 @@ async function startRender(renderParams) {
             };
 
             for (let D = 0; D < totalRaw; D += stride) {
+                if (isHeadRecenter && D > prevEmittedG) {
+                    for (let g = prevEmittedG + 1; g <= D; g++) {
+                        if (g === 0) continue;
+                        const fr = getFrameStateAt(segments, history, g);
+                        headPosVis += recenterAlpha * (fr.headPos - headPosVis);
+                    }
+                }
+                prevEmittedG = D;
+
                 const batchStart = D === 0 ? 0 : D - stride + 1;
                 const batchEnd   = D;
                 collectActivationsInRange(activations, batchStart, batchEnd, batchNodeLit, batchEdgeLit);
@@ -323,6 +345,12 @@ async function startRender(renderParams) {
                     batchNodeLit, batchEdgeLit, decayRem);
                 batchNodeLit.clear();
                 batchEdgeLit.clear();
+                if (isHeadRecenter) {
+                    for (let g = lastStrideAlignedD + 1; g <= lastLogical; g++) {
+                        const fr = getFrameStateAt(segments, history, g);
+                        headPosVis += recenterAlpha * (fr.headPos - headPosVis);
+                    }
+                }
                 await writeOneOutputFrame(lastLogical);
             }
         }
@@ -530,7 +558,11 @@ function getRenderFirstFramePreviewDataURL(renderParams) {
     canvas.width = W;
     canvas.height = H;
     const ctx = canvas.getContext('2d');
-    drawRenderFrame(ctx, renderParams, renderGraph, frame, {}, {}, tapeNow);
+    let drawFrame = frame;
+    if (renderParams.movementMode === 'headRecenter') {
+        drawFrame = Object.assign({}, frame, { headPosVis: frame.headPos });
+    }
+    drawRenderFrame(ctx, renderParams, renderGraph, drawFrame, {}, {}, tapeNow);
     try {
         return canvas.toDataURL('image/jpeg', 0.82);
     } catch (e) {
@@ -783,7 +815,10 @@ function drawRenderFrame(ctx, renderParams, snapGraph, frame, nodeBrightness, ed
 
     const geom = layoutRenderTapeGeometry(renderParams, tapeForFrame, W, H);
     drawGraphOnCanvas(ctx, snapGraph, W, geom.graphH, nodeBrightness, edgeBrightness, renderParams);
-    drawTapeOnCanvas(ctx, renderParams, tapeForFrame, frame.headPos, frame.currentState, W, H, geom);
+    const smoothTapeHeadPos = (renderParams.movementMode === 'headRecenter' && Number.isFinite(frame.headPosVis))
+        ? frame.headPosVis
+        : undefined;
+    drawTapeOnCanvas(ctx, renderParams, tapeForFrame, frame.headPos, frame.currentState, W, H, geom, smoothTapeHeadPos);
 }
 
 function drawGraphOnCanvas(ctx, snapGraph, W, H, nodeBrightness, edgeBrightness, renderParams) {
@@ -979,9 +1014,11 @@ function drawArrowHead(ctx, tip, dir, len, wid) {
 }
 
 /** clipRow: null 表示整段纸带用全局格号对齐；否则只绘 [start,start+len)，且 tapeCenterOffset 对齐该行第 0 个局部格 */
-function _drawTapeRowCells(ctx, tape, tapeTopY, tapeCenterY, cellW, cellH, cellFontSize, tapeCenterOffset, W, clipRow) {
+function _drawTapeRowCells(ctx, tape, tapeTopY, tapeCenterY, cellW, cellH, cellFontSize, tapeCenterOffset, W, clipRow, horizontalShift = 0, extraHPad = 0) {
+    const effOff = tapeCenterOffset + horizontalShift;
+    const pad = Math.min(W * 2, Math.ceil(Math.abs(effOff)) + Math.ceil(cellW) * 6 + extraHPad);
     ctx.fillStyle = 'hsl(0,0%,98%)';
-    ctx.fillRect(0, tapeTopY, W, cellH);
+    ctx.fillRect(-pad, tapeTopY, W + 2 * pad, cellH);
     ctx.font = `${cellFontSize}px 'Courier New', monospace`;
 
     const drawOneCell = (cx, ci) => {
@@ -1014,14 +1051,14 @@ function _drawTapeRowCells(ctx, tape, tapeTopY, tapeCenterY, cellW, cellH, cellF
     if (clipRow && clipRow.len > 0) {
         for (let li = 0; li < clipRow.len; li++) {
             const ci = clipRow.start + li;
-            const cx = tapeCenterOffset + li * cellW;
+            const cx = effOff + li * cellW;
             drawOneCell(cx, ci);
         }
     } else if (!clipRow) {
-        const startCell = Math.floor(-tapeCenterOffset / cellW) - 1;
-        const endCell   = Math.ceil((W - tapeCenterOffset) / cellW) + 1;
+        const startCell = Math.floor(-effOff / cellW) - 1;
+        const endCell   = Math.ceil((W - effOff) / cellW) + 1;
         for (let ci = startCell; ci < endCell; ci++) {
-            const cx = tapeCenterOffset + ci * cellW;
+            const cx = effOff + ci * cellW;
             drawOneCell(cx, ci);
         }
     }
@@ -1060,7 +1097,7 @@ function _drawTapeReadHead(ctx, tipX, tipY, headBoxY, headBoxW, headBoxH, cellW,
     ctx.textBaseline = 'alphabetic';
 }
 
-function drawTapeOnCanvas(ctx, renderParams, tape, headPos, currentState, W, H, geom) {
+function drawTapeOnCanvas(ctx, renderParams, tape, headPos, currentState, W, H, geom, smoothTapeHeadPos) {
     if (!tape || !Array.isArray(tape) || !geom) return;
 
     const { graphH, cellW, cellH, cellFontSize, headBoxH, headFontSize, wrapLines, headMoving, wrapRows } = geom;
@@ -1082,7 +1119,7 @@ function drawTapeOnCanvas(ctx, renderParams, tape, headPos, currentState, W, H, 
         for (const row of wrapRows) {
             const yc = row.tapeTopY + row.cellH / 2;
             _drawTapeRowCells(ctx, tape, row.tapeTopY, yc, row.cellW, row.cellH, row.cellFontSize, 0, W,
-                { start: row.start, len: row.cap });
+                { start: row.start, len: row.cap }, 0, 0);
         }
         headCellW = hr.cellW;
         headFs = Math.round(headCellW * 0.5);
@@ -1094,11 +1131,18 @@ function drawTapeOnCanvas(ctx, renderParams, tape, headPos, currentState, W, H, 
         const tapeTopY = graphH;
         tapeCenterY = graphH + Math.round(cellH / 2);
         headBoxY = graphH - headBoxH;
+        const isHeadRecenter = renderParams.movementMode === 'headRecenter';
+        const tapeHp = isHeadRecenter && Number.isFinite(smoothTapeHeadPos) ? smoothTapeHeadPos : headPos;
         const tapeCenterOffset = headMoving
             ? W / 2 - (tape.length / 2) * cellW
-            : W / 2 - headPos * cellW - cellW / 2;
-        headScreenX = headMoving ? tapeCenterOffset + headPos * cellW + cellW / 2 : W / 2;
-        _drawTapeRowCells(ctx, tape, tapeTopY, tapeCenterY, cellW, cellH, cellFontSize, tapeCenterOffset, W, null);
+            : W / 2 - tapeHp * cellW - cellW / 2;
+        headScreenX = headMoving
+            ? tapeCenterOffset + headPos * cellW + cellW / 2
+            : (isHeadRecenter ? tapeCenterOffset + headPos * cellW + cellW / 2 : W / 2);
+        const lagPad = isHeadRecenter && Number.isFinite(smoothTapeHeadPos)
+            ? Math.ceil(Math.abs(headPos - smoothTapeHeadPos) * cellW) + Math.ceil(cellW * 2)
+            : 0;
+        _drawTapeRowCells(ctx, tape, tapeTopY, tapeCenterY, cellW, cellH, cellFontSize, tapeCenterOffset, W, null, 0, lagPad);
         headCellW = cellW;
         headFs = headFontSize;
         headBH = headBoxH;
