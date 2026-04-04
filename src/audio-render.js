@@ -380,12 +380,21 @@ function encodeWav(pcmFloat32, sampleRate) {
 
 // ── Main export function ──────────────────────────────────────────────────────
 
+/** 与 render-anim.js 中 tailContinuationFrameCount 保持一致 */
+function tailContinuationFrameCount(renderParams) {
+    const stride = Math.max(1, parseInt(renderParams.speedMultiplier, 10) || 1);
+    const halflife = Math.max(1, parseInt(renderParams.halflife, 10) || 10);
+    const decayTail = Math.ceil(9 * halflife);
+    let minTail = parseInt(renderParams.minTailContinuationFrames, 10);
+    if (!Number.isFinite(minTail) || minTail < 0) minTail = 90;
+    return Math.max(decayTail, minTail * stride);
+}
+
 function bakeAudio(history, renderParams, stateNames) {
     const SAMPLE_RATE = 44100;
     const fps         = Math.max(1, renderParams.fps || 30);
     const pauseFrames = Math.max(0, renderParams.pauseFrames);   // allow 0 pause
     const moveFrames  = Math.max(1, renderParams.moveFrames);
-    const halflife    = Math.max(1, renderParams.halflife);
     const speedMult   = Math.max(1, parseInt(renderParams.speedMultiplier, 10) || 1);
 
     // Duration of one "beat" in seconds: movement + pause, minimum 1 frame worth.
@@ -410,7 +419,7 @@ function bakeAudio(history, renderParams, stateNames) {
     const noteMap = buildStateNoteMap(stateNames, scaleNotes, seed);
 
     // Total audio duration: 逻辑总帧数与 buildRenderTimeline / 图像渲染一致，再按 speedMult 缩短。
-    const cooldown  = Math.ceil(9 * halflife);
+    const cooldown  = tailContinuationFrameCount(renderParams);
     let totalFramesRaw = 1 + pauseFrames;   // dark frame + initial pause
     for (let i = 1; i < history.length; i++) {
         const posChanged = history[i][1] !== history[i-1][1];

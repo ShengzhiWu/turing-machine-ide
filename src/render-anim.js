@@ -5,6 +5,7 @@ const _renderDefaultParams = {
     width: 1920, height: 1080,
     fps: 30,
     moveFrames: 10, pauseFrames: 5, halflife: 10,
+    minTailContinuationFrames: 90,  // 停机后尾部至少延续的逻辑帧数（含衰减段）
     speedMultiplier: 1,  // 每 N 个逻辑帧输出 1 帧（含图像与音频时长）
     graphicScale: 1.0,
     renderImage: true, renderMusic: false,
@@ -58,6 +59,7 @@ async function menuRenderAnimation() {  // 点击菜单->文件->渲染动画触
             lblPauseFrames:   t('renderLabelPauseFrames'),
             lblSpeedMultiplier: t('renderLabelSpeedMultiplier'),
             lblHalflife:      t('renderLabelHalflife'),
+            lblMinTailContinuation: t('renderLabelMinTailContinuation'),
             lblTotalFrames:   t('renderLabelTotalFrames'),
             lblTotalDuration: t('renderLabelTotalDuration'),
             lblRenderImage:   t('renderLabelRenderImage'),
@@ -98,12 +100,25 @@ async function menuRenderAnimation() {  // 点击菜单->文件->渲染动画触
 }
 
 /**
+ * 停机后尾部逻辑帧数。高亮衰减段为 ⌈9×半衰期⌉ 逻辑帧；「最小延续」按导出/预览的输出帧计数，
+ * 倍速抽样时乘以 stride，使尾部长度（秒）与倍速为 1 时一致。与 audio-render.js 保持一致。
+ */
+function tailContinuationFrameCount(renderParams) {
+    const stride = Math.max(1, parseInt(renderParams.speedMultiplier, 10) || 1);
+    const halflife = Math.max(1, parseInt(renderParams.halflife, 10) || 10);
+    const decayTail = Math.ceil(9 * halflife);
+    let minTail = parseInt(renderParams.minTailContinuationFrames, 10);
+    if (!Number.isFinite(minTail) || minTail < 0) minTail = 90;
+    return Math.max(decayTail, minTail * stride);
+}
+
+/**
  * 逻辑渲染帧总数（不含倍速抽样）。steps 为转移步数，movements 为 L/R 移动次数（与 run_turing_machine 一致）。
  */
 function computeRawTotalFrames(steps, movements, renderParams) {
     const pause    = Math.max(0, renderParams.pauseFrames);
     const move     = Math.max(1, renderParams.moveFrames);
-    const cooldown = Math.ceil(9 * renderParams.halflife);  // 9倍半衰期，亮度衰减到最初的 2 ^ -9，这样即使是白色也会衰减到看不见。加这个是为了确保动画一直延续到所有高亮熄灭
+    const cooldown = tailContinuationFrameCount(renderParams);
     const still = steps - movements;
     return 1 + pause + movements * (move + pause) + still * Math.max(1, pause) + cooldown;
 }
@@ -126,6 +141,7 @@ function computeTotalFrames(stats, renderParams) {
     // Settings window changed params → recompute total frames and send back
     ipcRenderer.on('render-params-changed', (event, params) => {
         Object.assign(_lastRenderParams, params);
+        if (typeof markDirty === 'function') markDirty();
         const n = computeTotalFrames(window._renderRunStats, _lastRenderParams);
         ipcRenderer.send('render-total-frames', n);
     });
@@ -366,7 +382,7 @@ function cubicEase(t) {
 function buildRenderTimeline(history, renderParams) {
     const pause = Math.max(0, renderParams.pauseFrames);
     const move  = Math.max(1, renderParams.moveFrames);
-    const cooldown = Math.ceil(9 * renderParams.halflife);
+    const cooldown = tailContinuationFrameCount(renderParams);
     const segments = [];
     const activations = [];
 

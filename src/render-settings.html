@@ -86,6 +86,10 @@
         <label id="lbl-speed-multiplier">Speed</label>
         <input id="speed-multiplier" type="number" value="1" min="1" max="1000000">
     </div>
+    <div class="row">
+        <label id="lbl-min-tail-continuation">Minimum tail continuation frames</label>
+        <input id="min-tail-continuation" type="number" value="90" min="0" max="1000000">
+    </div>
     <div class="row" style="margin-top:4px;margin-bottom:0">
         <label id="lbl-total-frames" style="color:rgba(255,255,255,0.45);font-size:12px;width:auto;"></label>
     </div>
@@ -206,6 +210,7 @@ ipcRenderer.on('render-settings-init', (e, data) => {
     setText('lbl-pause-frames',  'lblPauseFrames',  'Pause frames');
     setText('lbl-speed-multiplier', 'lblSpeedMultiplier', 'Speed');
     setText('lbl-halflife',      'lblHalflife',     'Highlight half-life (frames)');
+    setText('lbl-min-tail-continuation', 'lblMinTailContinuation', 'Minimum tail continuation frames');
     setText('lbl-render-image',  'lblRenderImage',  'Render image frames');
     setText('lbl-graphic-scale', 'lblGraphicScale', 'Graphic scale');
     setText('lbl-movement-mode-tape',  'renderMovementModeTape',  'Tape moves, head fixed');
@@ -242,6 +247,8 @@ ipcRenderer.on('render-settings-init', (e, data) => {
     set('pause-frames',  p.pauseFrames);
     set('speed-multiplier', p.speedMultiplier);
     set('halflife',      p.halflife);
+    if (p.minTailContinuationFrames !== undefined && p.minTailContinuationFrames !== null)
+        set('min-tail-continuation', p.minTailContinuationFrames);
     set('graphic-scale', p.graphicScale);
     if (p.movementMode) {
         const modeEl = document.querySelector(`input[name="movement-mode"][value="${p.movementMode}"]`);
@@ -284,7 +291,7 @@ function updateTotalFrames(n) {
     document.getElementById('lbl-total-frames').textContent = prefix + n + '\u2003\u2003' + (_s.lblTotalDuration || 'Duration: ') + dur.trim();
 }
 
-function getParams() {
+function getParams() {  // 获取渲染设置，用于保存
     let pauseFrames = parseInt(document.getElementById('pause-frames').value);
     if (pauseFrames === undefined)
         pauseFrames = 5;
@@ -296,6 +303,11 @@ function getParams() {
         pauseFrames:  Math.max(0,   pauseFrames),  // pauseFrames 可以为 0
         speedMultiplier: Math.max(1, parseInt(document.getElementById('speed-multiplier').value, 10) || 1),
         halflife:     Math.max(1,   parseInt(document.getElementById('halflife').value)       || 10),
+        minTailContinuationFrames: (() => {
+            const raw = document.getElementById('min-tail-continuation').value.trim();
+            const v = parseInt(raw, 10);
+            return Number.isFinite(v) && v >= 0 ? v : 90;
+        })(),
         graphicScale: Math.max(0.1, parseFloat(document.getElementById('graphic-scale').value) || 1.0),
         movementMode: document.querySelector('input[name="movement-mode"]:checked')?.value || 'tape',
         tapeWrapLines: document.getElementById('tape-wrap-lines').checked,
@@ -312,7 +324,7 @@ function getParams() {
     };
 }
 
-['width','height','fps','move-frames','pause-frames','speed-multiplier','halflife','graphic-scale',
+['width','height','fps','move-frames','pause-frames','halflife','speed-multiplier','min-tail-continuation','graphic-scale',
  'render-image','render-music','music-mode','music-root','music-lo','music-hi',
  'music-seed','music-samples','output-path','movement-mode-tape','movement-mode-head',
  'max-cells-per-row'].forEach(id => {
