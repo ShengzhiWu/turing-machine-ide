@@ -257,7 +257,7 @@ async function startRender(renderParams) {
                 const pct = (outFi / totalOut * 100).toFixed(1);
                 ipcRenderer.send('render-progress', { pct, current: outFi, total: totalOut });
 
-                if (outFi % 10 === 0) await new Promise(res => setTimeout(res, 0));
+                if (outFi % 10 === 0) await new Promise(res => setImmediate(res));
             };
 
             for (let D = 0; D < totalRaw; D += stride) {
@@ -290,7 +290,7 @@ async function startRender(renderParams) {
         // ── Audio bake ────────────────────────────────────────────────
         if (renderParams.renderMusic) {
             ipcRenderer.send('render-preview-status', 'Baking audio…');
-            await new Promise(res => setTimeout(res, 0));  // yield so status shows
+            await new Promise(res => setImmediate(res));  // yield so status shows
 
             const { bakeAudio } = require('./src/audio-render.js');
             const stateNames = _getStateNames();

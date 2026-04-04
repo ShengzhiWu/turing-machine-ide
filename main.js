@@ -10,6 +10,7 @@ var mainWindowCloseConfirmed   = false;
 var settingsWindow      = null;  // Render settings child window
 var previewWindow       = null;  // Render preview child window
 var currentRenderParams = null;  // Last known render settings (persisted in project file)
+var mainSavedBackgroundThrottling = true;  // restore after image/audio export
 
 // ── Helper: safely send to a window if it still exists ───────────────
 function sendTo(win, channel, ...args) {
@@ -111,6 +112,16 @@ ipcMain.on('render-ui-lock', (event, locked) => {
     // Also prevent closing settings window while rendering
     if (settingsWindow && !settingsWindow.isDestroyed())
         settingsWindow.setClosable(!locked);
+    // Export runs in main window renderer; disable Chromium timer/visibility throttling while locked
+    if (mainWindow && !mainWindow.isDestroyed()) {
+        const wc = mainWindow.webContents;
+        if (locked) {
+            mainSavedBackgroundThrottling = wc.getBackgroundThrottling();
+            wc.setBackgroundThrottling(false);
+        } else {
+            wc.setBackgroundThrottling(mainSavedBackgroundThrottling);
+        }
+    }
 });
 
 // ── Open render preview window ────────────────────────────────────────
