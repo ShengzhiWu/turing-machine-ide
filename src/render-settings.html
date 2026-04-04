@@ -148,7 +148,7 @@
         <div class="row">
             <label id="lbl-music-samples">Piano samples folder</label>
             <input id="music-samples" type="text" placeholder="(leave blank to use synth)">
-            <button class="btn btn-small" id="music-browse-btn">…</button>
+            <button class="btn btn-small" id="music-browse-btn">Browse</button>
         </div>
         <div class="row" style="margin-top:2px;">
             <label></label>
@@ -161,7 +161,7 @@
     <div class="section-title" id="sec-output">Output path</div>
     <div class="row">
         <input id="output-path" type="text" placeholder="">
-        <button class="btn" id="browse-btn">…</button>
+        <button class="btn" id="browse-btn">Browse</button>
     </div>
 
     <div id="progress-row">
@@ -206,7 +206,9 @@ ipcRenderer.on('render-settings-init', (e, data) => {
     setText('start-btn',         'btnStart',        'Render');
     document.getElementById('output-path').placeholder   = s.outputPlaceholder       || '';
     document.getElementById('music-samples').placeholder = s.musicSamplesPlaceholder || '(leave blank to use synth)';
-    document.getElementById('browse-btn').textContent    = s.btnBrowse || '…';
+    const browseLabel = s.btnBrowse || 'Browse';
+    document.getElementById('browse-btn').textContent = browseLabel;
+    document.getElementById('music-browse-btn').textContent = browseLabel;
     // 音阶选项文字
     const modeEl = document.getElementById('music-mode');
     modeEl.options[0].textContent = s.renderMusicModeMajor || 'Major';
