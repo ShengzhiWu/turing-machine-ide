@@ -85,6 +85,12 @@ ipcMain.on('render-params-changed', (event, params) => {
     sendTo(mainWindow, 'render-params-changed', params);
 });
 
+/** 设置窗口初始化/回填时同步参数，不触发主窗口 markDirty */
+ipcMain.on('render-params-sync', (event, params) => {
+    currentRenderParams = params;
+    sendTo(mainWindow, 'render-params-sync', params);
+});
+
 // ── Get render params (called by file.js when saving a project) ───────
 ipcMain.handle('get-render-params', () => currentRenderParams);
 

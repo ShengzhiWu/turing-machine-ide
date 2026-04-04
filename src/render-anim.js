@@ -152,13 +152,21 @@ function computeTotalFrames(stats, renderParams) {
         }, 120);
     }
 
-    // Settings window changed params → recompute total frames and send back
-    ipcRenderer.on('render-params-changed', (event, params) => {
+    function applyRenderParamsFromSettings(params, markDocumentDirty) {
         Object.assign(_lastRenderParams, params);
-        if (typeof markDirty === 'function') markDirty();
+        if (markDocumentDirty && typeof markDirty === 'function') markDirty();
         const n = computeTotalFrames(window._renderRunStats, _lastRenderParams);
         ipcRenderer.send('render-total-frames', n);
         scheduleRenderSettingsPreview();
+    }
+
+    // Settings window: user edits
+    ipcRenderer.on('render-params-changed', (event, params) => {
+        applyRenderParamsFromSettings(params, true);
+    });
+    // Settings window: open / reload form only (same state, do not mark project dirty)
+    ipcRenderer.on('render-params-sync', (event, params) => {
+        applyRenderParamsFromSettings(params, false);
     });
 
     // Settings window closed without rendering

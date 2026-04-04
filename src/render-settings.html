@@ -291,7 +291,7 @@ ipcRenderer.on('render-settings-init', (e, data) => {
     updateSubsections();
     updateHeadTapeWrapOptions();
     updateTotalFrames(data.totalFrames || 0);
-    ipcRenderer.send('render-params-changed', getParams());
+    ipcRenderer.send('render-params-sync', getParams());
 });
 
 ipcRenderer.on('render-progress', (e, data) => {
