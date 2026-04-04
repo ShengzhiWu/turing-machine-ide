@@ -92,6 +92,7 @@ async function menuRenderAnimation() {  // 点击菜单->文件->渲染动画触
             renderMovementModeHead:  t('renderMovementModeHead'),
             lblTapeWrapLines: t('renderTapeWrapLines'),
             lblMaxCellsPerRow: t('renderMaxCellsPerRow'),
+            renderPreviewUnavailable: t('renderPreviewUnavailable'),
             durationHour:     t('renderDurationHour'),
             durationMinute:   t('renderDurationMinute'),
             durationSecond:   t('renderDurationSecond'),
@@ -138,12 +139,23 @@ function computeTotalFrames(stats, renderParams) {
 {
     const { ipcRenderer } = require('electron');
 
+    let _renderSettingsPreviewTimer = null;
+    function scheduleRenderSettingsPreview() {
+        if (_renderSettingsPreviewTimer) clearTimeout(_renderSettingsPreviewTimer);
+        _renderSettingsPreviewTimer = setTimeout(() => {
+            _renderSettingsPreviewTimer = null;
+            const url = getRenderFirstFramePreviewDataURL(_lastRenderParams);
+            ipcRenderer.send('render-settings-preview-frame', url ? { dataURL: url } : { dataURL: null });
+        }, 120);
+    }
+
     // Settings window changed params → recompute total frames and send back
     ipcRenderer.on('render-params-changed', (event, params) => {
         Object.assign(_lastRenderParams, params);
         if (typeof markDirty === 'function') markDirty();
         const n = computeTotalFrames(window._renderRunStats, _lastRenderParams);
         ipcRenderer.send('render-total-frames', n);
+        scheduleRenderSettingsPreview();
     });
 
     // Settings window closed without rendering
@@ -466,6 +478,34 @@ function findSegmentForIndex(segments, g) {
         else return s;
     }
     return null;
+}
+
+/**
+ * 与导出第一输出帧一致：逻辑帧 0（暗帧），结点/边无高亮，纸带与机头为 history[0] 初始状态。
+ * 按设置的分辨率绘制（线宽等为像素单位，与导出一致）；返回 JPEG data URL，失败或无历史时返回 null。
+ */
+function getRenderFirstFramePreviewDataURL(renderParams) {
+    const history = window._renderHistory;
+    if (!history || history.length === 0) return null;
+    const timeline = buildRenderTimeline(history, renderParams);
+    if (!timeline.segments.length) return null;
+    const renderGraph = buildRenderGraphSnapshot();
+    const frame = getFrameStateAt(timeline.segments, history, 0);
+    const hi = Math.min(frame.historyIndex, history.length - 1);
+    const tapeCache = window._renderTapeSeed ? _createTapeRenderCache(window._renderTapeSeed) : null;
+    const tapeNow = tapeCache ? _tapeAtHistoryIndexForRender(history, hi, tapeCache) : null;
+    const W = Math.max(1, renderParams.width);
+    const H = Math.max(1, renderParams.height);
+    const canvas = document.createElement('canvas');
+    canvas.width = W;
+    canvas.height = H;
+    const ctx = canvas.getContext('2d');
+    drawRenderFrame(ctx, renderParams, renderGraph, frame, {}, {}, tapeNow);
+    try {
+        return canvas.toDataURL('image/jpeg', 0.82);
+    } catch (e) {
+        return null;
+    }
 }
 
 function getFrameStateAt(segments, history, g) {

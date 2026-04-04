@@ -53,9 +53,25 @@
         #frame-counter { font-size:12px; color:rgba(255,255,255,0.6); white-space:nowrap; min-width:70px; text-align:right; }
         .subsection-disabled { opacity:0.38; pointer-events:none; }
         .section-sep { border: none; border-top: 1px solid hsl(0,0%,28%); margin: 12px 0 0 0; }
+        #frame-preview-wrap { margin-bottom: 14px; }
+        #frame-preview-box {
+            border-radius: 6px; overflow: hidden;
+            border: 1px solid hsl(0,0%,28%); background: hsl(224,17%,12%);
+            min-height: 72px; display: flex; align-items: center; justify-content: center;
+        }
+        /* 全分辨率位图，仅布局上缩小以适配侧栏 */
+        #frame-preview-img { display: none; max-width: 100%; width: 100%; height: auto; vertical-align: top; }
+        #frame-preview-empty { display: none; padding: 16px; text-align: center; font-size: 12px; color: rgba(255,255,255,0.42); }
     </style>
 </head>
 <body>
+    <div id="frame-preview-wrap">
+        <div id="frame-preview-box">
+            <img id="frame-preview-img" alt="">
+            <div id="frame-preview-empty"></div>
+        </div>
+    </div>
+
     <div class="section-title" id="sec-size">Size</div>
     <div class="row">
         <label id="lbl-width">Width</label>
@@ -268,6 +284,7 @@ ipcRenderer.on('render-settings-init', (e, data) => {
     updateSubsections();
     updateHeadTapeWrapOptions();
     updateTotalFrames(data.totalFrames || 0);
+    ipcRenderer.send('render-params-changed', getParams());
 });
 
 ipcRenderer.on('render-progress', (e, data) => {
@@ -275,6 +292,21 @@ ipcRenderer.on('render-progress', (e, data) => {
     document.getElementById('frame-counter').textContent = data.current + ' / ' + data.total;
 });
 ipcRenderer.on('render-total-frames', (e, n) => updateTotalFrames(n));
+
+ipcRenderer.on('render-settings-preview-frame', (e, payload) => {
+    const img = document.getElementById('frame-preview-img');
+    const empty = document.getElementById('frame-preview-empty');
+    if (payload && payload.dataURL) {
+        img.src = payload.dataURL;
+        img.style.display = 'block';
+        empty.style.display = 'none';
+    } else {
+        img.removeAttribute('src');
+        img.style.display = 'none';
+        empty.style.display = 'block';
+        empty.textContent = _s.renderPreviewUnavailable || 'Preview unavailable';
+    }
+});
 
 function updateTotalFrames(n) {
     const prefix = _s.lblTotalFrames || 'Total frames: ';

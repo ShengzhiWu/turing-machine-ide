@@ -5,6 +5,11 @@ const { ipcMain, dialog, Menu } = electron;
 
 Menu.setApplicationMenu(null);  // 移除 Electron 默认菜单栏，使用应用内自定义菜单
 
+/** 渲染设置窗口：仅本会话内记住用户调整后的宽高（关闭窗口再打开仍有效；退出应用后作废） */
+const RENDER_SETTINGS_WIN_MIN = { w: 440, h: 200 };
+const RENDER_SETTINGS_WIN_DEFAULT = { width: 570, height: 890 };
+var renderSettingsSessionBounds = null;  // { width, height } | null
+
 var mainWindow                 = null;
 var mainWindowCloseConfirmed   = false;
 var settingsWindow      = null;  // Render settings child window
@@ -36,10 +41,13 @@ ipcMain.handle('open-render-settings', async (event, initData) => {
             params: Object.assign({}, initData && initData.params, currentRenderParams)
         });
     }
-    settingsWindow = new BrowserWindow({
-        width: 540,
-        height: 905,
-        resizable: false,
+    const rsSize = renderSettingsSessionBounds || RENDER_SETTINGS_WIN_DEFAULT;
+    settingsWindow = new BrowserWindow({  // 渲染设置窗口
+        width: rsSize.width,
+        height: rsSize.height,
+        minWidth: RENDER_SETTINGS_WIN_MIN.w,
+        minHeight: RENDER_SETTINGS_WIN_MIN.h,
+        resizable: true,
         minimizable: false,
         maximizable: false,
         title: (initData && initData.strings && initData.strings.renderSettingsTitle) || 'Render Settings',
@@ -51,6 +59,14 @@ ipcMain.handle('open-render-settings', async (event, initData) => {
     settingsWindow.loadFile('src/render-settings.html');
     settingsWindow.webContents.on('did-finish-load', () => {
         sendTo(settingsWindow, 'render-settings-init', initData);
+    });
+    settingsWindow.on('close', () => {
+        try {
+            if (!settingsWindow || settingsWindow.isDestroyed()) return;
+            const b = settingsWindow.getBounds();
+            if (b.width >= RENDER_SETTINGS_WIN_MIN.w && b.height >= RENDER_SETTINGS_WIN_MIN.h)
+                renderSettingsSessionBounds = { width: b.width, height: b.height };  // 记下渲染设置窗口的尺寸，这样用户下次打开时尺寸不变
+        } catch (e) { /* ignore */ }
     });
     settingsWindow.on('closed', () => {
         settingsWindow = null;
@@ -158,6 +174,11 @@ ipcMain.on('close-render-preview', () => {
 // ── Music preview: main window bakes WAV, relay result to settings window ──
 ipcMain.on('render-music-preview-result', (event, data) => {
     sendTo(settingsWindow, 'render-music-preview-ready', data);
+});
+
+// ── First-frame preview: main window draws → settings window shows ───
+ipcMain.on('render-settings-preview-frame', (event, payload) => {
+    sendTo(settingsWindow, 'render-settings-preview-frame', payload);
 });
 
 // ── Relay music-preview request from settings window to main window ──
