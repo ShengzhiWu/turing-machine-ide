@@ -623,12 +623,12 @@ function layoutRenderTapeGeometry(renderParams, tape, W, H) {
     const numRows = wrapLines ? (L === 0 ? 1 : Math.ceil(L / maxPerRow)) : 1;
     const rowUnits = wrapLines ? numRows + 0.5 * Math.max(0, numRows - 1) : 1;
 
-    const bottomPad = Math.max(8, Math.round(H * 0.02));
-    const minGraphH = Math.max(64, Math.round(H * 0.10));
+    const bottomPad = Math.round(H * 0.02);
+    const minGraphH = Math.round(H * 0.10);
     const maxStack = Math.max(0, H - bottomPad - minGraphH);
 
     const cellH0 = Math.round(H * 0.062);
-    const cellFontSize0 = Math.max(10, Math.round(cellH0 * 0.52));
+    const cellFontSize0 = Math.round(cellH0 * 0.52);
     const cellW0 = Math.max(Math.round(cellFontSize0 * 1.9), Math.round(W / 30));
 
     let shrink = 1;
@@ -641,8 +641,8 @@ function layoutRenderTapeGeometry(renderParams, tape, W, H) {
     }
 
     const cellHDesired = cellH0 * shrink;
-    const cellH = Math.max(6, Math.min(cellHDesired, maxStack / rowUnits));
-    const cellFontSize = Math.max(6, Math.round(cellH * 0.52));
+    const cellH = Math.max(0, Math.min(cellHDesired, maxStack / rowUnits));
+    const cellFontSize = Math.round(cellH * 0.52);
     const cellW = Math.max(Math.round(cellFontSize * 1.9), Math.round(W / 30)) * shrink;
 
     const stackH = cellH * rowUnits;
