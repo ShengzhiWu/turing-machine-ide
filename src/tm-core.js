@@ -217,12 +217,12 @@ function run_turing_machine(
             break;
         }
         if(action[1]=="R") {
-            position ++;
+            position++;
             movements++;
             lastStepMoved = true;
         }
         else if (action[1]=="L") {
-            position --;
+            position--;
             if (position < 0) {  // 向左移出了纸带，在左边加一格
                 position++;
                 tape.unshift('');
@@ -266,7 +266,9 @@ function run_turing_machine(
     if (lastStepMoved)  // 在（过滤前）最后一次记录后，最后一步移动了，那么 movements 比有记录的步数多 1，要减去
         movements--;
 
-    console.log(performance.now() - t0, "ms");
+    timePassed = performance.now() - t0;
+    if (timePassed > 100)
+        console.log(timePassed, "ms");
     t0 = performance.now();
 
     // head-tail 模式下补充最终状态
@@ -320,7 +322,9 @@ function run_turing_machine(
         });
     }
     
-    console.log(performance.now() - t0, "ms");
+    timePassed = performance.now() - t0;
+    if (timePassed > 100)
+        console.log(timePassed, "ms");
 
     return { history, steps: step, movements, stateArrivals, endTape: tape, endPosition: position, endState: state };
 }
