@@ -113,7 +113,10 @@ function computeTotalFrames(stats, renderParams) {
     const raw = computeRawTotalFrames(stats.steps, stats.movements, renderParams);
     if (raw === 0) return 0;
     const mult = Math.max(1, parseInt(renderParams.speedMultiplier, 10) || 1);
-    return Math.ceil(raw / mult);
+    const lastLogical = raw - 1;
+    const lastEmittedD = Math.floor(lastLogical / mult) * mult;
+    const needsFinalFrame = mult > 1 && lastEmittedD < lastLogical;
+    return Math.ceil(raw / mult) + (needsFinalFrame ? 1 : 0);
 }
 
 // ── IPC listeners (from settings window via main process) ────────────
@@ -209,19 +212,14 @@ async function startRender(renderParams) {
                 totalRaw = timeline.totalRaw;
             }
             const { segments, activations } = timeline;
-            const totalOut = Math.ceil(totalRaw / stride);
+            const lastLogical = totalRaw - 1;
+            const lastStrideAlignedD = Math.floor(lastLogical / stride) * stride;
+            const needsFinalFrame = stride > 1 && lastStrideAlignedD < lastLogical;
+            const totalOut = Math.ceil(totalRaw / stride) + (needsFinalFrame ? 1 : 0);
             let outFi = 0;
             const tapeCache = window._renderTapeSeed ? _createTapeRenderCache(window._renderTapeSeed) : null;
-            for (let D = 0; D < totalRaw; D += stride) {
-                const batchStart = D === 0 ? 0 : D - stride + 1;
-                const batchEnd   = D;
-                collectActivationsInRange(activations, batchStart, batchEnd, batchNodeLit, batchEdgeLit);
-                applyBatchBrightness(
-                    nodeBrightness, edgeBrightness,
-                    batchNodeLit, batchEdgeLit, decayBatch);
-                batchNodeLit.clear();
-                batchEdgeLit.clear();
 
+            const writeOneOutputFrame = async (D) => {
                 const frame = getFrameStateAt(segments, history, D);
                 const hi = Math.min(frame.historyIndex, history.length - 1);
                 const tapeNow = tapeCache ? _tapeAtHistoryIndexForRender(history, hi, tapeCache) : null;
@@ -244,6 +242,32 @@ async function startRender(renderParams) {
                 ipcRenderer.send('render-progress', { pct, current: outFi, total: totalOut });
 
                 if (outFi % 10 === 0) await new Promise(res => setTimeout(res, 0));
+            };
+
+            for (let D = 0; D < totalRaw; D += stride) {
+                const batchStart = D === 0 ? 0 : D - stride + 1;
+                const batchEnd   = D;
+                collectActivationsInRange(activations, batchStart, batchEnd, batchNodeLit, batchEdgeLit);
+                applyBatchBrightness(
+                    nodeBrightness, edgeBrightness,
+                    batchNodeLit, batchEdgeLit, decayBatch);
+                batchNodeLit.clear();
+                batchEdgeLit.clear();
+
+                await writeOneOutputFrame(D);
+            }
+
+            // 倍速抽样时最后一格可能落在停机前；补一帧逻辑末帧以显示最终停机状态（纸带/状态与 timeline 一致）
+            if (needsFinalFrame) {
+                const rem = lastLogical - lastStrideAlignedD;
+                collectActivationsInRange(activations, lastStrideAlignedD + 1, lastLogical, batchNodeLit, batchEdgeLit);
+                const decayRem = Math.pow(0.5, rem / renderParams.halflife);
+                applyBatchBrightness(
+                    nodeBrightness, edgeBrightness,
+                    batchNodeLit, batchEdgeLit, decayRem);
+                batchNodeLit.clear();
+                batchEdgeLit.clear();
+                await writeOneOutputFrame(lastLogical);
             }
         }
 
