@@ -613,7 +613,7 @@ function buildRenderGraphSnapshot() {
 
 /**
  * 渲染布局：有向图占画布顶部到「最上一行纸带格子」上边缘之间；纸带自下而上紧贴画布底排布。
- * 返回 drawTapeOnCanvas 所需几何（不含依赖 ctx.measureText 的 headBoxW）。
+ * 返回 drawTapeOnCanvas 所需几何（不含依赖 ctx.measureText 的 headBoxW；headBoxW = 最长状态名宽 + 0.5*cellW）。
  */
 function layoutRenderTapeGeometry(renderParams, tape, W, H) {
     const L = tape && Array.isArray(tape) ? tape.length : 0;
@@ -647,10 +647,10 @@ function layoutRenderTapeGeometry(renderParams, tape, W, H) {
 
     const stackH = cellH * rowUnits;
     const graphH = H - bottomPad - stackH;
-    const tapeRegionH = H - graphH;
 
-    const headBoxH = Math.round(tapeRegionH * 0.24) * shrink;
-    const headFontSize = Math.max(12, Math.round(tapeRegionH * 0.11));
+    // 机头尺寸相对纸带格宽 cellW
+    const headFontSize = Math.round(cellW * 0.5);  // 机头状态名字号
+    const headBoxH = Math.round(cellW * 1);  // 机头高度
 
     return {
         graphH,
@@ -930,12 +930,12 @@ function _drawTapeRowCells(ctx, tape, tapeTopY, tapeCenterY, cellW, cellH, cellF
     ctx.textBaseline = 'alphabetic';
 }
 
-function _drawTapeReadHead(ctx, tipX, tipY, headBoxY, headBoxW, headBoxH, shrink, headFontSizeScaled, currentState) {
+function _drawTapeReadHead(ctx, tipX, tipY, headBoxY, headBoxW, headBoxH, cellW, headFontSize, currentState) {
     const spikeTopY = headBoxY + headBoxH;
-    const pentPointW = Math.max(8 * shrink, Math.round(headBoxW * 0.30));
+    const pentPointW = Math.round(cellW * 0.4);  // 机头针尖根部宽度
     const rectL = tipX - headBoxW / 2;
     const rectR = tipX + headBoxW / 2;
-    const hr = Math.max(3 * shrink, Math.round(headBoxH * 0.18));
+    const hr = Math.round(cellW * 0.2);  // 机头圆角
     ctx.fillStyle = 'hsl(0,0%,22%)';
     ctx.beginPath();
     ctx.moveTo(rectL + hr, headBoxY);
@@ -953,7 +953,7 @@ function _drawTapeReadHead(ctx, tipX, tipY, headBoxY, headBoxW, headBoxH, shrink
 
     const displayState = canonicalStateName(currentState) || '';
     ctx.fillStyle    = 'white';
-    ctx.font         = `bold ${headFontSizeScaled}px system-ui, sans-serif`;
+    ctx.font         = `bold ${headFontSize}px system-ui, sans-serif`;
     ctx.textAlign    = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(displayState, tipX, headBoxY + headBoxH / 2);
@@ -970,7 +970,6 @@ function drawTapeOnCanvas(ctx, renderParams, tape, headPos, currentState, W, H, 
         cellW,
         cellH,
         cellFontSize,
-        shrink,
         headBoxH,
         headFontSize,
         wrapLines,
@@ -991,9 +990,7 @@ function drawTapeOnCanvas(ctx, renderParams, tape, headPos, currentState, W, H, 
         const w = ctx.measureText(name).width;
         if (w > maxStateNameW) maxStateNameW = w;
     }
-    const headPadX = headFontSize * 0.7;
-    const headBoxW = Math.max(headFontSize * 2.2, maxStateNameW + headPadX * 2) * shrink;
-    const headFontSizeScaled = headFontSize * shrink;
+    const headBoxW = maxStateNameW + 0.6 * cellW;  // 机头宽度
 
     // ── 分行：自下而上；最上一行格顶 y === graphH ─────────────────────────
     if (wrapLines) {
@@ -1021,7 +1018,7 @@ function drawTapeOnCanvas(ctx, renderParams, tape, headPos, currentState, W, H, 
         const local = headIdx - rowStart;
         const headScreenX = tapeLeftX + local * cellW + cellW / 2;
         const headBoxY = tapeTopYs[headRow] - headBoxH;
-        _drawTapeReadHead(ctx, headScreenX, tapeCenterY, headBoxY, headBoxW, headBoxH, shrink, headFontSizeScaled, currentState);
+        _drawTapeReadHead(ctx, headScreenX, tapeCenterY, headBoxY, headBoxW, headBoxH, cellW, headFontSize, currentState);
         return;
     }
 
@@ -1037,5 +1034,5 @@ function drawTapeOnCanvas(ctx, renderParams, tape, headPos, currentState, W, H, 
         : W / 2;
 
     _drawTapeRowCells(ctx, tape, tapeTopY, tapeCenterY, cellW, cellH, cellFontSize, tapeCenterOffset, W, null);
-    _drawTapeReadHead(ctx, headScreenX, tapeCenterY, headBoxY, headBoxW, headBoxH, shrink, headFontSizeScaled, currentState);
+    _drawTapeReadHead(ctx, headScreenX, tapeCenterY, headBoxY, headBoxW, headBoxH, cellW, headFontSize, currentState);
 }
