@@ -13,7 +13,8 @@ const _renderDefaultParams = {
     renderImage: true, renderMusic: false,
     movementMode: 'tape',  // 'tape' = 纸带动机头固定；'head' = 机头动纸带固定
     tapeWrapLines: true,   // 仅机头动模式：多行绘制纸带
-    maxCellsPerRow: 70,
+    maxCellsFirstRow: 40,  // 首行最大格数（格更大，便于看清纸带开头）
+    maxCellsOtherRows: 70, // 其余行最大格数
     musicMode: 'major', musicRoot: 'C4', musicLoNote: 'C3', musicHiNote: 'C6',
     musicSeed: 0, samplesDir: '',
     outputPath: '',
@@ -94,7 +95,8 @@ async function menuRenderAnimation() {  // 点击菜单->文件->渲染动画触
             renderMovementModeTape:  t('renderMovementModeTape'),
             renderMovementModeHead:  t('renderMovementModeHead'),
             lblTapeWrapLines: t('renderTapeWrapLines'),
-            lblMaxCellsPerRow: t('renderMaxCellsPerRow'),
+            lblMaxCellsFirstRow: t('renderCellsFirstRow'),
+            lblMaxCellsOtherRows: t('renderCellsOtherRows'),
             renderPreviewUnavailable: t('renderPreviewUnavailable'),
             durationHour:     t('renderDurationHour'),
             durationMinute:   t('renderDurationMinute'),
@@ -613,17 +615,67 @@ function buildRenderGraphSnapshot() {
     }));
 }
 
+/** 解析首行/其余行格数上限并生成拆行定义（L===0 仍一行占位） */
+function _tapeWrapRowDefsFromParams(renderParams, L) {
+    const legacyRaw = renderParams.maxCellsPerRow;
+    const legacy = legacyRaw != null && legacyRaw !== ''
+        ? Math.max(1, parseInt(legacyRaw, 10) || 50) : null;
+    let mf = parseInt(renderParams.maxCellsFirstRow, 10);
+    let mo = parseInt(renderParams.maxCellsOtherRows, 10);
+    if (!Number.isFinite(mf) || mf < 1) mf = legacy != null ? legacy : 40;
+    if (!Number.isFinite(mo) || mo < 1) mo = legacy != null ? legacy : 70;
+    if (L === 0) return { mf, mo, rows: [{ start: 0, cap: mf }] };
+    const rows = [];
+    for (let pos = 0; pos < L;) {
+        const cap = rows.length === 0 ? mf : mo;
+        rows.push({ start: pos, cap });
+        pos += cap;
+    }
+    return { mf, mo, rows };
+}
+
+function _tapeCellFontSize(cellH, cellW) {
+    return Math.max(6, Math.min(Math.round(cellH * 0.52), Math.floor(cellW / 1.9)));
+}
+
+/** 行间竖向空隙与行高成线性比例，故缩放 λ 后总栈高 = λ × 未缩放栈高 */
+function _tapeWrappedStackSum(hList) {
+    let s = 0;
+    for (let r = 0; r < hList.length; r++) {
+        s += hList[r];
+        if (r < hList.length - 1) s += 0.25 * (hList[r] + hList[r + 1]);
+    }
+    return s;
+}
+
+function _measureTapeHeadLabelMaxWidth(ctx, boldPx) {
+    ctx.font = `bold ${boldPx}px system-ui, sans-serif`;
+    let m = 0;
+    if (typeof code !== 'undefined') {
+        for (const st of Object.keys(code)) {
+            const w = ctx.measureText(st).width;
+            if (w > m) m = w;
+        }
+    }
+    for (const name of ['start', 'end', 'error']) {
+        const w = ctx.measureText(name).width;
+        if (w > m) m = w;
+    }
+    return m;
+}
+
 /**
  * 渲染布局：有向图占画布顶部到「最上一行纸带格子」上边缘之间；纸带自下而上紧贴画布底排布。
- * 返回 drawTapeOnCanvas 所需几何（不含依赖 ctx.measureText 的 headBoxW；headBoxW = 最长状态名宽 + 0.5*cellW）。
+ * 返回 drawTapeOnCanvas 所需几何（不含依赖 ctx.measureText 的 headBoxW；headBoxW = 最长状态名宽 + 0.6*cellW）。
  */
 function layoutRenderTapeGeometry(renderParams, tape, W, H) {
     const L = tape && Array.isArray(tape) ? tape.length : 0;
     const headMoving = renderParams.movementMode === 'head';
     const wrapLines = headMoving && renderParams.tapeWrapLines !== false;
-    const maxPerRow = Math.max(1, parseInt(renderParams.maxCellsPerRow, 10) || 50);
-    const numRows = wrapLines ? (L === 0 ? 1 : Math.ceil(L / maxPerRow)) : 1;
-    const rowUnits = wrapLines ? numRows + 0.5 * Math.max(0, numRows - 1) : 1;
+    const wrapPack = wrapLines ? _tapeWrapRowDefsFromParams(renderParams, L) : null;
+    const rowDefs = wrapPack ? wrapPack.rows : null;
+    const numRows = rowDefs ? rowDefs.length : 1;
+    const mo = wrapPack ? wrapPack.mo : 1;
 
     const bottomPad = Math.round(H * 0.02);
     const minGraphH = Math.round(H * 0.10);
@@ -635,36 +687,69 @@ function layoutRenderTapeGeometry(renderParams, tape, W, H) {
 
     let shrink = 1;
     if (headMoving) {
-        if (wrapLines) {
-            shrink = Math.min(1, W / (maxPerRow * cellW0));
-        } else if (L > 0) {
-            shrink = Math.min(1, W / (L * cellW0));
-        }
+        if (wrapLines) shrink = Math.min(1, W / (mo * cellW0));
+        else if (L > 0) shrink = Math.min(1, W / (L * cellW0));
     }
 
+    if (wrapLines && rowDefs && numRows > 0) {
+        const ratio = (cellH0 * shrink) / (W / mo);
+        const hIdeal = rowDefs.map(rd => ratio * (W / rd.cap));
+        const stackIdeal = _tapeWrappedStackSum(hIdeal);
+        const lambda = stackIdeal > 0 ? Math.min(1, maxStack / stackIdeal) : 1;
+        const cellHList = hIdeal.map(h => h * lambda);
+        const cellWList = rowDefs.map(rd => W / rd.cap);
+        const cellFontList = cellHList.map((ch, r) => _tapeCellFontSize(ch, cellWList[r]));
+        const stackH = lambda * stackIdeal;
+        const graphH = H - bottomPad - stackH;
+        const tapeBottomY = H - bottomPad;
+        const tapeTopYs = [];
+        let nextBottom = tapeBottomY;
+        for (let r = numRows - 1; r >= 0; r--) {
+            tapeTopYs[r] = nextBottom - cellHList[r];
+            nextBottom = tapeTopYs[r];
+            if (r > 0) nextBottom -= 0.25 * (cellHList[r - 1] + cellHList[r]);
+        }
+        const cw0 = cellWList[0];
+        return {
+            graphH,
+            bottomPad,
+            stackH,
+            cellW: cw0,
+            cellH: cellHList[0],
+            cellFontSize: cellFontList[0],
+            shrink,
+            headBoxH: Math.round(cw0),
+            headFontSize: Math.round(cw0 * 0.5),
+            wrapLines,
+            numRows,
+            headMoving,
+            wrapRows: rowDefs.map((rd, r) => ({
+                start: rd.start,
+                cap: rd.cap,
+                cellW: cellWList[r],
+                cellH: cellHList[r],
+                cellFontSize: cellFontList[r],
+                tapeTopY: tapeTopYs[r],
+            })),
+        };
+    }
+
+    const rowUnits = 1;
     const cellHDesired = cellH0 * shrink;
     const cellH = Math.max(0, Math.min(cellHDesired, maxStack / rowUnits));
     let cellFontSize = Math.round(cellH * 0.52);
     let cellW = Math.max(Math.round(cellFontSize * 1.9), Math.round(W / 30)) * shrink;
 
-    // 机头移动模式：有意义格应横向铺满画布。shrink 按未压缩的 cellH0 计算，但 cellH 被 maxStack
-    // 压窄后若不重算 cellW，会出现 L*cellW < W（或 maxPerRow*cellW < W）的左右留白（见 40e72a47）。
     if (headMoving) {
-        if (wrapLines) {
-            cellW = W / maxPerRow;
-        } else if (L > 0) {
-            cellW = W / L;
-        }
-        const capFromW = Math.floor(cellW / 1.9);
-        cellFontSize = Math.max(6, Math.min(Math.round(cellH * 0.52), capFromW));
+        if (L > 0) cellW = W / L;
+        cellFontSize = _tapeCellFontSize(cellH, cellW);
     }
 
     const stackH = cellH * rowUnits;
     const graphH = H - bottomPad - stackH;
 
-    // 机头尺寸相对纸带格宽 cellW
-    const headFontSize = Math.round(cellW * 0.5);  // 机头状态名字号
-    const headBoxH = Math.round(cellW * 1);  // 机头高度
+    const headFontSize = Math.round(cellW * 0.5);
+    const headBoxH = Math.round(cellW * 1);
 
     return {
         graphH,
@@ -677,9 +762,9 @@ function layoutRenderTapeGeometry(renderParams, tape, W, H) {
         headBoxH,
         headFontSize,
         wrapLines,
-        maxPerRow,
         numRows,
         headMoving,
+        wrapRows: null,  // 非分行路径不使用
     };
 }
 
@@ -978,75 +1063,47 @@ function _drawTapeReadHead(ctx, tipX, tipY, headBoxY, headBoxW, headBoxH, cellW,
 function drawTapeOnCanvas(ctx, renderParams, tape, headPos, currentState, W, H, geom) {
     if (!tape || !Array.isArray(tape) || !geom) return;
 
-    const {
-        graphH,
-        bottomPad,
-        cellW,
-        cellH,
-        cellFontSize,
-        headBoxH,
-        headFontSize,
-        wrapLines,
-        maxPerRow,
-        numRows,
-        headMoving,
-    } = geom;
+    const { graphH, cellW, cellH, cellFontSize, headBoxH, headFontSize, wrapLines, headMoving, wrapRows } = geom;
+    const L = tape.length;
+    const headIdx = L === 0 ? 0 : Math.max(0, Math.min(headPos, L - 1));
 
-    ctx.font = `bold ${headFontSize}px system-ui, sans-serif`;
-    let maxStateNameW = 0;
-    if (typeof code !== 'undefined') {
-        for (const st of Object.keys(code)) {
-            const w = ctx.measureText(st).width;
-            if (w > maxStateNameW) maxStateNameW = w;
+    let headCellW, headBH, headFs, tapeCenterY, headScreenX, headBoxY;
+
+    if (wrapLines && wrapRows && wrapRows.length > 0) {
+        let headRow = wrapRows.length - 1;
+        for (let r = 0; r < wrapRows.length; r++) {
+            const { start, cap } = wrapRows[r];
+            if (headIdx >= start && headIdx < start + cap) {
+                headRow = r;
+                break;
+            }
         }
-    }
-    for (const name of ['start', 'end', 'error']) {
-        const w = ctx.measureText(name).width;
-        if (w > maxStateNameW) maxStateNameW = w;
-    }
-    const headBoxW = maxStateNameW + 0.6 * cellW;  // 机头宽度
-
-    // ── 分行：自下而上；最上一行格顶 y === graphH ─────────────────────────
-    if (wrapLines) {
-        const L = tape.length;
-        const gap = cellH * 0.5;
-        const tapeBottomY = H - bottomPad;
-        const tapeTopYs = [];
-        for (let r = 0; r < numRows; r++)
-            tapeTopYs[r] = tapeBottomY - cellH - (numRows - 1 - r) * (cellH + gap);
-
-        const headIdx = L === 0 ? 0 : Math.max(0, Math.min(headPos, L - 1));
-        const headRow = Math.min(Math.floor(headIdx / maxPerRow), numRows - 1);
-
-        const tapeLeftX = Math.max(0, (W - maxPerRow * cellW) / 2);
-
-        for (let r = 0; r < numRows; r++) {
-            const rowStart = r * maxPerRow;
-            const tapeCenterYR = tapeTopYs[r] + cellH / 2;
-            _drawTapeRowCells(ctx, tape, tapeTopYs[r], tapeCenterYR, cellW, cellH, cellFontSize, tapeLeftX, W,
-                { start: rowStart, len: maxPerRow });
+        const hr = wrapRows[headRow];
+        for (const row of wrapRows) {
+            const yc = row.tapeTopY + row.cellH / 2;
+            _drawTapeRowCells(ctx, tape, row.tapeTopY, yc, row.cellW, row.cellH, row.cellFontSize, 0, W,
+                { start: row.start, len: row.cap });
         }
-
-        const rowStart = headRow * maxPerRow;
-        const tapeCenterY = tapeTopYs[headRow] + cellH / 2;
-        const local = headIdx - rowStart;
-        const headScreenX = tapeLeftX + local * cellW + cellW / 2;
-        const headBoxY = tapeTopYs[headRow] - headBoxH;
-        _drawTapeReadHead(ctx, headScreenX, tapeCenterY, headBoxY, headBoxW, headBoxH, cellW, headFontSize, currentState);
-        return;
+        headCellW = hr.cellW;
+        headFs = Math.round(headCellW * 0.5);
+        headBH = Math.round(headCellW * 1);
+        tapeCenterY = hr.tapeTopY + hr.cellH / 2;
+        headScreenX = (headIdx - hr.start) * headCellW + headCellW / 2;
+        headBoxY = hr.tapeTopY - headBH;
+    } else {
+        const tapeTopY = graphH;
+        tapeCenterY = graphH + Math.round(cellH / 2);
+        headBoxY = graphH - headBoxH;
+        const tapeCenterOffset = headMoving
+            ? W / 2 - (tape.length / 2) * cellW
+            : W / 2 - headPos * cellW - cellW / 2;
+        headScreenX = headMoving ? tapeCenterOffset + headPos * cellW + cellW / 2 : W / 2;
+        _drawTapeRowCells(ctx, tape, tapeTopY, tapeCenterY, cellW, cellH, cellFontSize, tapeCenterOffset, W, null);
+        headCellW = cellW;
+        headFs = headFontSize;
+        headBH = headBoxH;
     }
 
-    const tapeTopY = graphH;
-    const tapeCenterY = graphH + Math.round(cellH / 2);
-    const headBoxY = graphH - headBoxH;
-
-    const tapeCenterOffset = headMoving
-        ? W / 2 - (tape.length / 2) * cellW
-        : W / 2 - headPos * cellW - cellW / 2;
-    const headScreenX = headMoving
-        ? tapeCenterOffset + headPos * cellW + cellW / 2
-        : W / 2;
-
-    _drawTapeRowCells(ctx, tape, tapeTopY, tapeCenterY, cellW, cellH, cellFontSize, tapeCenterOffset, W, null);
-    _drawTapeReadHead(ctx, headScreenX, tapeCenterY, headBoxY, headBoxW, headBoxH, cellW, headFontSize, currentState);
+    const headBoxW = _measureTapeHeadLabelMaxWidth(ctx, headFs) + 0.6 * headCellW;
+    _drawTapeReadHead(ctx, headScreenX, tapeCenterY, headBoxY, headBoxW, headBH, headCellW, headFs, currentState);
 }

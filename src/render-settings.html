@@ -147,8 +147,12 @@
             </div>
             <div id="max-cells-per-row-wrap">
                 <div class="row">
-                    <label id="lbl-max-cells-per-row" for="max-cells-per-row">Max cells per row</label>
-                    <input id="max-cells-per-row" type="number" value="50" min="1" max="100000">
+                    <label id="lbl-max-cells-first-row" for="max-cells-first-row">Max cells on first row</label>
+                    <input id="max-cells-first-row" type="number" value="40" min="1" max="100000">
+                </div>
+                <div class="row">
+                    <label id="lbl-max-cells-other-rows" for="max-cells-other-rows">Max cells on other rows</label>
+                    <input id="max-cells-other-rows" type="number" value="70" min="1" max="100000">
                 </div>
             </div>
         </div>
@@ -237,7 +241,8 @@ ipcRenderer.on('render-settings-init', (e, data) => {
     setText('lbl-movement-mode-tape',  'renderMovementModeTape',  'Tape moves, head fixed');
     setText('lbl-movement-mode-head',  'renderMovementModeHead',  'Head moves, tape fixed');
     setText('lbl-tape-wrap-lines',     'lblTapeWrapLines',        'Wrap tape to multiple rows');
-    setText('lbl-max-cells-per-row',   'lblMaxCellsPerRow',       'Max cells per row');
+    setText('lbl-max-cells-first-row',  'lblMaxCellsFirstRow',  'Max cells on first row');
+    setText('lbl-max-cells-other-rows', 'lblMaxCellsOtherRows', 'Max cells on other rows');
     setText('lbl-render-music',  'lblRenderMusic',  'Export audio');
     setText('lbl-music-mode',    'lblMusicMode',    'Scale');
     setText('lbl-music-root',    'lblMusicRoot',    'Root note');
@@ -287,7 +292,15 @@ ipcRenderer.on('render-settings-init', (e, data) => {
     if (p.renderImage !== undefined) document.getElementById('render-image').checked = !!p.renderImage;
     if (p.renderMusic !== undefined) document.getElementById('render-music').checked = !!p.renderMusic;
     if (p.tapeWrapLines !== undefined) document.getElementById('tape-wrap-lines').checked = !!p.tapeWrapLines;
-    if (p.maxCellsPerRow !== undefined) document.getElementById('max-cells-per-row').value = p.maxCellsPerRow;
+    const legacyM = p.maxCellsPerRow;
+    const firstRow = p.maxCellsFirstRow !== undefined && p.maxCellsFirstRow !== null
+        ? p.maxCellsFirstRow
+        : (legacyM !== undefined && legacyM !== null ? legacyM : 40);
+    const otherRows = p.maxCellsOtherRows !== undefined && p.maxCellsOtherRows !== null
+        ? p.maxCellsOtherRows
+        : (legacyM !== undefined && legacyM !== null ? legacyM : 70);
+    document.getElementById('max-cells-first-row').value = firstRow;
+    document.getElementById('max-cells-other-rows').value = otherRows;
     updateSubsections();
     updateHeadTapeWrapOptions();
     updateTotalFrames(data.totalFrames || 0);
@@ -355,7 +368,8 @@ function getParams() {  // 获取渲染设置，用于保存
         })(),
         movementMode: document.querySelector('input[name="movement-mode"]:checked')?.value || 'tape',
         tapeWrapLines: document.getElementById('tape-wrap-lines').checked,
-        maxCellsPerRow: Math.max(1, parseInt(document.getElementById('max-cells-per-row').value, 10) || 50),
+        maxCellsFirstRow: Math.max(1, parseInt(document.getElementById('max-cells-first-row').value, 10) || 40),
+        maxCellsOtherRows: Math.max(1, parseInt(document.getElementById('max-cells-other-rows').value, 10) || 70),
         renderImage:  document.getElementById('render-image').checked,
         renderMusic:  document.getElementById('render-music').checked,
         musicMode:    document.getElementById('music-mode').value,
@@ -376,7 +390,7 @@ function pushRenderParams() {
 const TYPING_PARAM_IDS = [
     'width', 'height', 'fps', 'move-frames', 'pause-frames', 'halflife', 'speed-multiplier', 'min-tail-continuation',
     'graphic-scale', 'graph-relative-margin', 'music-root', 'music-lo', 'music-hi', 'music-seed',
-    'music-samples', 'output-path', 'max-cells-per-row',
+    'music-samples', 'output-path', 'max-cells-first-row', 'max-cells-other-rows',
 ];
 TYPING_PARAM_IDS.forEach(id => {
     const el = document.getElementById(id);
