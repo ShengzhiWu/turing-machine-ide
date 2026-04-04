@@ -585,27 +585,80 @@ function buildRenderGraphSnapshot() {
     }));
 }
 
+/**
+ * 渲染布局：有向图占画布顶部到「最上一行纸带格子」上边缘之间；纸带自下而上紧贴画布底排布。
+ * 返回 drawTapeOnCanvas 所需几何（不含依赖 ctx.measureText 的 headBoxW）。
+ */
+function layoutRenderTapeGeometry(renderParams, tape, W, H) {
+    const L = tape && Array.isArray(tape) ? tape.length : 0;
+    const headMoving = renderParams.movementMode === 'head';
+    const wrapLines = headMoving && renderParams.tapeWrapLines !== false;
+    const maxPerRow = Math.max(1, parseInt(renderParams.maxCellsPerRow, 10) || 50);
+    const numRows = wrapLines ? (L === 0 ? 1 : Math.ceil(L / maxPerRow)) : 1;
+    const rowUnits = wrapLines ? numRows + 0.5 * Math.max(0, numRows - 1) : 1;
+
+    const bottomPad = Math.max(8, Math.round(H * 0.02));
+    const minGraphH = Math.max(64, Math.round(H * 0.10));
+    const maxStack = Math.max(0, H - bottomPad - minGraphH);
+
+    const cellH0 = Math.round(H * 0.062);
+    const cellFontSize0 = Math.max(10, Math.round(cellH0 * 0.52));
+    const cellW0 = Math.max(Math.round(cellFontSize0 * 1.9), Math.round(W / 30));
+
+    let shrink = 1;
+    if (headMoving) {
+        if (wrapLines) {
+            shrink = Math.min(1, W / (maxPerRow * cellW0));
+        } else if (L > 0) {
+            shrink = Math.min(1, W / (L * cellW0));
+        }
+    }
+
+    const cellHDesired = cellH0 * shrink;
+    const cellH = Math.max(6, Math.min(cellHDesired, maxStack / rowUnits));
+    const cellFontSize = Math.max(6, Math.round(cellH * 0.52));
+    const cellW = Math.max(Math.round(cellFontSize * 1.9), Math.round(W / 30)) * shrink;
+
+    const stackH = cellH * rowUnits;
+    const graphH = H - bottomPad - stackH;
+    const tapeRegionH = H - graphH;
+
+    const headBoxH = Math.round(tapeRegionH * 0.24) * shrink;
+    const headFontSize = Math.max(12, Math.round(tapeRegionH * 0.11));
+
+    return {
+        graphH,
+        bottomPad,
+        stackH,
+        cellW,
+        cellH,
+        cellFontSize,
+        shrink,
+        headBoxH,
+        headFontSize,
+        wrapLines,
+        maxPerRow,
+        numRows,
+        headMoving,
+    };
+}
+
 // ── Draw one render frame ─────────────────────────────────────────────
 function drawRenderFrame(ctx, renderParams, snapGraph, frame, nodeBrightness, edgeBrightness, tapeForFrame) {
     const W = renderParams.width, H = renderParams.height;
 
-    // Layout: graph area takes most of the frame; tape strip is compact at the bottom.
-    // tapeAreaH is computed to just fit: top-padding + headBox + tape strip + bottom-padding.
-    // We use a fixed fraction that keeps it tight. Approx 22% of total height.
-    const graphH    = Math.round(H * 0.78);
-    const tapeAreaY = graphH;
-    const tapeAreaH = H - graphH;
-
     // ── Background ───────────────────────────────────────────────────
     ctx.fillStyle = 'hsl(0,0%,60%)';  // matches graph-panel background
-    ctx.fillRect(0, 0, W, H);  // fill whole frame with graph color; tape area has no separate bg
+    ctx.fillRect(0, 0, W, H);
 
-    // ── Draw Graph ───────────────────────────────────────────────────
-    drawGraphOnCanvas(ctx, snapGraph, W, graphH, nodeBrightness, edgeBrightness, renderParams);
+    if (!tapeForFrame || !Array.isArray(tapeForFrame)) {
+        drawGraphOnCanvas(ctx, snapGraph, W, H, nodeBrightness, edgeBrightness, renderParams);
+        return;
+    }
 
-    // ── Draw Tape（tapeForFrame 由按需重放得到；无则跳过纸带条）────────────────
-    drawTapeOnCanvas(ctx, renderParams, tapeForFrame, frame.headPos, frame.currentState,
-        tapeAreaY, tapeAreaH, W);
+    const geom = layoutRenderTapeGeometry(renderParams, tapeForFrame, W, H);
+    drawGraphOnCanvas(ctx, snapGraph, W, geom.graphH, nodeBrightness, edgeBrightness, renderParams);
+    drawTapeOnCanvas(ctx, renderParams, tapeForFrame, frame.headPos, frame.currentState, W, H, geom);
 }
 
 function drawGraphOnCanvas(ctx, snapGraph, W, H, nodeBrightness, edgeBrightness, renderParams) {
@@ -881,36 +934,24 @@ function _drawTapeReadHead(ctx, tipX, tipY, headBoxY, headBoxW, headBoxH, shrink
     ctx.textBaseline = 'alphabetic';
 }
 
-function drawTapeOnCanvas(ctx, renderParams, tape, headPos, currentState, areaY, areaH, W) {
-    if (!tape || !Array.isArray(tape)) return;
+function drawTapeOnCanvas(ctx, renderParams, tape, headPos, currentState, W, H, geom) {
+    if (!tape || !Array.isArray(tape) || !geom) return;
 
-    // movementMode: 'tape' (default) = head fixed at screen center, tape scrolls
-    //               'head'           = tape origin fixed at screen center, head moves
-    const headMoving = (renderParams.movementMode === 'head');
-    // 未写入工程文件时默认开启分行（与设置面板默认勾选一致）
-    const wrapLines  = headMoving && (renderParams.tapeWrapLines !== false);
-    const maxPerRow  = Math.max(1, parseInt(renderParams.maxCellsPerRow, 10) || 50);
+    const {
+        graphH,
+        bottomPad,
+        cellW,
+        cellH,
+        cellFontSize,
+        shrink,
+        headBoxH,
+        headFontSize,
+        wrapLines,
+        maxPerRow,
+        numRows,
+        headMoving,
+    } = geom;
 
-    // ── Vertical layout & shrink factor ──────────────────────────────
-    const cellH0        = Math.round(areaH * 0.28);
-    const cellFontSize0 = Math.max(10, Math.round(cellH0 * 0.52));
-    const cellW0        = Math.max(Math.round(cellFontSize0 * 1.9), Math.round(W / 30));
-
-    let shrink = 1;
-    if (headMoving) {
-        if (wrapLines) {
-            shrink = Math.min(1, W / (maxPerRow * cellW0));
-        } else if (tape.length > 0) {
-            shrink = Math.min(1, W / (tape.length * cellW0));
-        }
-    }
-
-    const cellW        = cellW0        * shrink;
-    const cellH        = cellH0        * shrink;
-    const cellFontSize = Math.max(6, cellFontSize0 * shrink);
-
-    // ── Measure widest state name to size the read-head box ──────────
-    const headFontSize = Math.max(12, Math.round(areaH * 0.11));
     ctx.font = `bold ${headFontSize}px system-ui, sans-serif`;
     let maxStateNameW = 0;
     if (typeof code !== 'undefined') {
@@ -925,16 +966,13 @@ function drawTapeOnCanvas(ctx, renderParams, tape, headPos, currentState, areaY,
     }
     const headPadX = headFontSize * 0.7;
     const headBoxW = Math.max(headFontSize * 2.2, maxStateNameW + headPadX * 2) * shrink;
-    const headBoxH = Math.round(areaH * 0.24) * shrink;
     const headFontSizeScaled = headFontSize * shrink;
 
-    // ── 纸带固定 + 分行：多行绘制，行间竖直间隔为 0.5 格纸带高度 ─────────
+    // ── 分行：自下而上；最上一行格顶 y === graphH ─────────────────────────
     if (wrapLines) {
         const L = tape.length;
-        const numRows = L === 0 ? 1 : Math.ceil(L / maxPerRow);
         const gap = cellH * 0.5;
-        const bottomPad = Math.round(areaH * 0.05);
-        const tapeBottomY = areaY + areaH - bottomPad;
+        const tapeBottomY = H - bottomPad;
         const tapeTopYs = [];
         for (let r = 0; r < numRows; r++)
             tapeTopYs[r] = tapeBottomY - cellH - (numRows - 1 - r) * (cellH + gap);
@@ -942,7 +980,6 @@ function drawTapeOnCanvas(ctx, renderParams, tape, headPos, currentState, areaY,
         const headIdx = L === 0 ? 0 : Math.max(0, Math.min(headPos, L - 1));
         const headRow = Math.min(Math.floor(headIdx / maxPerRow), numRows - 1);
 
-        // 每行固定 maxPerRow 列，整体靠左对齐（与首列对齐）；超出 tape 长度的格画空格子
         const tapeLeftX = Math.max(0, (W - maxPerRow * cellW) / 2);
 
         for (let r = 0; r < numRows; r++) {
@@ -961,9 +998,9 @@ function drawTapeOnCanvas(ctx, renderParams, tape, headPos, currentState, areaY,
         return;
     }
 
-    const tapeCenterY  = areaY + Math.round(areaH * 0.78);
-    const tapeTopY     = tapeCenterY - Math.round(cellH / 2);
-    const headBoxY     = tapeTopY - headBoxH;
+    const tapeTopY = graphH;
+    const tapeCenterY = graphH + Math.round(cellH / 2);
+    const headBoxY = graphH - headBoxH;
 
     const tapeCenterOffset = headMoving
         ? W / 2 - (tape.length / 2) * cellW
