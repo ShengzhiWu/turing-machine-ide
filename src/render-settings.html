@@ -113,6 +113,21 @@
                 <span id="lbl-movement-mode-head">Head moves, tape fixed</span>
             </label>
         </div>
+        <div id="head-tape-wrap-options">
+            <div class="row" style="margin-top:8px;">
+                <label style="display:flex;align-items:center;gap:6px;width:auto;cursor:pointer;">
+                    <input type="checkbox" id="tape-wrap-lines" checked
+                           style="width:14px;height:14px;cursor:pointer;accent-color:hsl(210,60%,55%);">
+                    <span id="lbl-tape-wrap-lines">Wrap tape to multiple rows</span>
+                </label>
+            </div>
+            <div id="max-cells-per-row-wrap">
+                <div class="row">
+                    <label id="lbl-max-cells-per-row" for="max-cells-per-row">Max cells per row</label>
+                    <input id="max-cells-per-row" type="number" value="50" min="1" max="100000">
+                </div>
+            </div>
+        </div>
     </div>
 
     <hr class="section-sep">
@@ -195,6 +210,8 @@ ipcRenderer.on('render-settings-init', (e, data) => {
     setText('lbl-graphic-scale', 'lblGraphicScale', 'Graphic scale');
     setText('lbl-movement-mode-tape',  'renderMovementModeTape',  'Tape moves, head fixed');
     setText('lbl-movement-mode-head',  'renderMovementModeHead',  'Head moves, tape fixed');
+    setText('lbl-tape-wrap-lines',     'lblTapeWrapLines',        'Wrap tape to multiple rows');
+    setText('lbl-max-cells-per-row',   'lblMaxCellsPerRow',       'Max cells per row');
     setText('lbl-render-music',  'lblRenderMusic',  'Export audio');
     setText('lbl-music-mode',    'lblMusicMode',    'Scale');
     setText('lbl-music-root',    'lblMusicRoot',    'Root note');
@@ -239,7 +256,10 @@ ipcRenderer.on('render-settings-init', (e, data) => {
     if (p.outputPath) document.getElementById('output-path').value = p.outputPath;
     if (p.renderImage !== undefined) document.getElementById('render-image').checked = !!p.renderImage;
     if (p.renderMusic !== undefined) document.getElementById('render-music').checked = !!p.renderMusic;
+    if (p.tapeWrapLines !== undefined) document.getElementById('tape-wrap-lines').checked = !!p.tapeWrapLines;
+    if (p.maxCellsPerRow !== undefined) document.getElementById('max-cells-per-row').value = p.maxCellsPerRow;
     updateSubsections();
+    updateHeadTapeWrapOptions();
     updateTotalFrames(data.totalFrames || 0);
 });
 
@@ -278,6 +298,8 @@ function getParams() {
         halflife:     Math.max(1,   parseInt(document.getElementById('halflife').value)       || 10),
         graphicScale: Math.max(0.1, parseFloat(document.getElementById('graphic-scale').value) || 1.0),
         movementMode: document.querySelector('input[name="movement-mode"]:checked')?.value || 'tape',
+        tapeWrapLines: document.getElementById('tape-wrap-lines').checked,
+        maxCellsPerRow: Math.max(1, parseInt(document.getElementById('max-cells-per-row').value, 10) || 50),
         renderImage:  document.getElementById('render-image').checked,
         renderMusic:  document.getElementById('render-music').checked,
         musicMode:    document.getElementById('music-mode').value,
@@ -292,10 +314,14 @@ function getParams() {
 
 ['width','height','fps','move-frames','pause-frames','speed-multiplier','halflife','graphic-scale',
  'render-image','render-music','music-mode','music-root','music-lo','music-hi',
- 'music-seed','music-samples','output-path','movement-mode-tape','movement-mode-head'].forEach(id => {
+ 'music-seed','music-samples','output-path','movement-mode-tape','movement-mode-head',
+ 'max-cells-per-row'].forEach(id => {
     const el = document.getElementById(id);
     el.addEventListener('input',  () => ipcRenderer.send('render-params-changed', getParams()));
     el.addEventListener('change', () => ipcRenderer.send('render-params-changed', getParams()));
+});
+['movement-mode-tape', 'movement-mode-head'].forEach(id => {
+    document.getElementById(id).addEventListener('change', updateHeadTapeWrapOptions);
 });
 
 function updateSubsections() {
@@ -303,9 +329,27 @@ function updateSubsections() {
         'subsection-disabled', !document.getElementById('render-music').checked);
     document.getElementById('image-options').classList.toggle(
         'subsection-disabled', !document.getElementById('render-image').checked);
+    updateHeadTapeWrapOptions();
+}
+
+/** 仅「渲染图像 + 纸带固定机头动」时显示分行选项；动纸带模式下隐藏 */
+function updateHeadTapeWrapOptions() {
+    const wrapBlock = document.getElementById('head-tape-wrap-options');
+    const imgOn = document.getElementById('render-image').checked;
+    const headMode = document.getElementById('movement-mode-head').checked;
+    const show = imgOn && headMode;
+    wrapBlock.style.display = show ? '' : 'none';
+    const maxCellsWrap = document.getElementById('max-cells-per-row-wrap');
+    const wrapCb = document.getElementById('tape-wrap-lines');
+    // 与「音乐」未启用时一致：用 subsection-disabled 降低透明度并禁止指针，不用 input.disabled
+    maxCellsWrap.classList.toggle('subsection-disabled', !wrapCb.checked);
 }
 document.getElementById('render-music').addEventListener('change', updateSubsections);
 document.getElementById('render-image').addEventListener('change', updateSubsections);
+document.getElementById('tape-wrap-lines').addEventListener('change', () => {
+    updateHeadTapeWrapOptions();
+    ipcRenderer.send('render-params-changed', getParams());
+});
 
 document.getElementById('browse-btn').addEventListener('click', async () => {
     const r = await ipcRenderer.invoke('show-open-dialog', { title: _s.browseTitle || 'Select Output Folder', properties: ['openDirectory'] });
