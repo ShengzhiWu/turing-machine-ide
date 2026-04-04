@@ -290,7 +290,7 @@ function getParams() {
 
 ['width','height','fps','move-frames','pause-frames','speed-multiplier','halflife','graphic-scale',
  'render-image','render-music','music-mode','music-root','music-lo','music-hi',
- 'music-seed','music-samples','movement-mode-tape','movement-mode-head'].forEach(id => {
+ 'music-seed','music-samples','output-path','movement-mode-tape','movement-mode-head'].forEach(id => {
     const el = document.getElementById(id);
     el.addEventListener('input',  () => ipcRenderer.send('render-params-changed', getParams()));
     el.addEventListener('change', () => ipcRenderer.send('render-params-changed', getParams()));
