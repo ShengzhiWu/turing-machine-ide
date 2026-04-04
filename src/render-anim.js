@@ -8,6 +8,8 @@ const _renderDefaultParams = {
     minTailContinuationFrames: 90,  // 停机后尾部至少延续的逻辑帧数（含衰减段）
     speedMultiplier: 1,  // 每 N 个逻辑帧输出 1 帧（含图像与音频时长）
     graphicScale: 1.0,
+    /** 有向图适配：较短画布边的留白比例（与 drawGraphOnCanvas 中 margin 一致） */
+    graphRelativeMargin: 0.1,
     renderImage: true, renderMusic: false,
     movementMode: 'tape',  // 'tape' = 纸带动机头固定；'head' = 机头动纸带固定
     tapeWrapLines: true,   // 仅机头动模式：多行绘制纸带
@@ -64,6 +66,7 @@ async function menuRenderAnimation() {  // 点击菜单->文件->渲染动画触
             lblTotalDuration: t('renderLabelTotalDuration'),
             lblRenderImage:   t('renderLabelRenderImage'),
             lblGraphicScale:  t('renderLabelGraphicScale'),
+            lblGraphRelativeMargin: t('renderLabelGraphRelativeMargin'),
             lblRenderMusic:   t('renderLabelRenderMusic'),
             lblMusicMode:     t('renderLabelMusicMode'),
             lblMusicRoot:     t('renderLabelMusicRoot'),
@@ -675,9 +678,10 @@ function drawGraphOnCanvas(ctx, snapGraph, W, H, nodeBrightness, edgeBrightness,
         maxY = Math.max(maxY, node.pos[1]);
     });
 
-    // GRAPH_MARGIN: blank space (in graph-space units × fitFactor) around the node bounding box.
-    // Increase this value to add more whitespace around the graph in the rendered output.
-    const GRAPH_MARGIN_FACTOR = 0.18;  // fraction of the smaller canvas dimension used as margin
+    let graphRel = parseFloat(renderParams && renderParams.graphRelativeMargin);
+    if (!Number.isFinite(graphRel) || graphRel < 0) graphRel = 0.1;
+    graphRel = Math.min(graphRel, 0.49);
+    const GRAPH_MARGIN_FACTOR = graphRel;
     const rf = (() => {
         if (!isFinite(minX) || maxX === minX || maxY === minY) {
             // Fallback: use live frame transform
