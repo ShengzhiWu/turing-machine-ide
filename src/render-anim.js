@@ -11,8 +11,8 @@ const _renderDefaultParams = {
     /** 有向图适配：较短画布边的留白比例（与 drawGraphOnCanvas 中 margin 一致） */
     graphRelativeMargin: 0.1,
     /** 在有向图区域右下角叠加当前逻辑步号（来自运行历史） */
-    showStepNumber: false,
-    renderImage: true, renderMusic: false,
+    showStepNumber: true,
+    renderImage: true, renderMusic: true,
     movementMode: 'tape',  // 'tape' | 'head' | 'headRecenter'
     /** headRecenter：纸带滚动锚点逼近真实机头位置的半衰期（逻辑帧）；越大纸带越慢、机头仍可立即对准格 */
     recenterHalflifeFrames: 60,
