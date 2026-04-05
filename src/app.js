@@ -42,6 +42,9 @@ function finishEditingTapeCallback(data) {
 
 let tapeEditHintEl = null;
 
+/** 整表 innerHTML 重建时，焦点格会同步 blur；若此时再跑 finishEditingTapeCallback/run_program 会重入 refresh，触发 DOM NotFoundError */
+let suppressTapeCellBlurCommit = false;
+
 function ensureTapeEditHintElement() {
     if (tapeEditHintEl) return tapeEditHintEl;
     const el = document.createElement('div');
@@ -228,8 +231,13 @@ function refresh_history_table(history_table, history) {
         s += generate_history_table_row(e);
     });
 
-    history_table.innerHTML = s;
-    
+    suppressTapeCellBlurCommit = true;
+    try {
+        history_table.innerHTML = s;
+    } finally {
+        suppressTapeCellBlurCommit = false;
+    }
+
     // 让第一行所有单元格可编辑
     const firstRowCells = history_table.rows[0].cells;  // 获取表格第一行的所有单元格
     for (let i = 0; i < firstRowCells.length; i++) {
@@ -243,6 +251,7 @@ function refresh_history_table(history_table, history) {
         
         // 添加失去焦点事件监听
         cell.addEventListener('blur', function(event) {
+            if (suppressTapeCellBlurCommit) return;
             finishEditingTapeCallback({
                 cellIndex: i - 1,
                 value: cell.textContent
