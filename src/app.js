@@ -63,7 +63,8 @@ function ensureTapeEditHintElement() {
     tapeEditHintEl = el;
     const line1 = (typeof t === 'function') ? t('tapeHintTabNext') : 'Tab: next cell';
     const line2 = (typeof t === 'function') ? t('tapeHintShiftTabPrev') : 'Shift + Tab: previous cell';
-    tapeEditHintEl.innerHTML = `${line1}<br>${line2}`;
+    const line3 = (typeof t === 'function') ? t('tapeHintCtrlArrowsHead') : 'Ctrl + ← / →: move initial head';
+    tapeEditHintEl.innerHTML = `${line1}<br>${line2}<br>${line3}`;
     return tapeEditHintEl;
 }
 
@@ -72,7 +73,8 @@ function updateTapeEditHintText() {
     const hintEl = tapeEditHintEl;
     const line1 = (typeof t === 'function') ? t('tapeHintTabNext') : 'Tab: next cell';
     const line2 = (typeof t === 'function') ? t('tapeHintShiftTabPrev') : 'Shift + Tab: previous cell';
-    hintEl.innerHTML = `${line1}<br>${line2}`;
+    const line3 = (typeof t === 'function') ? t('tapeHintCtrlArrowsHead') : 'Ctrl + ← / →: move initial head';
+    hintEl.innerHTML = `${line1}<br>${line2}<br>${line3}`;
 }
 
 function isFirstRowEditableCell(el) {
@@ -190,6 +192,27 @@ function extendTapeForNavigation(direction) {
     }
 }
 
+function moveTapeHeadInitialPosition(direction) {
+    // direction: -1 左移机头；1 右移机头（移出边界时扩展纸带，与 Tab / Shift+Tab 一致）
+    if (direction === -1) {
+        if (start_position > 0) {
+            start_position--;
+        } else {
+            extendTapeForNavigation(-1);
+            start_position = 0;
+        }
+    } else if (direction === 1) {
+        if (start_position < tape.length - 1) {
+            start_position++;
+        } else {
+            extendTapeForNavigation(1);
+            start_position = tape.length - 1;
+        }
+    }
+    run_program();
+    focusTapeCell(start_position, true);
+}
+
 function refresh_history_table(history_table, history) {
     if (!result_table_style)
         return;
@@ -267,6 +290,20 @@ function refresh_history_table(history_table, history) {
                 }
 
                 focusTapeCell(targetCellIndex, true);
+            }
+
+            const ctrlOrMeta = event.ctrlKey || event.metaKey;
+            const isArrowLeft = event.key === 'ArrowLeft' || event.code === 'ArrowLeft';
+            const isArrowRight = event.key === 'ArrowRight' || event.code === 'ArrowRight';
+            if (ctrlOrMeta && (isArrowLeft || isArrowRight)) {
+                event.preventDefault();
+                const currentCellIndex = parseInt(cell.dataset.cellIndex, 10);
+                finishEditingTapeCallback({
+                    cellIndex: currentCellIndex,
+                    value: cell.textContent
+                });
+                const headDir = isArrowLeft ? -1 : 1;
+                moveTapeHeadInitialPosition(headDir);
             }
         });
         

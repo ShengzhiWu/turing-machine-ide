@@ -124,6 +124,7 @@ const MENU_I18N = {
         unsavedCancel:           '取消',
         tapeHintTabNext:         'Tab：下一格',
         tapeHintShiftTabPrev:    'Shift + Tab：上一格',
+        tapeHintCtrlArrowsHead:  'Ctrl + ← / →：移动机头初始位置',
         historyAutoscrollLockTitle: '自动滚动到最下面',
     },
     en: {
@@ -249,6 +250,7 @@ const MENU_I18N = {
         unsavedCancel:           'Cancel ',  // 这里加一个空格是因为如果不这样做，Cancel作为特殊字符串会被系统识别导致界面显示异常
         tapeHintTabNext:         'Tab: next cell',
         tapeHintShiftTabPrev:    'Shift + Tab: previous cell',
+        tapeHintCtrlArrowsHead:  'Ctrl/Cmd + ← / →: move initial head position',
         historyAutoscrollLockTitle: 'Auto-scroll to bottom',
     }
 };
