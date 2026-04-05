@@ -53,6 +53,19 @@
 
         td { width: 1.5em; }
 
+        /* 编辑代码时，高亮结果列表中对应的行（即发生了相应状态转移的行）的行号 */
+        #history-table {
+            --history-step-match-font-weight: 900;
+            --history-step-match-color: black;
+            --history-step-match-bg: rgba(255, 210, 90, 0.42);
+        }
+        #history-table td.history-step-cursor-match {
+            font-weight: var(--history-step-match-font-weight);
+            color: var(--history-step-match-color);
+            background-color: var(--history-step-match-bg);
+            border-radius: 3px;
+        }
+
         /* ── Menu Bar ── */
         #menu-bar {
             display: flex;

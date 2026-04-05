@@ -195,6 +195,45 @@ function extendTapeForNavigation(direction) {
     }
 }
 
+function trimProgramLineContent(rawLine) {
+    return (rawLine || '').split('//')[0].trim();
+}
+
+/**
+ * 程序光标所在行若与某条历史记录中的规则（record[5]）一致，则将该行步数列加粗。
+ * 同时匹配 lineIndex 与 lineContent，避免程序里两条完全相同规则行歧义。
+ */
+function syncHistoryTableProgramLineHighlight() {
+    const minimalCb = document.getElementById('minimal-mode-checkbox');
+    if (minimalCb && minimalCb.checked) return;
+    if (!history_table || !result_table_style) return;
+
+    const trList = history_table.querySelectorAll('tr');
+    if (!trList.length) return;
+
+    const hist = typeof result !== 'undefined' && result && Array.isArray(result.history) ? result.history : null;
+    if (!hist) return;
+
+    const lineIdx = typeof editing_line === 'number' ? editing_line : 0;
+    const lines = (code_editor_value || '').split('\n');
+    const raw = lines[lineIdx] !== undefined ? lines[lineIdx] : '';
+    const needle = trimProgramLineContent(raw);
+
+    trList.forEach((row, i) => {
+        const stepCell = row.cells[0];
+        if (!stepCell) return;
+        const rec = hist[i];
+        const ji = rec && rec[5];
+        const match = Boolean(
+            needle &&
+            ji &&
+            ji.lineContent === needle &&
+            ji.lineIndex === lineIdx
+        );
+        stepCell.classList.toggle('history-step-cursor-match', match);
+    });
+}
+
 function moveTapeHeadInitialPosition(direction) {
     // direction: -1 左移机头；1 右移机头（移出边界时扩展纸带，与 Tab / Shift+Tab 一致）
     if (direction === -1) {
@@ -347,6 +386,7 @@ function refresh_history_table(history_table, history) {
         });
     });
 
+    syncHistoryTableProgramLineHighlight();
     scrollHistoryToBottomIfLocked();
 }
 
@@ -460,6 +500,7 @@ code_editor.addEventListener('tm-change', e => {  // 代码编辑器内容变化
                 highlighted_vertex_name = undefined;  // 没有状态名称，取消高亮
         }
     });
+    syncHistoryTableProgramLineHighlight();
 });
 
 code_editor.addEventListener('tm-cursor-line-change', e => {  // 代码编辑器光标移动到新行监听器
@@ -476,6 +517,7 @@ code_editor.addEventListener('tm-cursor-line-change', e => {  // 代码编辑器
     else {
         highlighted_vertex_name = undefined;
     }
+    syncHistoryTableProgramLineHighlight();
 });
 
 // code_editor.addEventListener('tm-errors', e => {  // 代码编辑器语法错误监听器
