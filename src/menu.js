@@ -455,6 +455,7 @@ function buildMenuBar() {
 function closeAllMenus() {
     document.querySelectorAll('.menu-item.active').forEach(el => el.classList.remove('active'));
     document.querySelectorAll('.submenu-open').forEach(el => el.classList.remove('submenu-open'));
+    if (typeof hideGraphContextMenu === 'function') hideGraphContextMenu();
 }
 
 // ── About dialog ─────────────────────────────────────────────────────

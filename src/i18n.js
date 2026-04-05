@@ -118,6 +118,12 @@ const MENU_I18N = {
         mouseHintPan:            '中键拖动：平移画布',
         mouseHintRotate:         'Alt + 左键拖动：旋转画布',
         mouseHintPin:            '双击节点：固定/取消固定',
+        mouseHintMarquee:        '左键：选择点（Ctrl/⌘ 增选，Shift 减选）',
+        graphCtxCreateGroup:     '为选中节点新建分组',
+        graphCtxMoveIntoGroup:   '将选中节点移入此分组',
+        graphCtxMoveOutOfGroup:  '将选中节点移出此分组',
+        graphCtxDeleteGroup:     '删除此分组',
+        graphGroupNamePlaceholder: '组名',
         unsavedTitle:            '未保存的修改',
         unsavedMessage:          '当前工程有未保存的修改，是否在打开前保存？',
         unsavedCloseMessage:     '当前工程有未保存的修改，是否在关闭前保存？',
@@ -246,6 +252,12 @@ const MENU_I18N = {
         mouseHintPan:            'Middle-click drag: move',
         mouseHintRotate:         'Alt + left drag: rotate',
         mouseHintPin:            'Double-click a node: pin/unpin',
+        mouseHintMarquee:        'Left: select points (Ctrl/⌘ add, Shift subtract)',
+        graphCtxCreateGroup:     'New group from selection',
+        graphCtxMoveIntoGroup:   'Move selection into this group',
+        graphCtxMoveOutOfGroup:  'Remove selection from this group',
+        graphCtxDeleteGroup:     'Delete this group',
+        graphGroupNamePlaceholder: 'Group name',
         unsavedTitle:            'Unsaved Changes',
         unsavedMessage:          'The current project has unsaved changes. Save before opening?',
         unsavedCloseMessage:     'The current project has unsaved changes. Save before closing?',
@@ -336,6 +348,11 @@ function applyLanguageToUI() {
 
     const graphHintPin = document.getElementById('graph-hint-pin');
     if (graphHintPin) graphHintPin.textContent = t('mouseHintPin');
+
+    const graphHintMarquee = document.getElementById('graph-hint-marquee');
+    if (graphHintMarquee) graphHintMarquee.textContent = t('mouseHintMarquee');
+
+    if (typeof refreshGraphContextMenuLabels === 'function') refreshGraphContextMenuLabels();
 
     const historyAutoscrollBtn = document.getElementById('history-autoscroll-lock-btn');
     if (historyAutoscrollBtn) {

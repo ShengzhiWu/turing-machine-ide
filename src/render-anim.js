@@ -814,6 +814,88 @@ function layoutRenderTapeGeometry(renderParams, tape, W, H) {
     };
 }
 
+/**
+ * 视觉分组渲染到画布：几何与 graph.js 的 updateGraphVisualGroupRects 一致（圆盘并集、对数 pad），
+ * 颜色为 hsla(hue,50%,52%,0.26) / hsla(hue,65%,28%,0.45)，组名为白字；须先于边、节点绘制。
+ */
+function drawRenderGraphGroupsOnCanvas(ctx, snapGraph, toScreen, vr, gs) {
+    if (typeof graphVisualGroups === 'undefined' || !graphVisualGroups.length) return;
+    const floor = typeof graph_group_pad_floor !== 'undefined' ? graph_group_pad_floor : 5;
+    const logA = typeof graph_group_pad_log_a !== 'undefined' ? graph_group_pad_log_a : 45;
+    const logB = typeof graph_group_pad_log_b !== 'undefined' ? graph_group_pad_log_b : 8;
+
+    const nameToNode = new Map();
+    snapGraph.forEach(n => {
+        if (n && n.name) nameToNode.set(n.name, n);
+    });
+
+    const padForCount = n => Math.max(floor, logA - logB * Math.log(n)) * gs;
+    const rx = 14 * gs;
+
+    graphVisualGroups.forEach((g, gi) => {
+        const mems = g.members instanceof Set ? g.members : (Array.isArray(g.members) ? g.members : []);
+        let uminX = Infinity, uminY = Infinity, umaxX = -Infinity, umaxY = -Infinity;
+        let cnt = 0;
+        const consider = rawName => {
+            const node = nameToNode.get(rawName);
+            if (!node || !node.visible || !node.name || node.name.startsWith('self-connection')) return;
+            const p = toScreen(node.pos);
+            cnt++;
+            uminX = Math.min(uminX, p[0] - vr);
+            umaxX = Math.max(umaxX, p[0] + vr);
+            uminY = Math.min(uminY, p[1] - vr);
+            umaxY = Math.max(umaxY, p[1] + vr);
+        };
+        mems.forEach(consider);
+        if (cnt === 0) return;
+
+        let hue = g.hue;
+        if (typeof hue !== 'number' || !Number.isFinite(hue))
+            hue = (gi * 47) % 360;
+
+        const pad = padForCount(cnt);
+        const gx = uminX - pad;
+        const gy = uminY - pad;
+        const gw = umaxX - uminX + 2 * pad;
+        const gh = umaxY - uminY + 2 * pad;
+        const titleCx = (uminX + umaxX) * 0.5;
+        const rCorner = Math.min(rx, gw / 2, gh / 2);
+
+        ctx.save();
+        ctx.fillStyle = `hsla(${hue}, 50%, 52%, 0.26)`;
+        ctx.strokeStyle = `hsla(${hue}, 65%, 28%, 0.45)`;
+        ctx.lineWidth = 1.2 * gs;
+        _renderCanvasRoundRectPath(ctx, gx, gy, gw, gh, rCorner);
+        ctx.fill();
+        ctx.stroke();
+
+        const nm = (g.name && String(g.name).trim()) ? String(g.name).trim() : '';
+        if (nm) {
+            ctx.fillStyle = '#ffffff';
+            ctx.font = `600 ${Math.max(1, Math.round(11 * gs))}px system-ui,sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'bottom';
+            ctx.fillText(nm, titleCx, gy - 6 * gs);
+        }
+        ctx.restore();
+    });
+}
+
+function _renderCanvasRoundRectPath(ctx, x, y, w, h, r) {
+    r = Math.max(0, Math.min(r, w / 2, h / 2));
+    ctx.beginPath();
+    if (typeof ctx.roundRect === 'function') {
+        ctx.roundRect(x, y, w, h, r);
+        return;
+    }
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+}
+
 // ── Draw one render frame ─────────────────────────────────────────────
 function drawRenderFrame(ctx, renderParams, snapGraph, frame, nodeBrightness, edgeBrightness, tapeForFrame) {
     const W = renderParams.width, H = renderParams.height;
@@ -898,6 +980,8 @@ function drawGraphOnCanvas(ctx, snapGraph, W, H, nodeBrightness, edgeBrightness,
     const ahW = arrow_head_width  * gs; // scaled arrowhead width
     const fontSize   = Math.round(12 * gs);
     const lineWidth  = 1.2 * gs;
+
+    drawRenderGraphGroupsOnCanvas(ctx, snapGraph, toScreen, vr, gs);
 
     // Draw connections
     snapGraph.forEach(node => {

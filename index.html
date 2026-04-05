@@ -119,6 +119,63 @@
             display: block;
         }
 
+        #graph-context-menu.graph-context-menu {
+            position: fixed;
+            z-index: 10050;
+            min-width: 200px;
+            padding: 4px 0;
+            background: hsl(224, 17%, 18%);
+            border: 1px solid hsl(0, 0%, 38%);
+            border-radius: 4px;
+            box-shadow: 2px 6px 16px rgba(0, 0, 0, 0.45);
+            font-size: 13px;
+            font-family: system-ui, sans-serif;
+            color: rgba(255, 255, 255, 0.92);
+            user-select: none;
+        }
+
+        #graph-context-menu .graph-ctx-item {
+            padding: 6px 14px;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        #graph-context-menu .graph-ctx-item:hover:not(.disabled) {
+            background: hsl(210, 55%, 36%);
+        }
+
+        #graph-context-menu .graph-ctx-item.disabled {
+            opacity: 0.38;
+            cursor: default;
+            pointer-events: none;
+        }
+
+        #graph-context-menu .graph-ctx-name-row {
+            padding: 6px 10px 8px;
+            border-bottom: 1px solid hsl(0, 0%, 30%);
+        }
+
+        #graph-context-menu .graph-ctx-name-input {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 5px 8px;
+            font-size: 13px;
+            font-family: system-ui, sans-serif;
+            border: 1px solid hsl(0, 0%, 40%);
+            border-radius: 3px;
+            background: hsl(224, 14%, 14%);
+            color: rgba(255, 255, 255, 0.95);
+        }
+
+        #graph-context-menu .graph-ctx-name-input::placeholder {
+            color: rgba(255, 255, 255, 0.38);
+        }
+
+        #graph-context-menu .graph-ctx-name-input:focus {
+            outline: 1px solid hsl(210, 55%, 45%);
+            border-color: hsl(210, 55%, 45%);
+        }
+
         .menu-dropdown-item {
             padding: 6px 18px;
             color: rgba(255,255,255,0.85);
@@ -643,7 +700,7 @@
     <div id="graph-panel" style="width: 40%; background-color: hsl(0, 0%, 60%);">
         <svg id="graph-view" style="position: absolute; width:100%; height:100%;"></svg>
         <div id="graph-hints" style="position:absolute; bottom:8px; left:8px; pointer-events:none; opacity:0.85; font-size:12px;">
-            <span id="graph-hint-pan"></span><span style="display:inline-block; width:2em;"></span><span id="graph-hint-rotate"></span><span style="display:inline-block; width:2em;"></span><span id="graph-hint-pin"></span>
+            <span id="graph-hint-pan"></span><span style="display:inline-block; width:2em;"></span><span id="graph-hint-rotate"></span><span style="display:inline-block; width:2em;"></span><span id="graph-hint-pin"></span><span style="display:inline-block; width:2em;"></span><span id="graph-hint-marquee"></span>
         </div>
         <button id="refresh-btn" title="Initialize Graph Embedding" onclick="refresh_graph_embedding(false, true);">
             <svg class="glow-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" style="width: 100%; height: 100%;">

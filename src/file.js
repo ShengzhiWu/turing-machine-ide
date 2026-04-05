@@ -127,6 +127,7 @@ async function buildProjectJSON() {  // 构建工程 JSON 对象
         style:     (typeof style_editor      !== 'undefined') ? style_editor.value : '',
         embedding: getGraphEmbedding(),
         "graph-pinned": getGraphPinnedState(),
+        "graph-groups": (typeof getGraphGroupsForSave === 'function') ? getGraphGroupsForSave() : [],
         tape:      getTapeInitial(),
         "start-position": start_position,
         "max-steps": parseInt(max_steps_input.value),
@@ -323,6 +324,9 @@ async function loadProjectFromObject(obj, fileName) {
     refresh_graph_embedding(false, false);
     if (obj.embedding) applyGraphEmbedding(obj.embedding);
     if (obj["graph-pinned"] !== undefined) applyGraphPinned(obj["graph-pinned"]);
+    if (typeof graphMarqueeSelected !== 'undefined') graphMarqueeSelected.clear();
+    if (typeof applyGraphGroupsFromFile === 'function')
+        applyGraphGroupsFromFile(obj["graph-groups"]);
 
     // 恢复纸带
     start_position = 0;
@@ -397,6 +401,8 @@ function loadExample(key) {
 
     // 刷新有向图（不沿用上一文件的节点固定状态）
     refresh_graph_embedding(false, false);
+    if (typeof graphMarqueeSelected !== 'undefined') graphMarqueeSelected.clear();
+    if (typeof applyGraphGroupsFromFile === 'function') applyGraphGroupsFromFile(null);
 
     // 若有预设嵌入坐标则应用
     if (ex['embedding'] !== undefined) {
