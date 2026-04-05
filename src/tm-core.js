@@ -155,6 +155,7 @@ function run_turing_machine(
     }
 
     let lastStepMoved = false;
+    let lastRuleJumpInfo = undefined;  // 最近执行的一条规则在源码中的位置（供历史表点击跳转等）
 
     while(state != "end" && state != "error") {  // 主循环
         step ++;
@@ -180,6 +181,7 @@ function run_turing_machine(
             state = "error";
             break;
         }
+        lastRuleJumpInfo = action[3];
         state = action[2];
         if (stateArrivals !== undefined)
             stateArrivals[state] = (stateArrivals[state] || 0) + 1;
@@ -208,7 +210,7 @@ function run_turing_machine(
         }
 
         if (need_record) {
-            history.push([step, position, state_0, state, recordTape ? [...tape] : undefined]);
+            history.push([step, position, state_0, state, recordTape ? [...tape] : undefined, action[3]]);
         }
         lastStepMoved = false;
 
@@ -273,7 +275,7 @@ function run_turing_machine(
 
     // head-tail 模式下补充最终状态
     if (filterHeadTail && step > 0) {
-        history.push([step, position, history[history.length - 1][3], state, recordTape ? [...tape] : undefined]);
+        history.push([step, position, history[history.length - 1][3], state, recordTape ? [...tape] : undefined, lastRuleJumpInfo]);
     }
 
     // 末尾保留：从最近快照递归重跑，用 subHistory 的尾部替换原 history 的尾部

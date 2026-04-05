@@ -8,10 +8,6 @@ var vertex_prefered_distance = 1.4 * global_size_factor;  //0.8
 var vertex_repel_strength = 0.01 * global_force_factor;  // 0.02
 var connection_length_preserve_strength = 0.01 * global_force_factor;  // 0.02
 
-/** 延迟执行「单击跳转编辑器」，以便与双击固定节点区分（需略小于系统双击间隔） */
-var pendingGraphNodeJumpTimer = null;
-var GRAPH_NODE_JUMP_DELAY_MS = 450;
-
 function nodeIsPinnedForPhysics(node) {
     return !!(node && node._pinned);
 }
@@ -243,7 +239,7 @@ function build_graph_dom(graph) {
         node._dom = dom;           // 将 DOM 引用挂在 node 上
         node._display_name = node_name;
 
-        // ── 单击跳转 / 双击固定节点 / 拖动节点 ───────────────────────
+        // ── 单击立即跳转代码；双击固定/取消固定；拖动节点 ─────────────
         let didDragThisGesture = false;
         [dom.circle, dom.name].forEach(el => {
             el.style.cursor = 'pointer';
@@ -251,26 +247,17 @@ function build_graph_dom(graph) {
                 if (e.altKey) return;
                 if (didDragThisGesture) return;
                 e.stopPropagation();
-                if (e.detail === 1) {
-                    if (pendingGraphNodeJumpTimer) {
-                        clearTimeout(pendingGraphNodeJumpTimer);
-                        pendingGraphNodeJumpTimer = null;
-                    }
-                    pendingGraphNodeJumpTimer = setTimeout(() => {
-                        pendingGraphNodeJumpTimer = null;
-                        jumpEditorToState(node[0], node_name, node._jumpInfo);
-                    }, GRAPH_NODE_JUMP_DELAY_MS);
-                } else if (e.detail === 2) {
-                    if (pendingGraphNodeJumpTimer) {
-                        clearTimeout(pendingGraphNodeJumpTimer);
-                        pendingGraphNodeJumpTimer = null;
-                    }
-                    node._pinned = !node._pinned;
-                    if (typeof markDirty === 'function') markDirty();
-                } else if (e.detail > 2 && pendingGraphNodeJumpTimer) {
-                    clearTimeout(pendingGraphNodeJumpTimer);
-                    pendingGraphNodeJumpTimer = null;
-                }
+                // 仅响应双击序列里的第一次 click，避免连点三次时重复跳转
+                if (e.detail === 1)
+                    jumpEditorToState(node[0], node_name, node._jumpInfo);
+            });
+            el.addEventListener('dblclick', e => {
+                if (e.altKey) return;
+                if (didDragThisGesture) return;
+                e.stopPropagation();
+                e.preventDefault();
+                node._pinned = !node._pinned;
+                if (typeof markDirty === 'function') markDirty();
             });
             el.addEventListener('mousedown', e => {
                 if (e.button !== 0) return;  // 只响应左键
@@ -291,10 +278,6 @@ function build_graph_dom(graph) {
                     if (!dragged && Math.sqrt(totalDx*totalDx + totalDy*totalDy) > DRAG_THRESHOLD) {
                         dragged = true;
                         didDragThisGesture = true;
-                        if (pendingGraphNodeJumpTimer) {
-                            clearTimeout(pendingGraphNodeJumpTimer);
-                            pendingGraphNodeJumpTimer = null;
-                        }
                         dragging_node = node;
                         graph_view.style.cursor = 'grabbing';
                         el.style.cursor = 'grabbing';
@@ -386,6 +369,32 @@ function build_graph_dom(graph) {
 }
 
 /**
+ * 根据 parseProgramCode 附在规则上的 jumpInfo（行号 + 去注释行内容）跳转光标。
+ * @returns {boolean} 是否成功定位
+ */
+function jumpEditorToRuleJumpInfo(jumpInfo) {
+    if (!jumpInfo || typeof code_editor === 'undefined' || !code_editor) return false;
+    const lines = code_editor_value.split('\n');
+    let { lineIndex, lineContent } = jumpInfo;
+
+    if (lines[lineIndex] !== undefined &&
+        lines[lineIndex].split('//')[0].trim() === lineContent) {
+        code_editor.setCursor(lineIndex, 0, { focus: true });
+        return true;
+    }
+
+    for (let i = 0; i < lines.length; i++) {
+        if (lines[i].split('//')[0].trim() === lineContent) {
+            jumpInfo.lineIndex = i;
+            code_editor.setCursor(i, 0, { focus: true });
+            return true;
+        }
+    }
+
+    return false;
+}
+
+/**
  * 在代码编辑器中找到目标节点对应的行，并将光标跳转过去。
  *
  * - 普通节点：匹配第一元 == state_name 的第一行。
@@ -396,30 +405,13 @@ function build_graph_dom(graph) {
  *   比较时需还原为代码中的字面形式。
  */
 function jumpEditorToState(raw_name, state_name, jumpInfo) {
-    const lines = code_editor_value.split('\n');
-
     // ── end_from / error_from 节点：用 jumpInfo 定位 ────────────
     if (jumpInfo && (raw_name.startsWith('end_from_') || raw_name.startsWith('error_from_'))) {
-        let { lineIndex, lineContent } = jumpInfo;
-
-        // 先按行号快速匹配
-        if (lines[lineIndex] !== undefined &&
-            lines[lineIndex].split('//')[0].trim() === lineContent) {
-            code_editor.setCursor(lineIndex, 0, { focus: true });
-            return;
-        }
-
-        // 行号处内容已变，全文搜索行内容
-        for (let i = 0; i < lines.length; i++) {
-            if (lines[i].split('//')[0].trim() === lineContent) {
-                jumpInfo.lineIndex = i;  // 更新缓存的行号
-                code_editor.setCursor(i, 0, { focus: true });
-                return;
-            }
-        }
-
-        return;  // 找不到则不跳转
+        if (jumpEditorToRuleJumpInfo(jumpInfo)) return;
+        return;
     }
+
+    const lines = code_editor_value.split('\n');
 
     // ── 普通节点：匹配第一元 ─────────────────────────────────
     for (let i = 0; i < lines.length; i++) {

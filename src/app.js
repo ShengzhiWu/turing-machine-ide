@@ -320,11 +320,31 @@ function refresh_history_table(history_table, history) {
         cell.setAttribute('data-original-content', cell.textContent);
     }
 
-    // 鼠标悬停显示状态转移
+    // 鼠标悬停显示状态转移；单击跳转到该步对应规则在代码中的行（与图节点单击一致）
     const rows = history_table.querySelectorAll('tr');
     rows.forEach((row, i) => {
         const record = history[i];
         row.title = `state: ${(record[2] != undefined ? record[2] + " → " : "")}${(record[3] != undefined ? record[3] : "")}`;
+
+        if (i === 0) {
+            row.cells[0].style.cursor = 'pointer';
+        } else {
+            row.style.cursor = 'pointer';
+        }
+
+        row.addEventListener('click', (e) => {
+            if (i === 0) {
+                const td = e.target.closest('td');
+                if (!td || td !== row.cells[0]) return;
+            }
+            if (typeof closeAllMenus === 'function') closeAllMenus();
+            if (record[5] && typeof jumpEditorToRuleJumpInfo === 'function' &&
+                jumpEditorToRuleJumpInfo(record[5]))
+                return;
+            const fallbackState = record[2] !== undefined ? record[2] : record[3];
+            if (fallbackState !== undefined && typeof jumpEditorToState === 'function')
+                jumpEditorToState(fallbackState, fallbackState, undefined);
+        });
     });
 
     scrollHistoryToBottomIfLocked();
