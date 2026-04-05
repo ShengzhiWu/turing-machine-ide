@@ -1,9 +1,13 @@
+const path = require('path');
 const electron = require('electron');
 const app = electron.app;
 const BrowserWindow = electron.BrowserWindow;
 const { ipcMain, dialog, Menu } = electron;
 
 Menu.setApplicationMenu(null);  // 移除 Electron 默认菜单栏，使用应用内自定义菜单
+
+/** Windows 任务栏/窗口图标（开发与打包后均相对于 main.js 所在目录解析） */
+const APP_ICON = path.join(__dirname, 'resources', 'icon.ico');
 
 /** 渲染设置窗口：仅本会话内记住用户调整后的宽高（关闭窗口再打开仍有效；退出应用后作废） */
 const RENDER_SETTINGS_WIN_MIN = { w: 440, h: 200 };
@@ -47,6 +51,7 @@ ipcMain.handle('open-render-settings', async (event, initData) => {
     }
     const rsSize = renderSettingsSessionBounds || RENDER_SETTINGS_WIN_DEFAULT;
     settingsWindow = new BrowserWindow({  // 渲染设置窗口
+        icon: APP_ICON,
         width: rsSize.width,
         height: rsSize.height,
         minWidth: RENDER_SETTINGS_WIN_MIN.w,
@@ -179,6 +184,7 @@ ipcMain.handle('open-render-preview', async (event, initData) => {
     const maxW = Math.min(Math.round(initData.width  * 0.6), 1280);
     const maxH = Math.min(Math.round(initData.height * 0.6) + 60, 800);
     previewWindow = new BrowserWindow({
+        icon: APP_ICON,
         width: maxW,
         height: maxH,
         minWidth: 320,
@@ -292,6 +298,7 @@ ipcMain.handle('open-file', async () => {
 // ── Application startup ───────────────────────────────────────────────
 app.on('ready', () => {
     mainWindow = new BrowserWindow({
+        icon: APP_ICON,
         width: 1600,
         height: 900,
         title: 'Turing Machine IDE',
