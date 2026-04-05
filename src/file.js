@@ -320,7 +320,7 @@ async function loadProjectFromObject(obj, fileName) {
     }
 
     // 恢复图嵌入（先刷新图结构，再覆盖坐标与固定状态）
-    refresh_graph_embedding({ preserveNodePins: false });
+    refresh_graph_embedding(false, false);
     if (obj.embedding) applyGraphEmbedding(obj.embedding);
     if (obj["graph-pinned"] !== undefined) applyGraphPinned(obj["graph-pinned"]);
 
@@ -396,7 +396,7 @@ function loadExample(key) {
     tape = normalizeTape([...ex['tapes'][0]]);
 
     // 刷新有向图（不沿用上一文件的节点固定状态）
-    refresh_graph_embedding({ preserveNodePins: false });
+    refresh_graph_embedding(false, false);
 
     // 若有预设嵌入坐标则应用
     if (ex['embedding'] !== undefined) {

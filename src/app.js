@@ -394,16 +394,32 @@ refresh_history_table(history_table, result.history);
 
 /**
  * 根据代码重建有向图（仅在图结构变化时调用，非每帧）。
- * @param {{ preserveNodePins?: boolean }} [opts]  preserveNodePins 默认 true（F4 等）；载入工程/样例时传 false，避免沿用上一次的固定状态。
+ * @param {boolean} [recyclePositions=true] 是否从当前图上按节点名回收坐标（打开文件/样例时应为 false）。
+ * @param {boolean} [preserveNodePins=true] 是否沿用上一张图上各节点的固定针脚与平面坐标（载入工程/样例时应为 false）。在「不回收全体坐标」时，仍会仅对已固定节点回收坐标，避免重置嵌入时拖动钉住的点。
  */
-function refresh_graph_embedding(opts) {
+function refresh_graph_embedding(recyclePositions = true, preserveNodePins = true) {
     // TODO: real-time compile
-    const preservePins = !opts || opts.preserveNodePins !== false;
-    const prevPins = preservePins && typeof graph !== 'undefined' && Array.isArray(graph)
+    const prevPins = preserveNodePins && typeof graph !== 'undefined' && Array.isArray(graph)
         ? Object.fromEntries(graph.map(n => [n[0], !!n._pinned]))
         : {};
+    let positionMap = null;
+    if (typeof graph !== 'undefined' && Array.isArray(graph)) {
+        if (recyclePositions) {
+            positionMap = Object.fromEntries(
+                graph
+                    .filter(n => Array.isArray(n[1]) && n[1].length >= 2)
+                    .map(n => [n[0], [n[1][0], n[1][1]]])
+            );
+        } else if (preserveNodePins) {
+            positionMap = Object.fromEntries(
+                graph
+                    .filter(n => n._pinned && Array.isArray(n[1]) && n[1].length >= 2)
+                    .map(n => [n[0], [n[1][0], n[1][1]]])
+            );
+        }
+    }
     code = parseProgramCode(code_editor_value);  // 解析代码文本
-    graph = construct_directed_graph_with_code(code);
+    graph = construct_directed_graph_with_code(code, 0, positionMap);
     graph.forEach(node => {
         if (prevPins[node[0]]) node._pinned = true;
     });
@@ -470,7 +486,7 @@ document.getElementById('pixel-scale-y-input').addEventListener('input', functio
     if (minimalCb && minimalCb.checked) renderBitmap(result.history);
 });
 
-code_editor.addEventListener('tm-refresh-graph', e => {  // 按 F4 刷新图
+code_editor.addEventListener('tm-refresh-graph', e => {  // 按 F4：带坐标回收的重建
     refresh_graph_embedding();
 });
 

@@ -29,14 +29,26 @@ function makeRng(seed) {
 }
 
 
-function construct_directed_graph_with_code(code, seed=0) {  // 根据图灵机代码构建状态图
+/**
+ * @param {Record<string, [number, number]>|null} [positionMap]  节点显示名 → 已有平面坐标；有则复用，无则随机（用于 F4 更新图等场景下的坐标回收）
+ */
+function construct_directed_graph_with_code(code, seed = 0, positionMap = null) {  // 根据图灵机代码构建状态图
     const rng = makeRng(seed);
     const get_random_point = () => [rng.nextGaussian(), rng.nextGaussian()];
+    const recycledPos = (name) => {
+        if (!positionMap) return null;
+        const p = positionMap[name];
+        if (!p || !Array.isArray(p) || p.length < 2) return null;
+        const x = p[0], y = p[1];
+        if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+        return [x, y];
+    };
+    const vertexPos = (name) => recycledPos(name) || get_random_point();
     var graph = [];
     for (const [state, action] of Object.entries(code)) {
         graph.push([
             state,  // State
-            get_random_point(),  // Position
+            vertexPos(state),  // Position
             true,  // Visibility
             []  // Connections: [target_vertex_index, edge_name, prefered_length, offset_for_multiple_edges]
         ]);  // Add every state as a node in graph
@@ -58,7 +70,7 @@ function construct_directed_graph_with_code(code, seed=0) {  // 根据图灵机�
             const edge_name = (input == "" ? '""': (input == OTHER ? 'other': input)) + (output != N ? '→'+ (output == "" ? '""': output): "") + ', ' + direction;
             if(nextState == state) {  // Connect to self
                 const scIndex = graph.filter(n => n[0].startsWith('self-connection')).length;
-                graph.push([`self-connection-${scIndex}`, get_random_point(), false, i]);  // Add the new node for displaying a self-connection
+                graph.push([`self-connection-${scIndex}`, vertexPos(`self-connection-${scIndex}`), false, i]);  // Add the new node for displaying a self-connection
                 vertex[3].push([graph.length - 1, edge_name , self_connection_default_length, undefined]);  // Add a connection
             }
             else {  // Connection to another vertex
@@ -70,7 +82,7 @@ function construct_directed_graph_with_code(code, seed=0) {  // 根据图灵机�
                         nextState = "error_from_" + i;
                     const newNode = [
                         nextState,
-                        get_random_point(),
+                        vertexPos(nextState),
                         true,
                         []
                     ];  // Add the new node.

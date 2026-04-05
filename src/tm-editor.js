@@ -25,7 +25,7 @@
 const LOCALES = {
     zh: {
         formatLabels: ['状态', '记号', '修改后的记号', '移动', '新状态（可省略）'],
-        statusHint:   '💡 每行一条五元组图灵机指令 | 用other表示其他的纸带记号 | 按F4刷新图 | 按F5执行程序',
+        statusHint:   '💡 每行一条五元组图灵机指令 | 用other表示其他的纸带记号 | 按F4更新图 | 按F5执行程序',
         noErrors:     '无错误',
         errorCount:   n => `错误: ${n}`,
         placeholder:  '输入如: q0, "1", "X", R, q1  // 注释',
@@ -48,7 +48,7 @@ const LOCALES = {
     },
     en: {
         formatLabels: ['State', 'Symbol', 'Write', 'Move', 'New state (optional)'],
-        statusHint:   '💡 Each line is a quintuple Turing machine instruction | Use "other" for other tape symbols | Press F4 to refresh the graph | Press F5 to run the program',
+        statusHint:   '💡 Each line is a quintuple Turing machine instruction | Use "other" for other tape symbols | Press F4 to update the graph | Press F5 to run the program',
         noErrors:     'No errors',
         errorCount:   n => `Errors: ${n}`,
         placeholder:  'e.g. q0, "1", "X", R, q1  // comment',
