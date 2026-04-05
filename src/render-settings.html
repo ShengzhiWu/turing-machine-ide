@@ -125,6 +125,13 @@
             <label id="lbl-graph-relative-margin">Relative margin</label>
             <input id="graph-relative-margin" type="number" value="0.1" min="0" max="0.49" step="0.01">
         </div>
+        <div class="row">
+            <label style="display:flex;align-items:center;gap:6px;width:auto;cursor:pointer;">
+                <input type="checkbox" id="show-step-number"
+                       style="width:14px;height:14px;cursor:pointer;accent-color:hsl(210,60%,55%);">
+                <span id="lbl-show-step-number">Show step number</span>
+            </label>
+        </div>
         <div class="row" style="margin-top:6px;flex-direction:column;align-items:flex-start;gap:8px;">
             <label style="display:flex;align-items:center;gap:6px;width:auto;cursor:pointer;">
                 <input type="radio" name="movement-mode" id="movement-mode-tape" value="tape" checked
@@ -247,6 +254,7 @@ ipcRenderer.on('render-settings-init', (e, data) => {
     setText('lbl-render-image',  'lblRenderImage',  'Render image frames');
     setText('lbl-graphic-scale', 'lblGraphicScale', 'Graphic scale');
     setText('lbl-graph-relative-margin', 'lblGraphRelativeMargin', 'Relative margin');
+    setText('lbl-show-step-number',    'lblShowStepNumber',       'Show step number');
     setText('lbl-movement-mode-tape',  'renderMovementModeTape',  'Tape moves, head fixed');
     setText('lbl-movement-mode-head',  'renderMovementModeHead',  'Head moves, tape fixed');
     setText('lbl-movement-mode-head-recenter', 'renderMovementModeHeadRecenter', 'Head moves, slow recenter');
@@ -301,6 +309,7 @@ ipcRenderer.on('render-settings-init', (e, data) => {
     set('music-samples', p.samplesDir);
     if (p.outputPath) document.getElementById('output-path').value = p.outputPath;
     if (p.renderImage !== undefined) document.getElementById('render-image').checked = !!p.renderImage;
+    if (p.showStepNumber !== undefined) document.getElementById('show-step-number').checked = !!p.showStepNumber;
     if (p.renderMusic !== undefined) document.getElementById('render-music').checked = !!p.renderMusic;
     if (p.tapeWrapLines !== undefined) document.getElementById('tape-wrap-lines').checked = !!p.tapeWrapLines;
     const legacyM = p.maxCellsPerRow;
@@ -385,6 +394,7 @@ function getParams() {  // 获取渲染设置，用于保存
         maxCellsOtherRows: Math.max(1, parseInt(document.getElementById('max-cells-other-rows').value, 10) || 70),
         recenterHalflifeFrames: Math.max(1, parseInt(document.getElementById('recenter-halflife-frames').value, 10) || 60),
         renderImage:  document.getElementById('render-image').checked,
+        showStepNumber: document.getElementById('show-step-number').checked,
         renderMusic:  document.getElementById('render-music').checked,
         musicMode:    document.getElementById('music-mode').value,
         musicRoot:    document.getElementById('music-root').value.trim()  || 'C4',
@@ -449,6 +459,7 @@ document.getElementById('render-image').addEventListener('change', () => {
     updateSubsections();
     pushRenderParams();
 });
+document.getElementById('show-step-number').addEventListener('change', pushRenderParams);
 ['movement-mode-tape', 'movement-mode-head', 'movement-mode-head-recenter'].forEach(id => {
     document.getElementById(id).addEventListener('change', () => {
         updateHeadTapeWrapOptions();

@@ -10,6 +10,8 @@ const _renderDefaultParams = {
     graphicScale: 1.0,
     /** 有向图适配：较短画布边的留白比例（与 drawGraphOnCanvas 中 margin 一致） */
     graphRelativeMargin: 0.1,
+    /** 在有向图区域右下角叠加当前逻辑步号（来自运行历史） */
+    showStepNumber: false,
     renderImage: true, renderMusic: false,
     movementMode: 'tape',  // 'tape' | 'head' | 'headRecenter'
     /** headRecenter：纸带滚动锚点逼近真实机头位置的半衰期（逻辑帧）；越大纸带越慢、机头仍可立即对准格 */
@@ -70,6 +72,7 @@ async function menuRenderAnimation() {  // 点击菜单->文件->渲染动画触
             lblRenderImage:   t('renderLabelRenderImage'),
             lblGraphicScale:  t('renderLabelGraphicScale'),
             lblGraphRelativeMargin: t('renderLabelGraphRelativeMargin'),
+            lblShowStepNumber: t('renderLabelShowStepNumber'),
             lblRenderMusic:   t('renderLabelRenderMusic'),
             lblMusicMode:     t('renderLabelMusicMode'),
             lblMusicRoot:     t('renderLabelMusicRoot'),
@@ -808,20 +811,27 @@ function drawRenderFrame(ctx, renderParams, snapGraph, frame, nodeBrightness, ed
     ctx.fillStyle = 'hsl(0,0%,60%)';  // matches graph-panel background
     ctx.fillRect(0, 0, W, H);
 
+    const hist = window._renderHistory;
+    let logicalStep;
+    if (hist && frame && Number.isFinite(frame.historyIndex) && frame.historyIndex >= 0 && frame.historyIndex < hist.length) {
+        const row = hist[frame.historyIndex];
+        if (row && row.length > 0) logicalStep = row[0];
+    }
+
     if (!tapeForFrame || !Array.isArray(tapeForFrame)) {
-        drawGraphOnCanvas(ctx, snapGraph, W, H, nodeBrightness, edgeBrightness, renderParams);
+        drawGraphOnCanvas(ctx, snapGraph, W, H, nodeBrightness, edgeBrightness, renderParams, logicalStep);
         return;
     }
 
     const geom = layoutRenderTapeGeometry(renderParams, tapeForFrame, W, H);
-    drawGraphOnCanvas(ctx, snapGraph, W, geom.graphH, nodeBrightness, edgeBrightness, renderParams);
+    drawGraphOnCanvas(ctx, snapGraph, W, geom.graphH, nodeBrightness, edgeBrightness, renderParams, logicalStep);
     const smoothTapeHeadPos = (renderParams.movementMode === 'headRecenter' && Number.isFinite(frame.headPosVis))
         ? frame.headPosVis
         : undefined;
     drawTapeOnCanvas(ctx, renderParams, tapeForFrame, frame.headPos, frame.currentState, W, H, geom, smoothTapeHeadPos);
 }
 
-function drawGraphOnCanvas(ctx, snapGraph, W, H, nodeBrightness, edgeBrightness, renderParams) {
+function drawGraphOnCanvas(ctx, snapGraph, W, H, nodeBrightness, edgeBrightness, renderParams, logicalStep) {
     if (!snapGraph || snapGraph.length === 0) return;
 
     // Compute bounding box of ALL nodes (including hidden self-connection helper nodes),
@@ -1001,6 +1011,20 @@ function drawGraphOnCanvas(ctx, snapGraph, W, H, nodeBrightness, edgeBrightness,
         ctx.fillText(dn, p2[0] + vertex_name_text_offset[0]*gs - 3,
                             p2[1] + vertex_name_text_offset[1]*gs + 4);
     });
+
+    // 绘制步编号
+    if (renderParams && renderParams.showStepNumber && logicalStep !== undefined && logicalStep !== null) {
+        const pad = Math.max(8, Math.round(Math.min(W, H) * 0.018));
+        const fontPx = Math.max(14, Math.round(Math.min(W, H) * 0.038));  // 步数文本字号
+        const text = String(logicalStep);
+        ctx.save();
+        ctx.font = `400 ${fontPx}px system-ui, sans-serif`;
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'bottom';
+        ctx.fillStyle = '#000';
+        ctx.fillText(text, W - pad, H - pad);
+        ctx.restore();
+    }
 }
 
 function drawArrowHead(ctx, tip, dir, len, wid) {
