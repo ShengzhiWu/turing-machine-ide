@@ -170,6 +170,10 @@
                     <label id="lbl-max-cells-other-rows" for="max-cells-other-rows">Max cells on other rows</label>
                     <input id="max-cells-other-rows" type="number" value="70" min="1" max="100000">
                 </div>
+                <div class="row">
+                    <label id="lbl-tape-wrap-line-gap-avg" for="tape-wrap-line-gap-avg">Relative line spacing</label>
+                    <input id="tape-wrap-line-gap-avg" type="number" value="0.3" min="0" max="4" step="0.05">
+                </div>
             </div>
         </div>
     </div>
@@ -262,6 +266,7 @@ ipcRenderer.on('render-settings-init', (e, data) => {
     setText('lbl-tape-wrap-lines',     'lblTapeWrapLines',        'Wrap tape to multiple rows');
     setText('lbl-max-cells-first-row',  'lblMaxCellsFirstRow',  'Max cells on first row');
     setText('lbl-max-cells-other-rows', 'lblMaxCellsOtherRows', 'Max cells on other rows');
+    setText('lbl-tape-wrap-line-gap-avg', 'lblRelativeLineSpacing', 'Relative line spacing');
     setText('lbl-render-music',  'lblRenderMusic',  'Export audio');
     setText('lbl-music-mode',    'lblMusicMode',    'Scale');
     setText('lbl-music-root',    'lblMusicRoot',    'Root note');
@@ -321,6 +326,10 @@ ipcRenderer.on('render-settings-init', (e, data) => {
         : (legacyM !== undefined && legacyM !== null ? legacyM : 70);
     document.getElementById('max-cells-first-row').value = firstRow;
     document.getElementById('max-cells-other-rows').value = otherRows;
+    if (p.tapeWrapLineGapAvg !== undefined && p.tapeWrapLineGapAvg !== null && Number.isFinite(Number(p.tapeWrapLineGapAvg)))
+        set('tape-wrap-line-gap-avg', p.tapeWrapLineGapAvg);
+    else
+        set('tape-wrap-line-gap-avg', 0.3);
     if (p.recenterHalflifeFrames !== undefined && p.recenterHalflifeFrames !== null)
         set('recenter-halflife-frames', p.recenterHalflifeFrames);
     updateSubsections();
@@ -392,6 +401,11 @@ function getParams() {  // 获取渲染设置，用于保存
         tapeWrapLines: document.getElementById('tape-wrap-lines').checked,
         maxCellsFirstRow: Math.max(1, parseInt(document.getElementById('max-cells-first-row').value, 10) || 40),
         maxCellsOtherRows: Math.max(1, parseInt(document.getElementById('max-cells-other-rows').value, 10) || 70),
+        tapeWrapLineGapAvg: (() => {
+            const v = parseFloat(document.getElementById('tape-wrap-line-gap-avg').value);
+            if (!Number.isFinite(v) || v < 0) return 0.3;
+            return Math.min(4, v);
+        })(),
         recenterHalflifeFrames: Math.max(1, parseInt(document.getElementById('recenter-halflife-frames').value, 10) || 60),
         renderImage:  document.getElementById('render-image').checked,
         showStepNumber: document.getElementById('show-step-number').checked,
@@ -414,7 +428,7 @@ function pushRenderParams() {
 const TYPING_PARAM_IDS = [
     'width', 'height', 'fps', 'move-frames', 'pause-frames', 'halflife', 'speed-multiplier', 'min-tail-continuation',
     'graphic-scale', 'graph-relative-margin', 'music-root', 'music-lo', 'music-hi', 'music-seed',
-    'music-samples', 'output-path', 'max-cells-first-row', 'max-cells-other-rows', 'recenter-halflife-frames',
+    'music-samples', 'output-path', 'max-cells-first-row', 'max-cells-other-rows', 'tape-wrap-line-gap-avg', 'recenter-halflife-frames',
 ];
 TYPING_PARAM_IDS.forEach(id => {
     const el = document.getElementById(id);

@@ -19,6 +19,8 @@ const _renderDefaultParams = {
     tapeWrapLines: true,   // 仅「纸带固定机头动」模式：多行绘制纸带
     maxCellsFirstRow: 40,  // 首行最大格数（格更大，便于看清纸带开头）
     maxCellsOtherRows: 70, // 其余行最大格数
+    /** 分行时间距 = 该系数 × 相邻两行格高的平均值 */
+    tapeWrapLineGapAvg: 0.3,
     musicMode: 'major', musicRoot: 'C4', musicLoNote: 'C3', musicHiNote: 'C6',
     musicSeed: 0, samplesDir: '',
     outputPath: '',
@@ -104,6 +106,7 @@ async function menuRenderAnimation() {  // 点击菜单->文件->渲染动画触
             lblTapeWrapLines: t('renderTapeWrapLines'),
             lblMaxCellsFirstRow: t('renderCellsFirstRow'),
             lblMaxCellsOtherRows: t('renderCellsOtherRows'),
+            lblRelativeLineSpacing: t('renderLabelRelativeLineSpacing'),
             renderPreviewUnavailable: t('renderPreviewUnavailable'),
             durationHour:     t('renderDurationHour'),
             durationMinute:   t('renderDurationMinute'),
@@ -673,14 +676,21 @@ function _tapeCellFontSize(cellH, cellW) {
     return Math.max(6, Math.min(Math.round(cellH * 0.52), Math.floor(cellW / 1.9)));
 }
 
-/** 行间竖向空隙与行高成线性比例，故缩放 λ 后总栈高 = λ × 未缩放栈高 */
-function _tapeWrappedStackSum(hList) {
+/** 行间竖向空隙 = gapAvg×(h_r+h_{r+1})/2，与行高成比例；缩放 λ 后总栈高 = λ × 未缩放栈高 */
+function _tapeWrappedStackSum(hList, gapAvg) {
     let s = 0;
+    const g = Number.isFinite(gapAvg) && gapAvg >= 0 ? gapAvg : 0.3;
     for (let r = 0; r < hList.length; r++) {
         s += hList[r];
-        if (r < hList.length - 1) s += 0.25 * (hList[r] + hList[r + 1]);
+        if (r < hList.length - 1) s += g * (hList[r] + hList[r + 1]) / 2;
     }
     return s;
+}
+
+function _tapeWrapLineGapAvgFromParams(renderParams) {
+    let v = parseFloat(renderParams.tapeWrapLineGapAvg);
+    if (!Number.isFinite(v) || v < 0) v = 0.3;
+    return Math.min(v, 4);
 }
 
 function _measureTapeHeadLabelMaxWidth(ctx, boldPx) {
@@ -727,9 +737,10 @@ function layoutRenderTapeGeometry(renderParams, tape, W, H) {
     }
 
     if (wrapLines && rowDefs && numRows > 0) {
+        const lineGapAvg = _tapeWrapLineGapAvgFromParams(renderParams);
         const ratio = (cellH0 * shrink) / (W / mo);
         const hIdeal = rowDefs.map(rd => ratio * (W / rd.cap));
-        const stackIdeal = _tapeWrappedStackSum(hIdeal);
+        const stackIdeal = _tapeWrappedStackSum(hIdeal, lineGapAvg);
         const lambda = stackIdeal > 0 ? Math.min(1, maxStack / stackIdeal) : 1;
         const cellHList = hIdeal.map(h => h * lambda);
         const cellWList = rowDefs.map(rd => W / rd.cap);
@@ -742,7 +753,7 @@ function layoutRenderTapeGeometry(renderParams, tape, W, H) {
         for (let r = numRows - 1; r >= 0; r--) {
             tapeTopYs[r] = nextBottom - cellHList[r];
             nextBottom = tapeTopYs[r];
-            if (r > 0) nextBottom -= 0.25 * (cellHList[r - 1] + cellHList[r]);
+            if (r > 0) nextBottom -= lineGapAvg * (cellHList[r - 1] + cellHList[r]) / 2;
         }
         const cw0 = cellWList[0];
         return {
