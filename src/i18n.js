@@ -28,7 +28,8 @@ const MENU_I18N = {
         aboutTitle:     'Turing Machine IDE',
         aboutVersion:   '版本 1.3',
         aboutBody:      `<p><b>开发者：</b>武圣智<br>
-                            <b>许可证：</b>GPL-3.0</p>`,
+                            <b>许可证：</b>GPL-3.0<br>
+                            <b>日期：</b>2026年4月6日</p>`,
         closeBtn:       '关闭',
         saveDialogTitle:'保存工程',
         embedDialogTitle:'保存图嵌入',
@@ -162,7 +163,8 @@ const MENU_I18N = {
         aboutTitle:     'Turing Machine IDE',
         aboutVersion:   'Version 1.3',
         aboutBody:      `<p><b>Developer:</b> Shengzhi Wu<br>
-                            <b>License:</b> GPL-3.0</p>`,
+                            <b>License:</b> GPL-3.0<br>
+                            <b>Date:</b> April 6, 2026</p>`,
         closeBtn:       'Close',
         saveDialogTitle:'Save Project',
         embedDialogTitle:'Save Graph Embedding',
