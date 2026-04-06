@@ -19,8 +19,27 @@
   },
   "build": {
     "appId": "com.turing-machine-ide.app",
+    "productName": "Turing Machine IDE",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "src/**/*",
+      "node_modules/**/*",
+      "resources/**/*",
+      "main.js",
+      "index.html",
+      "package.json"
+    ],
+    "extraResources": [],
     "win": {
-      "icon": "resources/icon.ico"
+      "icon": "resources/icon.ico",
+      "target": "nsis",
+      "executableName": "TuringMachineIDE"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
     }
   }
 }
