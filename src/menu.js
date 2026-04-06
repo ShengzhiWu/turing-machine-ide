@@ -313,18 +313,31 @@ function buildMenuBar() {
                     submenu: [
                         {
                             label: t('language'),
-                            submenu: [
-                                {
-                                    label: t('langZh'),
-                                    checked: () => language === 'zh',
-                                    action: () => switchLanguage('zh')
-                                },
-                                {
-                                    label: t('langEn'),
-                                    checked: () => language === 'en',
-                                    action: () => switchLanguage('en')
-                                },
-                            ]
+                            submenu: (() => {
+                                const opts = [
+                                    { code: 'zh', labelKey: 'langZh' },
+                                    { code: 'en', labelKey: 'langEn' },
+                                    { code: 'zh-tw', labelKey: 'langZhTW' },
+                                    { code: 'ru', labelKey: 'langRu' },
+                                    { code: 'fr', labelKey: 'langFr' },
+                                    { code: 'de', labelKey: 'langDe' },
+                                    { code: 'it', labelKey: 'langIt' },
+                                    { code: 'ja', labelKey: 'langJa' },
+                                    { code: 'ko', labelKey: 'langKo' },
+                                    { code: 'es', labelKey: 'langEs' },
+                                    { code: 'hi', labelKey: 'langHi' },
+                                    { code: 'pt', labelKey: 'langPt' },
+                                    { code: 'id', labelKey: 'langId' },
+                                    { code: 'th', labelKey: 'langTh' },
+                                    { code: 'vi', labelKey: 'langVi' },
+                                    { code: 'eo', labelKey: 'langEo' },
+                                ];
+                                return opts.map(({ code, labelKey }) => ({
+                                    label: t(labelKey),
+                                    checked: () => language === code,
+                                    action: () => switchLanguage(code)
+                                }));
+                            })()
                         },
                     ]
                 },

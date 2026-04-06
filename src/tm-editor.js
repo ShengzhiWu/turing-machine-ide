@@ -2,7 +2,7 @@
 // tm-editor.js — <tm-editor> 自定义元素
 //
 // 属性：
-//   lang="zh" | "en"   语言（默认 en；不支持的语言回退到 en）
+//   lang                与主界面 language 一致（默认 en）；不支持时回退 en
 //   value               初始内容（attribute 或 property）
 //
 // Property（JS）：
@@ -67,6 +67,398 @@ const LOCALES = {
         },
         hints: {
             move: { L: '(left)', R: '(right)', N_move: '(no move)', N_write: '(no write)' },
+        },
+    },
+    "zh-tw": {
+        formatLabels: ["狀態","記號","修改後的記號","移動","新狀態（可省略）"],
+        statusHint:   "💡 每行一條五元組圖靈機指令 | 用 other 表示其他的紙帶記號 | 按 F4 更新圖 | 按 F5 執行程式",
+        noErrors:     "無錯誤",
+        errorCount:   (n) => "錯誤: " + n + "",
+        placeholder:  "輸入如: q0, \"1\", \"X\", R, q1  // 注釋",
+        errors: {
+            state: "狀態名不能爲空，至少需要一個非空字符",
+            symbol: "第2元必須是雙引號括起的字符串（如 \"0\"）或關鍵字 other",
+            write: "第3元必須是雙引號括起的字符串（如 \"X\"）或 N",
+            move: "第4元必須是 L（左移）、R（右移）或 N（不移動）",
+            extra: "超出五元組，多餘的元素",
+            missing: "此處缺少元素",
+            end_state: "第1元不能是 end（end 是終止狀態，不能作爲當前狀態發出轉移規則）",
+            error_state: "第1元不能是 error（error 是錯誤終止狀態，不能作爲當前狀態發出轉移規則）",
+            start_new: "第5元不能是 start（start 是初始狀態，不能作爲目標狀態）",
+            duplicate: "與另一行的前兩個元素（狀態 + 記號）完全相同，圖靈機中此組合只能有一條規則",
+            fallback: "語法錯誤",
+        },
+        hints: {
+            move: {
+                L: "（左移）",
+                R: "（右移）",
+                N_move: "（不動）",
+                N_write: "（不修改）",
+            },
+        },
+    },
+    "ru": {
+        formatLabels: ["Состояние","Символ","Запись","Переход","Новое состояние (необязательно)"],
+        statusHint:   "💡 Каждая строка — квинтет МТ | Для прочих символов ленты используйте \"other\" | F4 — обновить граф | F5 — запуск",
+        noErrors:     "Нет ошибок",
+        errorCount:   (n) => "Ошибок: " + n + "",
+        placeholder:  "напр. q0, \"1\", \"X\", R, q1  // комментарий",
+        errors: {
+            state: "Имя состояния не может быть пустым",
+            symbol: "Элемент 2 — строка в кавычках (напр. \"0\") или ключевое слово \"other\"",
+            write: "Элемент 3 — строка в кавычках (напр. \"X\") или N (без записи)",
+            move: "Элемент 4 — L (влево), R (вправо) или N (без движения)",
+            extra: "Лишний элемент после квинтета",
+            missing: "Здесь не хватает элемента",
+            end_state: "Элемент 1 не может быть \"end\" (конечное состояние не задаёт переходы)",
+            error_state: "Элемент 1 не может быть \"error\" (терминальная ошибка не задаёт переходы)",
+            start_new: "Элемент 5 не может быть \"start\" (начальное состояние не может быть целью)",
+            duplicate: "Другая строка с той же парой (состояние, символ) — допускается только одно правило",
+            fallback: "Синтаксическая ошибка",
+        },
+        hints: {
+            move: {
+                L: "(влево)",
+                R: "(вправо)",
+                N_move: "(без движения)",
+                N_write: "(без записи)",
+            },
+        },
+    },
+    "fr": {
+        formatLabels: ["État","Symbole","Écriture","Déplacement","Nouvel état (facultatif)"],
+        statusHint:   "💡 Chaque ligne est une instruction quintuple | Utilisez \"other\" pour les autres symboles | F4 met à jour le graphe | F5 exécute",
+        noErrors:     "Aucune erreur",
+        errorCount:   (n) => "Erreurs : " + n + "",
+        placeholder:  "ex. q0, \"1\", \"X\", R, q1  // commentaire",
+        errors: {
+            state: "Le nom d’état ne peut pas être vide",
+            symbol: "L’élément 2 doit être une chaîne entre guillemets (ex. \"0\") ou le mot-clé \"other\"",
+            write: "L’élément 3 doit être une chaîne entre guillemets (ex. \"X\") ou N (pas d’écriture)",
+            move: "L’élément 4 doit être L (gauche), R (droite) ou N (pas de mouvement)",
+            extra: "Élément en trop après le quintuple",
+            missing: "Élément manquant ici",
+            end_state: "L’élément 1 ne peut pas être \"end\" (état terminal sans transitions)",
+            error_state: "L’élément 1 ne peut pas être \"error\" (état d’erreur terminal)",
+            start_new: "L’élément 5 ne peut pas être \"start\" (l’état initial ne peut pas être cible)",
+            duplicate: "Une autre règle a la même paire (état, symbole) — une seule règle autorisée",
+            fallback: "Erreur de syntaxe",
+        },
+        hints: {
+            move: {
+                L: "(gauche)",
+                R: "(droite)",
+                N_move: "(pas de mouvement)",
+                N_write: "(pas d’écriture)",
+            },
+        },
+    },
+    "de": {
+        formatLabels: ["Zustand","Symbol","Schreiben","Bewegung","Neuer Zustand (optional)"],
+        statusHint:   "💡 Jede Zeile ist ein Quintupel | \"other\" für andere Bandsymbole | F4 Graph aktualisieren | F5 ausführen",
+        noErrors:     "Keine Fehler",
+        errorCount:   (n) => "Fehler: " + n + "",
+        placeholder:  "z. B. q0, \"1\", \"X\", R, q1  // Kommentar",
+        errors: {
+            state: "Zustandsname darf nicht leer sein",
+            symbol: "Element 2 muss ein String in Anführungszeichen (z. B. \"0\") oder \"other\" sein",
+            write: "Element 3 muss ein String (z. B. \"X\") oder N (kein Schreiben) sein",
+            move: "Element 4 muss L, R oder N sein",
+            extra: "Zusätzliches Element nach dem Quintupel",
+            missing: "Hier fehlt ein Element",
+            end_state: "Element 1 darf nicht \"end\" sein",
+            error_state: "Element 1 darf nicht \"error\" sein",
+            start_new: "Element 5 darf nicht \"start\" sein",
+            duplicate: "Gleiches (Zustand, Symbol) wie eine andere Zeile — nur eine Regel erlaubt",
+            fallback: "Syntaxfehler",
+        },
+        hints: {
+            move: {
+                L: "(links)",
+                R: "(rechts)",
+                N_move: "(keine Bewegung)",
+                N_write: "(kein Schreiben)",
+            },
+        },
+    },
+    "it": {
+        formatLabels: ["Stato","Simbolo","Scrittura","Movimento","Nuovo stato (opzionale)"],
+        statusHint:   "💡 Ogni riga è un quintuplo | Usa \"other\" per altri simboli | F4 aggiorna il grafo | F5 esegue",
+        noErrors:     "Nessun errore",
+        errorCount:   (n) => "Errori: " + n + "",
+        placeholder:  "es. q0, \"1\", \"X\", R, q1  // commento",
+        errors: {
+            state: "Il nome dello stato non può essere vuoto",
+            symbol: "L’elemento 2 deve essere una stringa tra virgolette o \"other\"",
+            write: "L’elemento 3 deve essere una stringa o N",
+            move: "L’elemento 4 deve essere L, R o N",
+            extra: "Elemento extra oltre il quintuplo",
+            missing: "Elemento mancante",
+            end_state: "L’elemento 1 non può essere \"end\"",
+            error_state: "L’elemento 1 non può essere \"error\"",
+            start_new: "L’elemento 5 non può essere \"start\"",
+            duplicate: "Stessa coppia (stato, simbolo) di un’altra riga",
+            fallback: "Errore di sintassi",
+        },
+        hints: {
+            move: {
+                L: "(sinistra)",
+                R: "(destra)",
+                N_move: "(nessun movimento)",
+                N_write: "(nessuna scrittura)",
+            },
+        },
+    },
+    "ja": {
+        formatLabels: ["状態","記号","書き込み","移動","新しい状態（省略可）"],
+        statusHint:   "💡 各行は五元組の命令です | その他の記号は \"other\" | F4 でグラフ更新 | F5 で実行",
+        noErrors:     "エラーなし",
+        errorCount:   (n) => "エラー: " + n + "",
+        placeholder:  "例 q0, \"1\", \"X\", R, q1  // コメント",
+        errors: {
+            state: "状態名は空にできません",
+            symbol: "第2要素は引用符付き文字列または \"other\" です",
+            write: "第3要素は引用符付き文字列または N です",
+            move: "第4要素は L、R または N です",
+            extra: "五元組を超える要素があります",
+            missing: "要素が不足しています",
+            end_state: "第1要素は \"end\" にできません",
+            error_state: "第1要素は \"error\" にできません",
+            start_new: "第5要素は \"start\" にできません",
+            duplicate: "同じ（状態, 記号）の別行があります",
+            fallback: "構文エラー",
+        },
+        hints: {
+            move: {
+                L: "（左）",
+                R: "（右）",
+                N_move: "（移動なし）",
+                N_write: "（書き込みなし）",
+            },
+        },
+    },
+    "ko": {
+        formatLabels: ["상태","기호","쓰기","이동","새 상태(선택)"],
+        statusHint:   "💡 각 줄은 5튜플 명령입니다 | 다른 기호는 \"other\" | F4 그래프 갱신 | F5 실행",
+        noErrors:     "오류 없음",
+        errorCount:   (n) => "오류: " + n + "",
+        placeholder:  "예 q0, \"1\", \"X\", R, q1  // 주석",
+        errors: {
+            state: "상태 이름은 비울 수 없습니다",
+            symbol: "2번째 요소는 따옴표 문자열이거나 \"other\"여야 합니다",
+            write: "3번째 요소는 따옴표 문자열이거나 N이어야 합니다",
+            move: "4번째 요소는 L, R 또는 N이어야 합니다",
+            extra: "5튜플 뒤에 불필요한 요소가 있습니다",
+            missing: "요소가 없습니다",
+            end_state: "1번째 요소는 \"end\"일 수 없습니다",
+            error_state: "1번째 요소는 \"error\"일 수 없습니다",
+            start_new: "5번째 요소는 \"start\"일 수 없습니다",
+            duplicate: "같은 (상태, 기호) 쌍이 다른 줄에 있습니다",
+            fallback: "구문 오류",
+        },
+        hints: {
+            move: {
+                L: "(왼쪽)",
+                R: "(오른쪽)",
+                N_move: "(이동 없음)",
+                N_write: "(쓰기 없음)",
+            },
+        },
+    },
+    "es": {
+        formatLabels: ["Estado","Símbolo","Escritura","Movimiento","Nuevo estado (opcional)"],
+        statusHint:   "💡 Cada línea es un quinteto | Use \"other\" para otros símbolos | F4 actualiza el grafo | F5 ejecuta",
+        noErrors:     "Sin errores",
+        errorCount:   (n) => "Errores: " + n + "",
+        placeholder:  "ej. q0, \"1\", \"X\", R, q1  // comentario",
+        errors: {
+            state: "El nombre del estado no puede estar vacío",
+            symbol: "El elemento 2 debe ser una cadena entre comillas o \"other\"",
+            write: "El elemento 3 debe ser una cadena o N",
+            move: "El elemento 4 debe ser L, R o N",
+            extra: "Elemento extra tras el quinteto",
+            missing: "Falta un elemento",
+            end_state: "El elemento 1 no puede ser \"end\"",
+            error_state: "El elemento 1 no puede ser \"error\"",
+            start_new: "El elemento 5 no puede ser \"start\"",
+            duplicate: "Otra regla tiene el mismo par (estado, símbolo)",
+            fallback: "Error de sintaxis",
+        },
+        hints: {
+            move: {
+                L: "(izquierda)",
+                R: "(derecha)",
+                N_move: "(sin movimiento)",
+                N_write: "(sin escritura)",
+            },
+        },
+    },
+    "hi": {
+        formatLabels: ["स्थिति","प्रतीक","लेखन","गति","नई स्थिति (वैकल्पिक)"],
+        statusHint:   "💡 प्रत्येक पंक्ति एक पंचक निर्देश है | अन्य प्रतीकों के लिए \"other\" | F4 ग्राफ अपडेट | F5 चलाएँ",
+        noErrors:     "कोई त्रुटि नहीं",
+        errorCount:   (n) => "त्रुटियाँ: " + n + "",
+        placeholder:  "उदा. q0, \"1\", \"X\", R, q1  // टिप्पणी",
+        errors: {
+            state: "स्थिति नाम खाली नहीं हो सकता",
+            symbol: "तत्व 2 उद्धृत स्ट्रिंग या \"other\" होना चाहिए",
+            write: "तत्व 3 उद्धृत स्ट्रिंग या N होना चाहिए",
+            move: "तत्व 4 L, R या N होना चाहिए",
+            extra: "पंचक के बाद अतिरिक्त तत्व",
+            missing: "तत्व गायब",
+            end_state: "तत्व 1 \"end\" नहीं हो सकता",
+            error_state: "तत्व 1 \"error\" नहीं हो सकता",
+            start_new: "तत्व 5 \"start\" नहीं हो सकता",
+            duplicate: "दूसरी पंक्ति में वही (स्थिति, प्रतीक) जोड़ी",
+            fallback: "वाक्य-रचना त्रुटि",
+        },
+        hints: {
+            move: {
+                L: "(बाएँ)",
+                R: "(दाएँ)",
+                N_move: "(गति नहीं)",
+                N_write: "(लेखन नहीं)",
+            },
+        },
+    },
+    "pt": {
+        formatLabels: ["Estado","Símbolo","Escrita","Movimento","Novo estado (opcional)"],
+        statusHint:   "💡 Cada linha é um quinteto | Use \"other\" para outros símbolos | F4 atualiza o grafo | F5 executa",
+        noErrors:     "Sem erros",
+        errorCount:   (n) => "Erros: " + n + "",
+        placeholder:  "ex. q0, \"1\", \"X\", R, q1  // comentário",
+        errors: {
+            state: "O nome do estado não pode estar vazio",
+            symbol: "O elemento 2 deve ser uma string entre aspas ou \"other\"",
+            write: "O elemento 3 deve ser uma string ou N",
+            move: "O elemento 4 deve ser L, R ou N",
+            extra: "Elemento extra após o quinteto",
+            missing: "Falta um elemento",
+            end_state: "O elemento 1 não pode ser \"end\"",
+            error_state: "O elemento 1 não pode ser \"error\"",
+            start_new: "O elemento 5 não pode ser \"start\"",
+            duplicate: "Outra regra tem o mesmo par (estado, símbolo)",
+            fallback: "Erro de sintaxe",
+        },
+        hints: {
+            move: {
+                L: "(esquerda)",
+                R: "(direita)",
+                N_move: "(sem movimento)",
+                N_write: "(sem escrita)",
+            },
+        },
+    },
+    "id": {
+        formatLabels: ["Status","Simbol","Tulis","Gerak","Status baru (opsional)"],
+        statusHint:   "💡 Setiap baris adalah instruksi kuintupel | Gunakan \"other\" untuk simbol lain | F4 perbarui grafik | F5 jalankan",
+        noErrors:     "Tidak ada kesalahan",
+        errorCount:   (n) => "Kesalahan: " + n + "",
+        placeholder:  "mis. q0, \"1\", \"X\", R, q1  // komentar",
+        errors: {
+            state: "Nama status tidak boleh kosong",
+            symbol: "Elemen 2 harus string dalam tanda kutip atau \"other\"",
+            write: "Elemen 3 harus string atau N",
+            move: "Elemen 4 harus L, R, atau N",
+            extra: "Elemen tambahan setelah kuintupel",
+            missing: "Elemen hilang",
+            end_state: "Elemen 1 tidak boleh \"end\"",
+            error_state: "Elemen 1 tidak boleh \"error\"",
+            start_new: "Elemen 5 tidak boleh \"start\"",
+            duplicate: "Baris lain memiliki pasangan (status, simbol) yang sama",
+            fallback: "Kesalahan sintaks",
+        },
+        hints: {
+            move: {
+                L: "(kiri)",
+                R: "(kanan)",
+                N_move: "(tanpa gerak)",
+                N_write: "(tanpa tulis)",
+            },
+        },
+    },
+    "th": {
+        formatLabels: ["สถานะ","สัญลักษณ์","เขียน","เคลื่อนที่","สถานะใหม่ (ไม่บังคับ)"],
+        statusHint:   "💡 แต่ละบรรทัดเป็นคำสั่งควินทูเปิล | ใช้ \"other\" สำหรับสัญลักษณ์อื่น | F4 อัปเดตกราฟ | F5 รัน",
+        noErrors:     "ไม่มีข้อผิดพลาด",
+        errorCount:   (n) => "ข้อผิดพลาด: " + n + "",
+        placeholder:  "เช่น q0, \"1\", \"X\", R, q1  // หมายเหตุ",
+        errors: {
+            state: "ชื่อสถานะต้องไม่ว่าง",
+            symbol: "องค์ประกอบที่ 2 ต้องเป็นสตริงในเครื่องหมายคำพูดหรือ \"other\"",
+            write: "องค์ประกอบที่ 3 ต้องเป็นสตริงหรือ N",
+            move: "องค์ประกอบที่ 4 ต้องเป็น L, R หรือ N",
+            extra: "องค์ประกอบเกินหลังควินทูเปิล",
+            missing: "ขาดองค์ประกอบ",
+            end_state: "องค์ประกอบที่ 1 ต้องไม่เป็น \"end\"",
+            error_state: "องค์ประกอบที่ 1 ต้องไม่เป็น \"error\"",
+            start_new: "องค์ประกอบที่ 5 ต้องไม่เป็น \"start\"",
+            duplicate: "บรรทัดอื่นมีคู่ (สถานะ, สัญลักษณ์) เดียวกัน",
+            fallback: "ไวยากรณ์ผิดพลาด",
+        },
+        hints: {
+            move: {
+                L: "(ซ้าย)",
+                R: "(ขวา)",
+                N_move: "(ไม่เคลื่อนที่)",
+                N_write: "(ไม่เขียน)",
+            },
+        },
+    },
+    "vi": {
+        formatLabels: ["Trạng thái","Ký hiệu","Ghi","Di chuyển","Trạng thái mới (tùy chọn)"],
+        statusHint:   "💡 Mỗi dòng là một lệnh bộ năm | Dùng \"other\" cho ký hiệu khác | F4 cập nhật đồ thị | F5 chạy",
+        noErrors:     "Không lỗi",
+        errorCount:   (n) => "Lỗi: " + n + "",
+        placeholder:  "vd. q0, \"1\", \"X\", R, q1  // chú thích",
+        errors: {
+            state: "Tên trạng thái không được để trống",
+            symbol: "Phần tử 2 phải là chuỗi trong dấu ngoặc kép hoặc \"other\"",
+            write: "Phần tử 3 phải là chuỗi hoặc N",
+            move: "Phần tử 4 phải là L, R hoặc N",
+            extra: "Phần tử thừa sau bộ năm",
+            missing: "Thiếu phần tử",
+            end_state: "Phần tử 1 không được là \"end\"",
+            error_state: "Phần tử 1 không được là \"error\"",
+            start_new: "Phần tử 5 không được là \"start\"",
+            duplicate: "Dòng khác có cùng cặp (trạng thái, ký hiệu)",
+            fallback: "Lỗi cú pháp",
+        },
+        hints: {
+            move: {
+                L: "(trái)",
+                R: "(phải)",
+                N_move: "(không di chuyển)",
+                N_write: "(không ghi)",
+            },
+        },
+    },
+    "eo": {
+        formatLabels: ["Stato","Simbolo","Skribo","Movado","Nova stato (laŭvola)"],
+        statusHint:   "💡 Ĉiu linio estas kvintopa instrukcio | Uzu \"other\" por aliaj simboloj | F4 ĝisdatigas la grafikon | F5 rulas",
+        noErrors:     "Neniuj eraroj",
+        errorCount:   (n) => "Eraroj: " + n + "",
+        placeholder:  "ekz. q0, \"1\", \"X\", R, q1  // komento",
+        errors: {
+            state: "Stata nomo ne povas esti malplena",
+            symbol: "Elemento 2 devas esti ĉeno inter citiloj aŭ \"other\"",
+            write: "Elemento 3 devas esti ĉeno aŭ N",
+            move: "Elemento 4 devas esti L, R aŭ N",
+            extra: "Ekstra elemento post la kvintopo",
+            missing: "Mankas elemento",
+            end_state: "Elemento 1 ne povas esti \"end\"",
+            error_state: "Elemento 1 ne povas esti \"error\"",
+            start_new: "Elemento 5 ne povas esti \"start\"",
+            duplicate: "Alia linio havas la saman paron (stato, simbolo)",
+            fallback: "Sintaksa eraro",
+        },
+        hints: {
+            move: {
+                L: "(maldekstre)",
+                R: "(dekstre)",
+                N_move: "(sen movo)",
+                N_write: "(sen skribo)",
+            },
         },
     },
 };
@@ -527,7 +919,7 @@ class TmEditor extends HTMLElement {
     // ── 内部：应用语言 ──
 
     _applyLang() {
-        const L = LOCALES[this._lang] || LOCALES.zh;
+        const L = LOCALES[this._lang] || LOCALES.en;
         this._fmtItems.forEach((el, i) => { el.textContent = L.formatLabels[i]; });
         this._statusHint.textContent = L.statusHint;
         this._textarea.placeholder   = L.placeholder;
@@ -535,10 +927,10 @@ class TmEditor extends HTMLElement {
         this._updateErrorCounter(this._errorCount);
     }
 
-    _t(key) { return (LOCALES[this._lang] || LOCALES.zh).errors[key] || (LOCALES[this._lang] || LOCALES.zh).errors.fallback; }
+    _t(key) { return (LOCALES[this._lang] || LOCALES.en).errors[key] || (LOCALES[this._lang] || LOCALES.en).errors.fallback; }
 
     _hint(item, elemIdx) {
-        const m = (LOCALES[this._lang] || LOCALES.zh).hints.move;
+        const m = (LOCALES[this._lang] || LOCALES.en).hints.move;
         if (item === 'N') return elemIdx === 3 ? m.N_move : m.N_write;
         return m[item] || '';
     }
@@ -651,7 +1043,7 @@ class TmEditor extends HTMLElement {
     }
 
     _updateErrorCounter(n) {
-        const L = LOCALES[this._lang] || LOCALES.zh;
+        const L = LOCALES[this._lang] || LOCALES.en;
         this._errorCounter.textContent = n ? L.errorCount(n) : L.noErrors;
         this._errorCounter.className   = `error-count ${n ? 'has-errors' : 'no-errors'}`;
     }
