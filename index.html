@@ -844,7 +844,17 @@
     <script src="src/examples/huffman-code.js"></script>
 
     <script>
-        var language = 'zh';  // 默认语言：zh、en、zh-tw、ru、fr、de、it、ja、ko、es、hi、pt、id、th、vi、eo（见菜单）；未知码回退 en
+        // Electron：按系统首选语言匹配界面；非 Electron 或异常时回退 en
+        var language = 'en';
+        try {
+            if (typeof require !== 'undefined') {
+                const { ipcRenderer } = require('electron');
+                if (ipcRenderer && typeof ipcRenderer.sendSync === 'function') {
+                    const fromOs = ipcRenderer.sendSync('get-initial-ui-language');
+                    if (fromOs && typeof fromOs === 'string') language = fromOs;
+                }
+            }
+        } catch (_) { /* 浏览器直接打开 index.html 等 */ }
         var example = '596440';  // 默认样例
         var codeModified;   // 用户是否修改过图灵机代码
         var styleModified;  // 用户是否修改过样式代码

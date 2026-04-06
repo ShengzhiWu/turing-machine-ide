@@ -295,6 +295,44 @@ ipcMain.handle('open-file', async () => {
     return { content, path: filePath };
 });
 
+// ── Initial UI language (renderer asks via sendSync before i18n loads) ──
+const SUPPORTED_UI_LANGS = new Set(['zh', 'en', 'zh-tw', 'ru', 'fr', 'de', 'it', 'ja', 'ko', 'es', 'hi', 'pt', 'id', 'th', 'vi', 'eo']);
+
+function localeTagToAppLang(tag) {  // 将从系统获得的语言标签转化成本软件识别的语言 key
+    if (!tag || typeof tag !== 'string') return null;
+    const n = tag.toLowerCase().replace(/_/g, '-');
+    const base = n.split('-')[0];
+    if (base === 'zh') {
+        if (n === 'zh-tw' || n === 'zh-hk' || n === 'zh-mo' || n.includes('hant'))  // hant 是 han traditional 的缩写
+            return 'zh-tw';
+        return 'zh';
+    }
+    if (base === 'en') return 'en';
+    if (SUPPORTED_UI_LANGS.has(n)) return n;
+    if (SUPPORTED_UI_LANGS.has(base)) return base;
+    return null;
+}
+
+function getInitialAppLanguage() {  // 获取初始化语言
+    const tried = [];
+    try {
+        if (typeof app.getPreferredSystemLanguages === 'function')
+            tried.push(...app.getPreferredSystemLanguages());
+    } catch (_) { /* ignore */ }
+    try {
+        tried.push(app.getLocale());  // 获取系统语言
+    } catch (_) { /* ignore */ }
+    for (const tag of tried) {
+        const lang = localeTagToAppLang(tag);  // 将系统语言标签转化成本软件识别的语言 key
+        if (lang) return lang;
+    }
+    return 'en';  // 如果所有尝试都失败，则返回英语
+}
+
+ipcMain.on('get-initial-ui-language', (event) => {  // 获取初始化语言
+    event.returnValue = getInitialAppLanguage();
+});
+
 // ── Application startup ───────────────────────────────────────────────
 app.on('ready', () => {
     mainWindow = new BrowserWindow({
