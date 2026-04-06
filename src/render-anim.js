@@ -650,6 +650,7 @@ function buildRenderGraphSnapshot() {
             edgeName:    conn[1],
             offset:      conn[3],
         })) : [],
+        selfLoopAnchorIndex: (node[0].startsWith('self-connection') && typeof node[3] === 'number') ? node[3] : null  // 自环虚拟点指向父状态在 graph / snapGraph 中的下标，供边界框等从虚拟点反查真实点
     }));
 }
 
@@ -896,6 +897,16 @@ function _renderCanvasRoundRectPath(ctx, x, y, w, h, r) {
     ctx.closePath();
 }
 
+function cubicBezierPoint2D(p0, p1, p2, p3, t) {  // 三次贝塞尔 B(t)采样。起点P0，终点P3，控制点 P1、P2（与 canvas bezierCurveTo 一致）。用于自环尺寸估计
+    const u = 1 - t;
+    const uu = u * u, tt = t * t;
+    const b0 = uu * u, b1 = 3 * uu * t, b2 = 3 * u * tt, b3 = tt * t;
+    return [
+        b0 * p0[0] + b1 * p1[0] + b2 * p2[0] + b3 * p3[0],
+        b0 * p0[1] + b1 * p1[1] + b2 * p2[1] + b3 * p3[1],
+    ];
+}
+
 // ── Draw one render frame ─────────────────────────────────────────────
 function drawRenderFrame(ctx, renderParams, snapGraph, frame, nodeBrightness, edgeBrightness, tapeForFrame) {
     const W = renderParams.width, H = renderParams.height;
@@ -927,15 +938,36 @@ function drawRenderFrame(ctx, renderParams, snapGraph, frame, nodeBrightness, ed
 function drawGraphOnCanvas(ctx, snapGraph, W, H, nodeBrightness, edgeBrightness, renderParams, logicalStep) {
     if (!snapGraph || snapGraph.length === 0) return;
 
-    // Compute bounding box of ALL nodes (including hidden self-connection helper nodes),
-    // so that self-loop curves anchored to those positions don't extend outside the frame.
+    const pointsForCalculatingBoundingBox = [];  // 用于计算边界框的点的数组
+    snapGraph.forEach(node => {  // 遍历所有点（包括普通点和用于绘制自环的虚拟点）
+        if (node.name.startsWith('self-connection')) {  // 是自环虚拟点
+            const pi = node.selfLoopAnchorIndex;
+            const parent = pi != null ? snapGraph[pi] : null;
+            const a = parent.pos;
+            const b = node.pos;
+            const v = vector_subtract(b, a);
+            const ang = self_connection_angle;
+            const c1 = vector_rotate(v, ang * 0.5);
+            const c2 = vector_rotate(v, -ang * 0.5);
+            const p1 = vector_plus(a, c1);
+            const p2 = vector_plus(a, c2);
+            pointsForCalculatingBoundingBox.push(  // 采样三个点加进数组
+                cubicBezierPoint2D(a, p1, p2, a, 0.25),
+                cubicBezierPoint2D(a, p1, p2, a, 0.5),
+                cubicBezierPoint2D(a, p1, p2, a, 0.75)
+            );
+            return;
+        }
+        else  // 是普通点
+            pointsForCalculatingBoundingBox.push(node.pos);  // 直接加进数组
+    });
+
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    snapGraph.forEach(node => {
-        if (!node.name) return;
-        minX = Math.min(minX, node.pos[0]);
-        minY = Math.min(minY, node.pos[1]);
-        maxX = Math.max(maxX, node.pos[0]);
-        maxY = Math.max(maxY, node.pos[1]);
+    pointsForCalculatingBoundingBox.forEach(p => {
+        minX = Math.min(minX, p[0]);
+        minY = Math.min(minY, p[1]);
+        maxX = Math.max(maxX, p[0]);
+        maxY = Math.max(maxY, p[1]);
     });
 
     let graphRel = parseFloat(renderParams && renderParams.graphRelativeMargin);
