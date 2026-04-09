@@ -29,6 +29,16 @@ const _renderDefaultParams = {
 };
 let _lastRenderParams = Object.assign({}, _renderDefaultParams);  // 渲染设置
 
+// Local render constants
+const RENDER_SETTINGS_PREVIEW_DEBOUNCE_MS = 120;     // 设置面板：预览更新防抖（ms）
+const RENDER_PREVIEW_THROTTLE_MS = 150;              // 渲染预览窗：推送帧预览节流（ms）
+const RENDER_PREVIEW_CLOSE_DELAY_MS = 800;           // 渲染完成后：预览窗关闭延迟（ms）
+const RENDER_YIELD_EVERY_N_OUTPUT_FRAMES = 10;        // 导出 PNG：每 N 帧让出事件循环一次
+const RENDER_FIRST_FRAME_JPEG_QUALITY = 0.82;         // 设置面板首帧预览：JPEG 质量
+const RENDER_GRAPH_PANEL_FALLBACK_W = 640;            // 图面板尺寸兜底：宽（px）
+const RENDER_GRAPH_PANEL_FALLBACK_H = 400;            // 图面板尺寸兜底：高（px）
+const RENDER_HIGHLIGHT_VISIBLE_THRESHOLD = 0.02;      // 高亮可见阈值：亮度 <= 该值视为不高亮
+
 async function menuRenderAnimation() {  // 点击菜单->文件->渲染动画触发此函数
     const { ipcRenderer } = require('electron');
 
@@ -169,7 +179,7 @@ function computeTotalFrames(stats, renderParams) {
             _renderSettingsPreviewTimer = null;
             const url = getRenderFirstFramePreviewDataURL(_lastRenderParams);
             ipcRenderer.send('render-settings-preview-frame', url ? { dataURL: url } : { dataURL: null });
-        }, 120);
+        }, RENDER_SETTINGS_PREVIEW_DEBOUNCE_MS);
     }
 
     /** markDocumentDirty：是否标工程未保存。opts：关窗时 skipPreview/skipTotalFrames 避免 JPEG 与无意义 IPC */
@@ -335,7 +345,7 @@ async function startRender(renderParams) {
                 outFi++;
 
                 const now = Date.now();
-                if (now - lastPreviewTime >= 150) {
+                if (now - lastPreviewTime >= RENDER_PREVIEW_THROTTLE_MS) {
                     lastPreviewTime = now;
                     ipcRenderer.send('render-preview-dataurl', dataURL);
                 }
@@ -343,7 +353,7 @@ async function startRender(renderParams) {
                 const pct = (outFi / totalOut * 100).toFixed(1);
                 ipcRenderer.send('render-progress', { pct, current: outFi, total: totalOut });
 
-                if (outFi % 10 === 0) await new Promise(res => setImmediate(res));
+                if (outFi % RENDER_YIELD_EVERY_N_OUTPUT_FRAMES === 0) await new Promise(res => setImmediate(res));
             };
 
             for (let D = 0; D < totalRaw; D += stride) {
@@ -389,7 +399,7 @@ async function startRender(renderParams) {
         setTimeout(() => {
             if (renderParams.renderImage) ipcRenderer.send('close-render-preview');
             ipcRenderer.send('render-settings-close');
-        }, renderParams.renderImage ? 800 : 0);
+        }, renderParams.renderImage ? RENDER_PREVIEW_CLOSE_DELAY_MS : 0);
 
     } catch(e) {
         console.error('Render error', e);
@@ -582,7 +592,7 @@ function getRenderFirstFramePreviewDataURL(renderParams) {
     }
     drawRenderFrame(ctx, renderParams, renderGraph, drawFrame, {}, {}, tapeNow);
     try {
-        return canvas.toDataURL('image/jpeg', 0.82);
+        return canvas.toDataURL('image/jpeg', RENDER_FIRST_FRAME_JPEG_QUALITY);
     } catch (e) {
         return null;
     }
@@ -990,8 +1000,8 @@ function drawGraphOnCanvas(ctx, snapGraph, W, H, nodeBrightness, edgeBrightness,
         if (!isFinite(minX) || maxX === minX || maxY === minY) {
             // Fallback: use live frame transform
             const graphPanel = document.getElementById('graph-panel');
-            const gpW = graphPanel ? graphPanel.clientWidth  : 640;
-            const gpH = graphPanel ? graphPanel.clientHeight : 400;
+            const gpW = graphPanel ? graphPanel.clientWidth  : RENDER_GRAPH_PANEL_FALLBACK_W;
+            const gpH = graphPanel ? graphPanel.clientHeight : RENDER_GRAPH_PANEL_FALLBACK_H;
             const scaleX = W / gpW;
             const scaleY = H / gpH;
             const s = Math.min(scaleX, scaleY);
@@ -1053,7 +1063,7 @@ function drawGraphOnCanvas(ctx, snapGraph, W, H, nodeBrightness, edgeBrightness,
             const ek  = node.name + '||' + targetHistName;
             const ek2 = canonicalStateName(node.name) + '||' + canonicalStateName(targetHistName);
             const bright = Math.max(edgeBrightness[ek] || 0, edgeBrightness[ek2] || 0);
-            const edgeColor = bright > 0.02
+            const edgeColor = bright > RENDER_HIGHLIGHT_VISIBLE_THRESHOLD
                 ? `rgb(${Math.round(255*bright)},${Math.round(255*bright)},${Math.round(255*bright)})`
                 : 'black';
             ctx.strokeStyle = edgeColor;
@@ -1123,7 +1133,7 @@ function drawGraphOnCanvas(ctx, snapGraph, W, H, nodeBrightness, edgeBrightness,
 
         // Glow halo based on brightness
         const bright = nodeBrightness[dn] || nodeBrightness[node.name] || 0;
-        if (bright > 0.02) {
+        if (bright > RENDER_HIGHLIGHT_VISIBLE_THRESHOLD) {
             const glowR = vr + (8 + bright * 6) * gs;
             const grad = ctx.createRadialGradient(p2[0], p2[1], vr, p2[0], p2[1], glowR);
             grad.addColorStop(0, `rgba(255,255,255,${(bright * 0.8).toFixed(3)})`);
