@@ -35,8 +35,6 @@ const RENDER_PREVIEW_THROTTLE_MS = 150;              // 渲染预览窗：推送
 const RENDER_PREVIEW_CLOSE_DELAY_MS = 800;           // 渲染完成后：预览窗关闭延迟（ms）
 const RENDER_YIELD_EVERY_N_OUTPUT_FRAMES = 10;        // 导出 PNG：每 N 帧让出事件循环一次
 const RENDER_FIRST_FRAME_JPEG_QUALITY = 0.82;         // 设置面板首帧预览：JPEG 质量
-const RENDER_GRAPH_PANEL_FALLBACK_W = 640;            // 图面板尺寸兜底：宽（px）
-const RENDER_GRAPH_PANEL_FALLBACK_H = 400;            // 图面板尺寸兜底：高（px）
 const RENDER_HIGHLIGHT_VISIBLE_THRESHOLD = 0.02;      // 高亮可见阈值：亮度 <= 该值视为不高亮
 
 async function menuRenderAnimation() {  // 点击菜单->文件->渲染动画触发此函数
@@ -841,7 +839,7 @@ function layoutRenderTapeGeometry(renderParams, tape, W, H) {
  * 视觉分组渲染到画布：几何与 graph.js 的 updateGraphVisualGroupRects 一致（圆盘并集、对数 pad），
  * 颜色为 hsla(hue,50%,52%,0.26) / hsla(hue,65%,28%,0.45)，组名为白字；须先于边、节点绘制。
  */
-function drawRenderGraphGroupsOnCanvas(ctx, snapGraph, toScreen, vr, gs) {
+function drawGraphGroupsOnCanvas(ctx, snapGraph, toScreen, vr, gs) {
     if (typeof graphVisualGroups === 'undefined' || !graphVisualGroups.length) return;
     const floor = typeof graph_group_pad_floor !== 'undefined' ? graph_group_pad_floor : 5;
     const logA = typeof graph_group_pad_log_a !== 'undefined' ? graph_group_pad_log_a : 45;
@@ -984,6 +982,7 @@ function drawGraphOnCanvas(ctx, snapGraph, W, H, nodeBrightness, edgeBrightness,
             pointsForCalculatingBoundingBox.push(node.pos);  // 直接加进数组
     });
 
+    // 计算边界框
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     pointsForCalculatingBoundingBox.forEach(p => {
         minX = Math.min(minX, p[0]);
@@ -991,37 +990,33 @@ function drawGraphOnCanvas(ctx, snapGraph, W, H, nodeBrightness, edgeBrightness,
         maxX = Math.max(maxX, p[0]);
         maxY = Math.max(maxY, p[1]);
     });
+    if (minX === maxX) {
+        minX -= 1;
+        maxX += 1;
+    }
+    if (minY === maxY) {
+        minY -= 1;
+        maxY += 1;
+    }
 
     let graphRel = parseFloat(renderParams.graphRelativeMargin);
     if (!Number.isFinite(graphRel) || graphRel < 0) graphRel = 0.1;
     graphRel = Math.min(graphRel, 0.49);
     const GRAPH_MARGIN_FACTOR = graphRel;
-    const rf = (() => {
-        if (!isFinite(minX) || maxX === minX || maxY === minY) {
-            // Fallback: use live frame transform
-            const graphPanel = document.getElementById('graph-panel');
-            const gpW = graphPanel ? graphPanel.clientWidth  : RENDER_GRAPH_PANEL_FALLBACK_W;
-            const gpH = graphPanel ? graphPanel.clientHeight : RENDER_GRAPH_PANEL_FALLBACK_H;
-            const scaleX = W / gpW;
-            const scaleY = H / gpH;
-            const s = Math.min(scaleX, scaleY);
-            return { x: frame.x * scaleX, y: frame.y * scaleY, factor: frame.factor * s };
-        }
-        const margin = Math.min(W, H) * GRAPH_MARGIN_FACTOR;
-        const drawW = W - margin * 2;
-        const drawH = H - margin * 2;
-        const graphSpanX = maxX - minX;
-        const graphSpanY = maxY - minY;
-        const fitFactor = Math.min(drawW / graphSpanX, drawH / graphSpanY);
-        // Center the graph in the area
-        const centerX = (minX + maxX) / 2;
-        const centerY = (minY + maxY) / 2;
-        return {
-            x: W / 2 - centerX * fitFactor,
-            y: H / 2 - centerY * fitFactor,
-            factor: fitFactor,
-        };
-    })();
+    const margin = Math.min(W, H) * GRAPH_MARGIN_FACTOR;
+    const drawW = W - margin * 2;
+    const drawH = H - margin * 2;
+    const graphSpanX = maxX - minX;
+    const graphSpanY = maxY - minY;
+    const fitFactor = Math.min(drawW / graphSpanX, drawH / graphSpanY);
+    // Center the graph in the area
+    const centerX = (minX + maxX) / 2;
+    const centerY = (minY + maxY) / 2;
+    const rf = {
+        x: W / 2 - centerX * fitFactor,
+        y: H / 2 - centerY * fitFactor,
+        factor: fitFactor,
+    };
 
     function toScreen(pos) {
         return [rf.x + pos[0] * rf.factor,
@@ -1035,7 +1030,7 @@ function drawGraphOnCanvas(ctx, snapGraph, W, H, nodeBrightness, edgeBrightness,
     const fontSize   = Math.round(12 * gs);
     const lineWidth  = 1.2 * gs;
 
-    drawRenderGraphGroupsOnCanvas(ctx, snapGraph, toScreen, vr, gs);
+    drawGraphGroupsOnCanvas(ctx, snapGraph, toScreen, vr, gs);
 
     // Draw connections
     snapGraph.forEach(node => {
