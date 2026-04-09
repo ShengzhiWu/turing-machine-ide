@@ -16,6 +16,8 @@ const _renderDefaultParams = {
     movementMode: 'tape',  // 'tape' | 'head' | 'headRecenter'
     /** headRecenter：纸带滚动锚点逼近真实机头位置的半衰期（逻辑帧）；越大纸带越慢、机头仍可立即对准格 */
     recenterHalflifeFrames: 60,
+    /** 机头动 / 缓慢回中：机头水平中心移出画面时平移纸带，使中心落在 [0,W] 内（贴边） */
+    headClampInFrame: false,
     tapeWrapLines: true,   // 仅「纸带固定机头动」模式：多行绘制纸带
     maxCellsFirstRow: 40,  // 首行最大格数（格更大，便于看清纸带开头）
     maxCellsOtherRows: 70, // 其余行最大格数
@@ -103,6 +105,7 @@ async function menuRenderAnimation() {  // 点击菜单->文件->渲染动画触
             renderMovementModeHead:  t('renderMovementModeHead'),
             renderMovementModeHeadRecenter: t('renderMovementModeHeadRecenter'),
             lblRecenterHalflifeFrames: t('renderLabelRecenterHalflifeFrames'),
+            lblHeadClampInFrame: t('renderLabelHeadClampInFrame'),
             lblTapeWrapLines: t('renderTapeWrapLines'),
             lblMaxCellsFirstRow: t('renderCellsFirstRow'),
             lblMaxCellsOtherRows: t('renderCellsOtherRows'),
@@ -287,16 +290,41 @@ async function startRender(renderParams) {
             const isHeadRecenter = renderParams.movementMode === 'headRecenter';
             const recenterHL = Math.max(1, parseInt(renderParams.recenterHalflifeFrames, 10) || 60);
             const recenterAlpha = isHeadRecenter ? 1 - Math.pow(0.5, 1 / recenterHL) : 0;
-            /** 纸带滚动锚点：按半衰期逼近真实 headPos；H 大时纸带几乎不动，机头仍跟 headPos 读正确格 */
-            let headPosVis = getFrameStateAt(segments, history, 0).headPos;
-            let prevEmittedG = -1;
+            /** 摄像机/纸带滚动锚点：按半衰期逼近真实 headPos（单位：格） */
+            let cameraPos = getFrameStateAt(segments, history, 0).headPos;  // 摄像机位置（单位：格子）
+            let lastRecenterUpdatedG = 0;
 
             const writeOneOutputFrame = async (D) => {
+                // Ensure cameraPos is advanced for this frame (including停机后的 static/cooldown 段)
+                if (isHeadRecenter) {
+                    const targetG = Math.max(0, D | 0);
+                    // Update using intermediate logical frames to match original behavior.
+                    while (lastRecenterUpdatedG < targetG) {
+                        lastRecenterUpdatedG++;
+                        const fr = getFrameStateAt(segments, history, lastRecenterUpdatedG);
+                        cameraPos += recenterAlpha * (fr.headPos - cameraPos);
+                    }
+                }
                 const frame = getFrameStateAt(segments, history, D);
                 const hi = Math.min(frame.historyIndex, history.length - 1);
                 const tapeNow = tapeCache ? _tapeAtHistoryIndexForRender(history, hi, tapeCache) : null;
+
+                // Clamp cameraPos so the head center stays within the frame (in cell units).
+                if (isHeadRecenter && renderParams && renderParams.headClampInFrame && tapeNow && Array.isArray(tapeNow)) {
+                    const W = Math.max(1, renderParams.width);
+                    const H = Math.max(1, renderParams.height);
+                    const geom = layoutRenderTapeGeometry(renderParams, tapeNow, W, H);
+                    const cw = geom ? geom.cellW : NaN;
+                    if (Number.isFinite(cw) && cw > 0) {
+                        const halfCells = (W / 2) / cw;
+                        const d = cameraPos - frame.headPos;
+                        if (Math.abs(d) > halfCells) {
+                            cameraPos = frame.headPos + Math.sign(d || 1) * halfCells;
+                        }
+                    }
+                }
                 const drawFrame = isHeadRecenter
-                    ? Object.assign({}, frame, { headPosVis })
+                    ? Object.assign({}, frame, { cameraPos })
                     : frame;
                 drawRenderFrame(ctx, renderParams, renderGraph, drawFrame, nodeBrightness, edgeBrightness, tapeNow);
 
@@ -320,15 +348,6 @@ async function startRender(renderParams) {
             };
 
             for (let D = 0; D < totalRaw; D += stride) {
-                if (isHeadRecenter && D > prevEmittedG) {
-                    for (let g = prevEmittedG + 1; g <= D; g++) {
-                        if (g === 0) continue;
-                        const fr = getFrameStateAt(segments, history, g);
-                        headPosVis += recenterAlpha * (fr.headPos - headPosVis);
-                    }
-                }
-                prevEmittedG = D;
-
                 const batchStart = D === 0 ? 0 : D - stride + 1;
                 const batchEnd   = D;
                 collectActivationsInRange(activations, batchStart, batchEnd, batchNodeLit, batchEdgeLit);
@@ -351,12 +370,6 @@ async function startRender(renderParams) {
                     batchNodeLit, batchEdgeLit, decayRem);
                 batchNodeLit.clear();
                 batchEdgeLit.clear();
-                if (isHeadRecenter) {
-                    for (let g = lastStrideAlignedD + 1; g <= lastLogical; g++) {
-                        const fr = getFrameStateAt(segments, history, g);
-                        headPosVis += recenterAlpha * (fr.headPos - headPosVis);
-                    }
-                }
                 await writeOneOutputFrame(lastLogical);
             }
         }
@@ -566,7 +579,7 @@ function getRenderFirstFramePreviewDataURL(renderParams) {
     const ctx = canvas.getContext('2d');
     let drawFrame = frame;
     if (renderParams.movementMode === 'headRecenter') {
-        drawFrame = Object.assign({}, frame, { headPosVis: frame.headPos });
+        drawFrame = Object.assign({}, frame, { cameraPos: frame.headPos });
     }
     drawRenderFrame(ctx, renderParams, renderGraph, drawFrame, {}, {}, tapeNow);
     try {
@@ -599,7 +612,7 @@ function getFrameStateAt(segments, history, g) {
         const tEase = cubicEase(t01);
         const isLast = mf === seg.move - 1;
         return {
-            headPos: seg.prevPos + (seg.currPos - seg.prevPos) * tEase,
+            headPos: seg.prevPos + (seg.currPos - seg.prevPos) * tEase,  // 机头位置（单位：格子）
             historyIndex: isLast ? seg.i : seg.i - 1,
             currentState: isLast ? seg.currState : seg.prevState,
             activateNode: null, activateEdge: null,
@@ -929,10 +942,10 @@ function drawRenderFrame(ctx, renderParams, snapGraph, frame, nodeBrightness, ed
 
     const geom = layoutRenderTapeGeometry(renderParams, tapeForFrame, W, H);
     drawGraphOnCanvas(ctx, snapGraph, W, geom.graphH, nodeBrightness, edgeBrightness, renderParams, logicalStep);
-    const smoothTapeHeadPos = (renderParams.movementMode === 'headRecenter' && Number.isFinite(frame.headPosVis))
-        ? frame.headPosVis
+    const smoothTapeCameraPos = (renderParams.movementMode === 'headRecenter' && Number.isFinite(frame.cameraPos))
+        ? frame.cameraPos
         : undefined;
-    drawTapeOnCanvas(ctx, renderParams, tapeForFrame, frame.headPos, frame.currentState, W, H, geom, smoothTapeHeadPos);
+    drawTapeOnCanvas(ctx, renderParams, tapeForFrame, frame.headPos, frame.currentState, W, H, geom, smoothTapeCameraPos);
 }
 
 function drawGraphOnCanvas(ctx, snapGraph, W, H, nodeBrightness, edgeBrightness, renderParams, logicalStep) {
@@ -1248,7 +1261,7 @@ function _drawTapeReadHead(ctx, tipX, tipY, headBoxY, headBoxW, headBoxH, cellW,
     ctx.textBaseline = 'alphabetic';
 }
 
-function drawTapeOnCanvas(ctx, renderParams, tape, headPos, currentState, W, H, geom, smoothTapeHeadPos) {
+function drawTapeOnCanvas(ctx, renderParams, tape, headPos, currentState, W, H, geom, smoothTapeCameraPos) {
     if (!tape || !Array.isArray(tape) || !geom) return;
 
     const { graphH, cellW, cellH, cellFontSize, headBoxH, headFontSize, wrapLines, headMoving, wrapRows } = geom;
@@ -1283,15 +1296,15 @@ function drawTapeOnCanvas(ctx, renderParams, tape, headPos, currentState, W, H, 
         tapeCenterY = graphH + Math.round(cellH / 2);
         headBoxY = graphH - headBoxH;
         const isHeadRecenter = renderParams.movementMode === 'headRecenter';
-        const tapeHp = isHeadRecenter && Number.isFinite(smoothTapeHeadPos) ? smoothTapeHeadPos : headPos;
-        const tapeCenterOffset = headMoving
+        const tapeHp = isHeadRecenter && Number.isFinite(smoothTapeCameraPos) ? smoothTapeCameraPos : headPos;
+        let tapeCenterOffset = headMoving
             ? W / 2 - (tape.length / 2) * cellW
             : W / 2 - tapeHp * cellW - cellW / 2;
         headScreenX = headMoving
             ? tapeCenterOffset + headPos * cellW + cellW / 2
             : (isHeadRecenter ? tapeCenterOffset + headPos * cellW + cellW / 2 : W / 2);
-        const lagPad = isHeadRecenter && Number.isFinite(smoothTapeHeadPos)
-            ? Math.ceil(Math.abs(headPos - smoothTapeHeadPos) * cellW) + Math.ceil(cellW * 2)
+        const lagPad = isHeadRecenter && Number.isFinite(smoothTapeCameraPos)
+            ? Math.ceil(Math.abs(headPos - smoothTapeCameraPos) * cellW) + Math.ceil(cellW * 2)
             : 0;
         _drawTapeRowCells(ctx, tape, tapeTopY, tapeCenterY, cellW, cellH, cellFontSize, tapeCenterOffset, W, null, 0, lagPad);
         headCellW = cellW;

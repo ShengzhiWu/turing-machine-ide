@@ -149,6 +149,13 @@
                 <span id="lbl-movement-mode-head-recenter">Head moves, slow recenter</span>
             </label>
         </div>
+        <div id="head-clamp-in-frame-row" class="row" style="display:none;margin-top:4px;">
+            <label style="display:flex;align-items:center;gap:6px;width:auto;cursor:pointer;">
+                <input type="checkbox" id="head-clamp-in-frame"
+                       style="width:14px;height:14px;cursor:pointer;accent-color:hsl(210,60%,55%);">
+                <span id="lbl-head-clamp-in-frame">Keep head center in frame</span>
+            </label>
+        </div>
         <div id="recenter-halflife-row" class="row" style="display:none;">
             <label id="lbl-recenter-halflife-frames" for="recenter-halflife-frames">Recenter half-life (frames)</label>
             <input id="recenter-halflife-frames" type="number" value="60" min="1" max="1000000">
@@ -262,6 +269,7 @@ ipcRenderer.on('render-settings-init', (e, data) => {
     setText('lbl-movement-mode-tape',  'renderMovementModeTape',  'Tape moves, head fixed');
     setText('lbl-movement-mode-head',  'renderMovementModeHead',  'Head moves, tape fixed');
     setText('lbl-movement-mode-head-recenter', 'renderMovementModeHeadRecenter', 'Head moves, slow recenter');
+    setText('lbl-head-clamp-in-frame', 'lblHeadClampInFrame', 'Keep head center in frame');
     setText('lbl-recenter-halflife-frames', 'lblRecenterHalflifeFrames', 'Recenter half-life (frames)');
     setText('lbl-tape-wrap-lines',     'lblTapeWrapLines',        'Wrap tape to multiple rows');
     setText('lbl-max-cells-first-row',  'lblMaxCellsFirstRow',  'Max cells on first row');
@@ -332,6 +340,8 @@ ipcRenderer.on('render-settings-init', (e, data) => {
         set('tape-wrap-line-gap-avg', 0.3);
     if (p.recenterHalflifeFrames !== undefined && p.recenterHalflifeFrames !== null)
         set('recenter-halflife-frames', p.recenterHalflifeFrames);
+    if (p.headClampInFrame !== undefined)
+        document.getElementById('head-clamp-in-frame').checked = !!p.headClampInFrame;
     updateSubsections();
     updateHeadTapeWrapOptions();
     updateTotalFrames(data.totalFrames || 0);
@@ -407,6 +417,7 @@ function getParams() {  // 获取渲染设置，用于保存
             return Math.min(4, v);
         })(),
         recenterHalflifeFrames: Math.max(1, parseInt(document.getElementById('recenter-halflife-frames').value, 10) || 60),
+        headClampInFrame: document.getElementById('head-clamp-in-frame').checked,
         renderImage:  document.getElementById('render-image').checked,
         showStepNumber: document.getElementById('show-step-number').checked,
         renderMusic:  document.getElementById('render-music').checked,
@@ -464,6 +475,8 @@ function updateHeadTapeWrapOptions() {
     const recRow = document.getElementById('recenter-halflife-row');
     const recOn = imgOn && document.getElementById('movement-mode-head-recenter').checked;
     recRow.style.display = recOn ? '' : 'none';
+    const clampRow = document.getElementById('head-clamp-in-frame-row');
+    clampRow.style.display = recOn ? '' : 'none';
 }
 document.getElementById('render-music').addEventListener('change', () => {
     updateSubsections();
@@ -484,6 +497,7 @@ document.getElementById('tape-wrap-lines').addEventListener('change', () => {
     updateHeadTapeWrapOptions();
     pushRenderParams();
 });
+document.getElementById('head-clamp-in-frame').addEventListener('change', pushRenderParams);
 
 document.getElementById('browse-btn').addEventListener('click', async () => {
     const r = await ipcRenderer.invoke('show-open-dialog', { title: _s.browseTitle || 'Select Output Folder', properties: ['openDirectory'] });
