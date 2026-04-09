@@ -145,7 +145,6 @@ function computeRawTotalFrames(steps, movements, renderParams) {
 /** stats: { steps, movements }，来自 window._renderRunStats */
 function computeTotalFrames(stats, renderParams) {
     const raw = computeRawTotalFrames(stats.steps, stats.movements, renderParams);
-    if (raw === 0) return 0;
     const mult = Math.max(1, parseInt(renderParams.speedMultiplier, 10) || 1);
     const lastLogical = raw - 1;
     const lastEmittedD = Math.floor(lastLogical / mult) * mult;
@@ -297,7 +296,7 @@ async function startRender(renderParams) {
             const writeOneOutputFrame = async (D) => {
                 // Ensure cameraPos is advanced for this frame (including停机后的 static/cooldown 段)
                 if (isHeadRecenter) {
-                    const targetG = Math.max(0, D | 0);
+                    const targetG = D | 0;
                     // Update using intermediate logical frames to match original behavior.
                     while (lastRecenterUpdatedG < targetG) {
                         lastRecenterUpdatedG++;
@@ -310,12 +309,12 @@ async function startRender(renderParams) {
                 const tapeNow = tapeCache ? _tapeAtHistoryIndexForRender(history, hi, tapeCache) : null;
 
                 // Clamp cameraPos so the head center stays within the frame (in cell units).
-                if (isHeadRecenter && renderParams && renderParams.headClampInFrame && tapeNow && Array.isArray(tapeNow)) {
+                if (isHeadRecenter && renderParams.headClampInFrame && tapeNow) {
                     const W = Math.max(1, renderParams.width);
                     const H = Math.max(1, renderParams.height);
                     const geom = layoutRenderTapeGeometry(renderParams, tapeNow, W, H);
-                    const cw = geom ? geom.cellW : NaN;
-                    if (Number.isFinite(cw) && cw > 0) {
+                    const cw = geom.cellW;
+                    if (cw > 0) {
                         const halfCells = (W / 2) / cw;
                         const d = cameraPos - frame.headPos;
                         if (Math.abs(d) > halfCells) {
@@ -728,7 +727,7 @@ function _measureTapeHeadLabelMaxWidth(ctx, boldPx) {
  * 返回 drawTapeOnCanvas 所需几何（不含依赖 ctx.measureText 的 headBoxW；headBoxW = 最长状态名宽 + 0.6*cellW）。
  */
 function layoutRenderTapeGeometry(renderParams, tape, W, H) {
-    const L = tape && Array.isArray(tape) ? tape.length : 0;
+    const L = tape.length;
     const headMoving = renderParams.movementMode === 'head';
     const wrapLines = headMoving && renderParams.tapeWrapLines !== false;
     const wrapPack = wrapLines ? _tapeWrapRowDefsFromParams(renderParams, L) : null;
@@ -930,7 +929,7 @@ function drawRenderFrame(ctx, renderParams, snapGraph, frame, nodeBrightness, ed
 
     const hist = window._renderHistory;
     let logicalStep;
-    if (hist && frame && Number.isFinite(frame.historyIndex) && frame.historyIndex >= 0 && frame.historyIndex < hist.length) {
+    if (hist && frame && frame.historyIndex < hist.length) {
         const row = hist[frame.historyIndex];
         if (row && row.length > 0) logicalStep = row[0];
     }
@@ -942,7 +941,7 @@ function drawRenderFrame(ctx, renderParams, snapGraph, frame, nodeBrightness, ed
 
     const geom = layoutRenderTapeGeometry(renderParams, tapeForFrame, W, H);
     drawGraphOnCanvas(ctx, snapGraph, W, geom.graphH, nodeBrightness, edgeBrightness, renderParams, logicalStep);
-    const smoothTapeCameraPos = (renderParams.movementMode === 'headRecenter' && Number.isFinite(frame.cameraPos))
+    const smoothTapeCameraPos = (renderParams.movementMode === 'headRecenter')
         ? frame.cameraPos
         : undefined;
     drawTapeOnCanvas(ctx, renderParams, tapeForFrame, frame.headPos, frame.currentState, W, H, geom, smoothTapeCameraPos);
@@ -983,7 +982,7 @@ function drawGraphOnCanvas(ctx, snapGraph, W, H, nodeBrightness, edgeBrightness,
         maxY = Math.max(maxY, p[1]);
     });
 
-    let graphRel = parseFloat(renderParams && renderParams.graphRelativeMargin);
+    let graphRel = parseFloat(renderParams.graphRelativeMargin);
     if (!Number.isFinite(graphRel) || graphRel < 0) graphRel = 0.1;
     graphRel = Math.min(graphRel, 0.49);
     const GRAPH_MARGIN_FACTOR = graphRel;
@@ -1019,7 +1018,7 @@ function drawGraphOnCanvas(ctx, snapGraph, W, H, nodeBrightness, edgeBrightness,
                 rf.y + pos[1] * rf.factor];
     }
 
-    const gs  = (renderParams && renderParams.graphicScale) ? renderParams.graphicScale : 1.0;
+    const gs  = renderParams.graphicScale ? renderParams.graphicScale : 1.0;
     const vr  = vertex_r * gs;          // scaled node radius
     const ahL = arrow_head_length * gs; // scaled arrowhead length
     const ahW = arrow_head_width  * gs; // scaled arrowhead width
@@ -1153,7 +1152,7 @@ function drawGraphOnCanvas(ctx, snapGraph, W, H, nodeBrightness, edgeBrightness,
     });
 
     // 绘制步编号
-    if (renderParams && renderParams.showStepNumber && logicalStep !== undefined && logicalStep !== null) {
+    if (renderParams.showStepNumber && logicalStep !== undefined && logicalStep !== null) {
         const pad = Math.max(8, Math.round(Math.min(W, H) * 0.018));
         const fontPx = Math.max(14, Math.round(Math.min(W, H) * 0.038));  // 步数文本字号
         const text = String(logicalStep);
@@ -1262,7 +1261,7 @@ function _drawTapeReadHead(ctx, tipX, tipY, headBoxY, headBoxW, headBoxH, cellW,
 }
 
 function drawTapeOnCanvas(ctx, renderParams, tape, headPos, currentState, W, H, geom, smoothTapeCameraPos) {
-    if (!tape || !Array.isArray(tape) || !geom) return;
+    if (!geom) return;
 
     const { graphH, cellW, cellH, cellFontSize, headBoxH, headFontSize, wrapLines, headMoving, wrapRows } = geom;
     const L = tape.length;
@@ -1296,14 +1295,14 @@ function drawTapeOnCanvas(ctx, renderParams, tape, headPos, currentState, W, H, 
         tapeCenterY = graphH + Math.round(cellH / 2);
         headBoxY = graphH - headBoxH;
         const isHeadRecenter = renderParams.movementMode === 'headRecenter';
-        const tapeHp = isHeadRecenter && Number.isFinite(smoothTapeCameraPos) ? smoothTapeCameraPos : headPos;
+        const tapeHp = isHeadRecenter && smoothTapeCameraPos != null ? smoothTapeCameraPos : headPos;
         let tapeCenterOffset = headMoving
             ? W / 2 - (tape.length / 2) * cellW
             : W / 2 - tapeHp * cellW - cellW / 2;
         headScreenX = headMoving
             ? tapeCenterOffset + headPos * cellW + cellW / 2
             : (isHeadRecenter ? tapeCenterOffset + headPos * cellW + cellW / 2 : W / 2);
-        const lagPad = isHeadRecenter && Number.isFinite(smoothTapeCameraPos)
+        const lagPad = isHeadRecenter && smoothTapeCameraPos != null
             ? Math.ceil(Math.abs(headPos - smoothTapeCameraPos) * cellW) + Math.ceil(cellW * 2)
             : 0;
         _drawTapeRowCells(ctx, tape, tapeTopY, tapeCenterY, cellW, cellH, cellFontSize, tapeCenterOffset, W, null, 0, lagPad);
