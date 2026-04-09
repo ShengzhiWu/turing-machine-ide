@@ -30,12 +30,12 @@ const _renderDefaultParams = {
 let _lastRenderParams = Object.assign({}, _renderDefaultParams);  // 渲染设置
 
 // Local render constants
-const RENDER_SETTINGS_PREVIEW_DEBOUNCE_MS = 120;     // 设置面板：预览更新防抖（ms）
-const RENDER_PREVIEW_THROTTLE_MS = 150;              // 渲染预览窗：推送帧预览节流（ms）
-const RENDER_PREVIEW_CLOSE_DELAY_MS = 800;           // 渲染完成后：预览窗关闭延迟（ms）
-const RENDER_YIELD_EVERY_N_OUTPUT_FRAMES = 10;        // 导出 PNG：每 N 帧让出事件循环一次
-const RENDER_FIRST_FRAME_JPEG_QUALITY = 0.82;         // 设置面板首帧预览：JPEG 质量
-const RENDER_HIGHLIGHT_VISIBLE_THRESHOLD = 0.02;      // 高亮可见阈值：亮度 <= 该值视为不高亮
+const RENDER_SETTINGS_PREVIEW_DEBOUNCE_MS = 120;     // 设置面板首帧预览更新节流（ms）
+const RENDER_PREVIEW_THROTTLE_MS = 150;              // 渲染预览窗推送帧预览节流（ms）
+const RENDER_PREVIEW_CLOSE_DELAY_MS = 100;           // 渲染完成后预览窗关闭延迟（ms）
+const RENDER_YIELD_EVERY_N_OUTPUT_FRAMES = 10;        // 导出 PNG 每 N 帧让出事件循环一次，避免把 UI 卡死
+const RENDER_FIRST_FRAME_JPEG_QUALITY = 0.82;         // 首帧预览 JPEG 质量
+const RENDER_HIGHLIGHT_VISIBLE_THRESHOLD = 0.5 / 255;      // 高亮可见阈值
 
 async function menuRenderAnimation() {  // 点击菜单->文件->渲染动画触发此函数
     const { ipcRenderer } = require('electron');
